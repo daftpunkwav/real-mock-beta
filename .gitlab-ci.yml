@@ -1,0 +1,87 @@
+# RealMock GitLab CI
+
+stages:
+  - test
+
+.standard-backend-env: &standard-backend-env
+  image: python:3.12-slim
+  variables:
+    TEST_MODE: "1"
+    ENV: "dev"
+    LLM_API_KEY: "test-key"
+    LLM_API_BASE: "http://127.0.0.1:9999/v1"
+    CORS_ORIGINS: "http://localhost:8080"
+  before_script:
+    - cd services
+    - pip install -q -r ../requirements.txt
+    # 工具链固定版本（与本地验证一致）：ruff 0.16 默认规则集扩张会导致 252 错
+    - pip install -q ruff==0.15.20 mypy==2.1.0 pytest-cov==7.1.0 pip-audit==2.10.1
+  rules:
+    - changes:
+        - services/**/*
+        - pyproject.toml
+        - requirements.txt
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+shared:
+  stage: test
+  <<: *standard-backend-env
+  script:
+    - ruff check shared/
+    - python -m mypy shared/ --ignore-missing-imports
+    - pytest shared/tests -q
+    - pip-audit -r ../requirements.txt --ignore-vuln PYSEC-2026-311
+
+api-service:
+  stage: test
+  <<: *standard-backend-env
+  script:
+    - ruff check api_service/
+    - python -m mypy api_service/ --ignore-missing-imports
+    - pytest api_service/tests -q
+
+agent-service:
+  stage: test
+  <<: *standard-backend-env
+  script:
+    - ruff check agent_service/
+    - python -m mypy agent_service/ --ignore-missing-imports
+    - pytest agent_service/tests -q
+
+interview-service:
+  stage: test
+  <<: *standard-backend-env
+  script:
+    - ruff check interview_service/
+    - python -m mypy interview_service/ --ignore-missing-imports
+    - pytest interview_service/tests -q
+
+# 聚合层：完整回归（含三服务联调、会话级回归、路由兼容别名）+ 覆盖率守门
+# 覆盖率集中在 aggregate 把关（四包全量 60%+）；各服务 job 只做静态检查 + 自包 smoke
+aggregate:
+  stage: test
+  <<: *standard-backend-env
+  script:
+    - pytest tests -q --cov=shared --cov=api_service --cov=agent_service --cov=interview_service --cov-report=term-missing --cov-fail-under=40
+
+frontend:
+  stage: test
+  image: node:20-slim
+  before_script:
+    - cd apps/web
+    - npm ci
+  script:
+    - npx tsc --noEmit
+    - npm run lint
+    - npm run test
+    - npm run build
+    # 依赖审计：high 以上直接使 CI 失败
+    - npm audit --audit-level=high
+  rules:
+    - changes:
+        - apps/web/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -1,0 +1,46 @@
+# RealMock 后端依赖（services/ 根级，四个包共用，下限约束）
+#
+# 依赖锁定策略：
+# - 采用 `>=` 下限约束（兼容 PyPI 无锁文件时的语义）
+# - 如需可复现构建，请生成 hash-pinned lock：在 CI 相同的 Python 版本（当前 3.12）下
+#   执行 `pip-compile requirements.txt --generate-hashes -o requirements.lock` 并提交。
+#   注意：切勿在本地 Python 3.14 环境生成 lock——faster-whisper/opencv/numpy 等
+#   ABI 依赖在 3.12 可能无对应 wheel，跨版本 lock 会导致 CI 安装失败。
+# - pip-audit 在 CI 中扫描本文件（requirements.lock 存在时自动优先）。
+#
+# 注意：API Key 的 at-rest 加密使用 cryptography AES-256-GCM；
+# 部署时建议设置环境变量 SECRET_KEY（任意 ≥16 字节字符串）；
+# 未设置时 services/shared/data/.secret.key 会被自动生成。
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sqlalchemy>=2.0.36
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+httpx>=0.28.0
+python-multipart>=0.0.17
+pypdf>=5.1.0
+python-docx>=1.1.2
+aiofiles>=24.1.0
+python-dotenv>=1.0.1
+websockets>=12.0
+alembic>=1.14.0
+edge-tts>=6.1.0
+faster-whisper>=1.0.0
+opencv-python-headless>=4.9.0
+duckduckgo-search>=6.0.0
+ddgs>=9.0.0
+numpy>=1.26.0
+
+# RAG
+# 注意：chromadb 1.5.9 存在已知漏洞 PYSEC-2026-311（暂无修复版本，
+# PyPI 最新版即 1.5.9）。应用以 PersistentClient 嵌入式模式使用，未暴露
+# chroma server 端口，攻击面有限。上游发布修复版后请升级并移除本注释。
+chromadb>=0.5.0
+
+# 加密
+cryptography>=42.0.0
+cachetools>=5.3.0
+
+# 测试
+pytest>=8.3.0
+pytest-asyncio>=0.24.0

@@ -1,0 +1,43 @@
+# RealMock 后端根配置（services/ 单仓根）
+#
+# 结构：services/ 下四个平行 Python 包
+#   shared（平台能力）/ api_service（基础 API）/ agent_service（智能体）/ interview_service（模拟面试域）
+# 三服务仅依赖 shared，彼此零业务互依；模块化单体由 services/main.py 聚合单进程运行。
+
+[tool.pytest.ini_options]
+testpaths = ["services"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra -q --strict-markers --import-mode=importlib"
+asyncio_mode = "auto"
+# 把 services/ 加入 sys.path，使 shared / api_service / agent_service / interview_service
+# 作为顶层包可被 import（替代 sys.path 手工注入）
+pythonpath = ["services"]
+
+[tool.mypy]
+# python_version 固定 3.12（numpy 新版本类型存根需要 3.12+ 语法），
+# 与 CI 的 python:3.12 镜像对齐；requires-python 仍为 >=3.11
+python_version = "3.12"
+ignore_missing_imports = true
+no_incremental = true
+# backend/app 过渡期目录仍存在时,按 services/ 各包顶层目录解析模块
+explicit_package_bases = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# 固定规则集（E/F 基础），避免 ruff 0.16+ 新默认规则导致 CI 漂移
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+]
+ignore = [
+    "E501",  # 行宽由 formatter 处理，长字符串/URL 不强制换行
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试文件允许宽松的断言/辅助写法
+"**/tests/**" = ["E712"]

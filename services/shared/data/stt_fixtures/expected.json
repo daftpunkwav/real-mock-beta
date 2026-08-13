@@ -1,0 +1,6 @@
+{
+  "source_url": "https://github.com/foamliu/Listen-Attend-Spell/raw/master/audios/audio_0.wav",
+  "expected_zh": "同比前年增长五成",
+  "match": "normalized_contains",
+  "notes": "公开样例；连通性测试本地读此文件，不依赖外网 GitHub"
+}

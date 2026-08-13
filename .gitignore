@@ -1,0 +1,82 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Database
+*.db
+*.sqlite3
+data/*.db
+# 测试/脚本从错误 cwd 产生的 chroma 残留（services/ 根、仓库根）
+services/chroma_*/
+chroma_*/
+
+# 运行时数据目录默认忽略；标准 STT fixture 需入库供连通性测试
+services/shared/data/**
+!services/shared/data/stt_fixtures/
+!services/shared/data/stt_fixtures/**
+# Chroma / system_learning 等运行时产物（统一在 services/shared/data）
+services/shared/data/chroma/
+services/shared/data/system_learning.json
+services/shared/data/system_learning.json.lock
+services/shared/capabilities/data/**
+
+# master key / DB（统一在 services/shared/data）
+services/shared/data/.secret.key
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 临时 .git 备份（避免误提交）
+.git.backup-*/
+
+# Uploads
+uploads/
+apps/web/uploads/
+services/shared/uploads/
+
+# Logs
+*.log
+logs/
+
+# 个人笔记（原始构想，永不提交）
+docs/history/
+
+# CodeGraph 本地索引
+.codegraph/
+
+# 审计临时产物（文件清单）
+_audit_*.txt
