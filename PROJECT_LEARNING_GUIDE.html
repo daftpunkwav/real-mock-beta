@@ -1,0 +1,2887 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>RealMock 学习指南 · 从基础到原理的渐进式课程</title>
+<style>
+  /* ===================================================================
+   * 主题:浅色/深色双模,渐进式章节 + 前置依赖高亮
+   * =================================================================== */
+  :root {
+    --bg: #f7f8fb;
+    --bg-alt: #ffffff;
+    --bg-soft: #eff1f6;
+    --bg-code: #0c1018;
+    --bg-mark: #fff5b1;
+    --ink: #131720;
+    --ink-muted: #4a5161;
+    --ink-soft: #6b7383;
+    --line: #e1e4eb;
+    --line-soft: #ecedf3;
+    --primary: #4f46e5;
+    --primary-soft: #ece9ff;
+    --primary-ink: #2e2a85;
+    --secondary: #0ea5e9;
+    --secondary-soft: #e0f2fe;
+    --success: #10b981;
+    --success-soft: #d1fae5;
+    --warning: #f59e0b;
+    --warning-soft: #fef3c7;
+    --danger: #ef4444;
+    --danger-soft: #fee2e2;
+    --info: #06b6d4;
+    --info-soft: #cffafe;
+    --purple: #8b5cf6;
+    --purple-soft: #ede9fe;
+    --pink: #ec4899;
+    --pink-soft: #fce7f3;
+    --radius: 10px;
+    --shadow-sm: 0 1px 2px rgba(15, 17, 23, 0.05);
+    --shadow-md: 0 4px 14px rgba(15, 17, 23, 0.07);
+    --shadow-lg: 0 12px 36px rgba(15, 17, 23, 0.08);
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: "Inter", "PingFang SC", "Microsoft Yahei", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  [data-theme="dark"] {
+    --bg: #0a0d13;
+    --bg-alt: #11141b;
+    --bg-soft: #161a23;
+    --bg-code: #05070b;
+    --bg-mark: #4a3b00;
+    --ink: #e7e9ee;
+    --ink-muted: #a8aebd;
+    --ink-soft: #7e8597;
+    --line: #232838;
+    --line-soft: #1a1f2c;
+    --primary: #818cf8;
+    --primary-soft: #1e1f3a;
+    --primary-ink: #c7d2fe;
+    --secondary: #38bdf8;
+    --secondary-soft: #0c2a3a;
+    --success: #34d399;
+    --success-soft: #052e22;
+    --warning: #fbbf24;
+    --warning-soft: #3b2c0a;
+    --danger: #f87171;
+    --danger-soft: #3a1212;
+    --info: #22d3ee;
+    --info-soft: #0c2a3a;
+    --purple: #a78bfa;
+    --purple-soft: #2e2150;
+    --pink: #f472b6;
+    --pink-soft: #3a1f2c;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.6);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.78;
+    -webkit-font-smoothing: antialiased;
+    font-size: 15px;
+    transition: background 0.2s, color 0.2s;
+  }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre, kbd { font-family: var(--mono); }
+  :not(pre) > code {
+    background: var(--bg-soft);
+    color: var(--primary-ink);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    border: 1px solid var(--line-soft);
+  }
+  kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--bg-alt);
+    font-size: 0.85em;
+    color: var(--ink-muted);
+  }
+  mark { background: var(--bg-mark); color: inherit; padding: 0 2px; border-radius: 2px; }
+
+  /* 顶栏 */
+  .topbar { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); background: color-mix(in srgb, var(--bg) 88%, transparent); border-bottom: 1px solid var(--line); }
+  .topbar-inner { max-width: 1320px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .brand-dot { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--primary), var(--purple)); box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 35%, transparent); position: relative; }
+  .brand-dot::after { content: ""; position: absolute; inset: 6px; border-radius: 4px; background: var(--bg); }
+  .brand-name { font-size: 15px; }
+  .brand-sub { font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.12em; }
+  .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .search-wrap { position: relative; }
+  .search-wrap input { width: 320px; padding: 7px 12px 7px 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-alt); color: var(--ink); font-size: 13px; outline: none; }
+  .search-wrap input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .search-wrap svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); }
+  .icon-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-alt); color: var(--ink-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .icon-btn:hover { color: var(--primary); border-color: var(--primary); }
+
+  /* 布局 */
+  .layout { max-width: 1320px; margin: 0 auto; padding: 28px 24px 100px; display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 32px; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } aside.sidebar { display: none; } }
+
+  /* 侧栏 */
+  aside.sidebar { position: sticky; top: 76px; align-self: start; max-height: calc(100vh - 100px); overflow: auto; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-alt); box-shadow: var(--shadow-sm); font-size: 13px; }
+  aside.sidebar h4 { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-soft); margin: 18px 8px 6px; }
+  aside.sidebar h4:first-child { margin-top: 0; }
+  aside.sidebar ul { list-style: none; padding: 0; margin: 0; }
+  aside.sidebar li a { display: block; padding: 5px 8px; border-radius: 6px; color: var(--ink-muted); line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
+  aside.sidebar li a:hover { background: var(--bg-soft); color: var(--ink); text-decoration: none; }
+  aside.sidebar li a.active { background: var(--primary-soft); color: var(--primary-ink); font-weight: 600; }
+  aside.sidebar .part-label { font-size: 11px; color: var(--primary-ink); font-weight: 600; margin: 4px 8px; }
+  aside.sidebar .part-num { display: inline-block; width: 18px; height: 18px; border-radius: 4px; background: var(--primary-soft); color: var(--primary-ink); text-align: center; line-height: 18px; font-size: 11px; margin-right: 6px; }
+
+  /* 正文 */
+  main { min-width: 0; }
+  section { padding-top: 16px; }
+  h1 { font-size: 32px; line-height: 1.25; margin: 0 0 8px; letter-spacing: -0.02em; }
+  h2 { font-size: 26px; line-height: 1.3; margin: 56px 0 18px; letter-spacing: -0.01em; padding-top: 28px; border-top: 1px solid var(--line); }
+  h2 .num { display: inline-block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-right: 10px; letter-spacing: 0.06em; }
+  h3 { font-size: 19px; line-height: 1.3; margin: 30px 0 12px; }
+  h4 { font-size: 15.5px; line-height: 1.35; margin: 22px 0 10px; color: var(--ink); }
+  p { margin: 8px 0 14px; }
+  ul, ol { margin: 8px 0 14px; padding-left: 24px; }
+  li { margin: 4px 0; }
+  blockquote { margin: 14px 0; padding: 12px 16px; border-left: 3px solid var(--primary); background: var(--primary-soft); color: var(--primary-ink); border-radius: 0 8px 8px 0; }
+  blockquote p { margin: 4px 0; }
+  blockquote.warn { border-left-color: var(--warning); background: var(--warning-soft); color: var(--warning); }
+  blockquote.tip { border-left-color: var(--success); background: var(--success-soft); color: var(--success); }
+  blockquote.danger { border-left-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
+  blockquote.prereq { border-left-color: var(--purple); background: var(--purple-soft); color: var(--purple); }
+  blockquote.q-a { border-left-color: var(--info); background: var(--info-soft); color: var(--info); }
+  hr { border: 0; border-top: 1px dashed var(--line); margin: 30px 0; }
+
+  /* 卡片 */
+  .grid { display: grid; gap: 14px; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 920px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+  .card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-alt); box-shadow: var(--shadow-sm); }
+  .card h4 { margin-top: 0; }
+  .card-pri { background: var(--primary-soft); border-color: transparent; color: var(--primary-ink); }
+  .card-pri h4, .card-pri b { color: var(--primary-ink); }
+  .card-ok { background: var(--success-soft); border-color: transparent; color: var(--success); }
+  .card-ok h4, .card-ok b { color: var(--success); }
+  .card-warn { background: var(--warning-soft); border-color: transparent; color: var(--warning); }
+  .card-warn h4, .card-warn b { color: var(--warning); }
+  .card-danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+  .card-danger h4, .card-danger b { color: var(--danger); }
+  .card-info { background: var(--info-soft); border-color: transparent; color: var(--info); }
+  .card-info h4, .card-info b { color: var(--info); }
+  .card-pur { background: var(--purple-soft); border-color: transparent; color: var(--purple); }
+  .card-pur h4, .card-pur b { color: var(--purple); }
+
+  /* 表格 */
+  .table-wrap { overflow-x: auto; margin: 12px 0 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-alt); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+  th { background: var(--bg-soft); color: var(--ink); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+
+  /* 代码 */
+  pre { background: var(--bg-code); color: #d8dee9; border-radius: 10px; padding: 14px 16px; margin: 10px 0 18px; overflow-x: auto; font-size: 12.5px; line-height: 1.65; box-shadow: var(--shadow-sm); }
+  pre code { background: none; color: inherit; padding: 0; border: 0; }
+  .code-cap { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; color: var(--ink-soft); margin-top: 10px; margin-bottom: -6px; padding: 0 4px; }
+  .code-cap .file { color: var(--ink-muted); font-weight: 600; }
+  .code-cap .tag { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--bg-soft); color: var(--ink-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .tk-com { color: #6b7280; font-style: italic; }
+  .tk-key { color: #c084fc; }
+  .tk-str { color: #86efac; }
+  .tk-num { color: #fbbf24; }
+  .tk-fn  { color: #60a5fa; }
+  .tk-cls { color: #f0abfc; }
+  .tk-dec { color: #fda4af; }
+
+  /* 树 */
+  .tree { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-soft); overflow-x: auto; }
+  .tree-comment { color: var(--ink-soft); }
+  .tree-dir { color: var(--primary-ink); font-weight: 600; }
+
+  /* 章节标签 */
+  .section-tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; background: var(--primary-soft); color: var(--primary-ink); margin-bottom: 6px; }
+  .tag-0 { background: var(--ink-soft); color: white; }
+  .tag-1 { background: var(--purple-soft); color: var(--purple); }
+  .tag-2 { background: var(--info-soft); color: var(--info); }
+  .tag-3 { background: var(--primary-soft); color: var(--primary); }
+  .tag-4 { background: var(--pink-soft); color: var(--pink); }
+  .tag-5 { background: var(--success-soft); color: var(--success); }
+  .tag-6 { background: var(--warning-soft); color: var(--warning); }
+
+  /* 进度 / 路径盒 */
+  .prereq-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .prereq-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--purple-soft); color: var(--purple); font-size: 12px; }
+  .prereq-chip a { color: inherit; text-decoration: none; border-bottom: 1px dashed currentColor; }
+
+  /* 学习路径盒 */
+  .learning-step {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px 16px; margin: 12px 0;
+    background: var(--bg-alt); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .learning-step .step-num {
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--primary); color: white; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .learning-step h4 { margin: 0 0 4px; color: var(--primary-ink); }
+  .learning-step p { margin: 0; color: var(--ink-muted); font-size: 13.5px; }
+
+  /* 数据流 */
+  .seq { display: grid; grid-template-columns: 110px 1fr; gap: 8px 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-soft); font-family: var(--mono); font-size: 12.5px; line-height: 1.7; }
+  .seq .who { color: var(--primary-ink); font-weight: 600; text-align: right; }
+  .seq .msg { color: var(--ink); }
+  .seq .msg b { color: var(--success); }
+
+  /* Tab */
+  .tabs { display: flex; flex-direction: column; gap: 0; margin: 12px 0 18px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .tabs-head { display: flex; background: var(--bg-soft); border-bottom: 1px solid var(--line); }
+  .tabs-head button { flex: 1; padding: 10px 14px; background: transparent; border: 0; color: var(--ink-muted); cursor: pointer; font-size: 13px; font-weight: 500; border-right: 1px solid var(--line); }
+  .tabs-head button:last-child { border-right: 0; }
+  .tabs-head button.active { color: var(--primary-ink); background: var(--primary-soft); }
+  .tabs-body { padding: 14px 16px; font-size: 13.5px; }
+  .tabs-body pre { margin: 0; }
+  .tabs-body [data-pane] { display: none; }
+  .tabs-body [data-pane].show { display: block; }
+
+  /* Definition list */
+  dl.kv { display: grid; grid-template-columns: 200px 1fr; gap: 6px 18px; }
+  dl.kv dt { font-family: var(--mono); color: var(--primary-ink); font-weight: 600; }
+  dl.kv dd { margin: 0; color: var(--ink-muted); }
+  @media (max-width: 720px) { dl.kv { grid-template-columns: 1fr; } }
+
+  /* Lists */
+  .check { list-style: none; padding-left: 0; }
+  .check li { padding-left: 24px; position: relative; }
+  .check li::before { content: ""; position: absolute; left: 4px; top: 9px; width: 14px; height: 14px; border-radius: 4px; background: var(--success-soft); border: 1.5px solid var(--success); }
+  .check li::after { content: ""; position: absolute; left: 8px; top: 12px; width: 5px; height: 8px; border-right: 2px solid var(--success); border-bottom: 2px solid var(--success); transform: rotate(45deg); }
+  .cross { list-style: none; padding-left: 0; }
+  .cross li { padding-left: 24px; position: relative; }
+  .cross li::before { content: ""; position: absolute; left: 4px; top: 9px; width: 14px; height: 14px; border-radius: 4px; background: var(--danger-soft); border: 1.5px solid var(--danger); }
+  .cross li::after { content: ""; position: absolute; left: 8px; top: 12px; width: 8px; height: 2px; background: var(--danger); transform: rotate(45deg); box-shadow: 0 3px 0 0 var(--danger); }
+  .arrow li::before { content: "→"; color: var(--primary); margin-right: 6px; font-weight: 700; }
+
+  /* 章节内"下一章"提示 */
+  .next-chapter { display: flex; gap: 10px; align-items: center; padding: 12px 18px; margin: 30px 0 10px; border-radius: var(--radius); background: linear-gradient(135deg, var(--primary-soft), var(--purple-soft)); color: var(--primary-ink); }
+  .next-chapter a { font-weight: 600; }
+
+  /* footer */
+  footer.colophon { margin-top: 60px; padding: 32px 24px; text-align: center; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12.5px; }
+
+  /* tools */
+  .muted { color: var(--ink-soft); }
+  .small { font-size: 12.5px; }
+  .lead { font-size: 16px; color: var(--ink-muted); }
+
+  /* back top */
+  .back-top { position: fixed; right: 24px; bottom: 24px; z-index: 40; width: 40px; height: 40px; border-radius: 50%; background: var(--primary); color: white; border: 0; box-shadow: var(--shadow-md); cursor: pointer; display: none; align-items: center; justify-content: center; }
+  .back-top.show { display: inline-flex; }
+
+  /* anchor */
+  .anchor { display: block; position: relative; top: -80px; visibility: hidden; }
+
+  /* print */
+  @media print {
+    aside.sidebar, .back-top, .topbar-actions { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    body { font-size: 12px; }
+    pre { font-size: 10.5px; }
+    h2 { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-dot" aria-hidden></div>
+      <div>
+        <div class="brand-name">RealMock 学习指南</div>
+        <div class="brand-sub">Progressive Course · From Basics to Principles</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search" placeholder="搜索概念 / API / 章节..." />
+      </div>
+      <button class="icon-btn" id="theme" title="切换主题"><svg id="theme-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button>
+      <a class="btn" href="#top" style="padding:6px 14px;border-radius:8px;background:var(--primary);color:white;font-size:13px;text-decoration:none">↑ 顶部</a>
+    </div>
+  </div>
+</header>
+
+<span id="top" class="anchor"></span>
+<div class="layout">
+
+  <aside class="sidebar">
+    <h4>学习路径</h4>
+    <ul>
+      <li><a href="#sec-0">Part 0 · 软件与编程基础 (6 章)</a></li>
+      <li><a href="#sec-1">Part 1 · AI 基础 (8 章)</a></li>
+      <li><a href="#sec-2">Part 2 · React 基础 (6 章)</a></li>
+      <li><a href="#sec-3">Part 3 · 实时 Web (3 章)</a></li>
+      <li><a href="#sec-4">Part 4 · Python 后端 (5 章)</a></li>
+      <li><a href="#sec-5">Part 5 · 系统设计 (4 章)</a></li>
+      <li><a href="#sec-q">面试题库 (60 题)</a></li>
+    </ul>
+
+    <h4>Part 0 · 软件与编程基础</h4>
+    <ul>
+      <li><a href="#sec-p0-1">0.1 什么是程序与代码</a></li>
+      <li><a href="#sec-p0-2">0.2 变量、函数、异步</a></li>
+      <li><a href="#sec-p0-3">0.3 类型系统</a></li>
+      <li><a href="#sec-p0-4">0.4 进程 / 线程 / 协程</a></li>
+      <li><a href="#sec-p0-5">0.5 内存 / 栈 / 堆</a></li>
+      <li><a href="#sec-p0-6">0.6 网络基础(TCP/HTTP/DNS)</a></li>
+    </ul>
+
+    <h4>Part 1 · AI 基础</h4>
+    <ul>
+      <li><a href="#sec-p1-1">1.1 什么是 AI / ML / 深度学习</a></li>
+      <li><a href="#sec-p1-2">1.2 神经网络基础</a></li>
+      <li><a href="#sec-p1-3">1.3 Transformer 架构</a></li>
+      <li><a href="#sec-p1-4">1.4 LLM 基础</a></li>
+      <li><a href="#sec-p1-5">1.5 Tokenization & Embedding</a></li>
+      <li><a href="#sec-p1-6">1.6 RAG 原理</a></li>
+      <li><a href="#sec-p1-7">1.7 Function Calling</a></li>
+      <li><a href="#sec-p1-8">1.8 Agent 模式</a></li>
+    </ul>
+
+    <h4>Part 2 · React 基础</h4>
+    <ul>
+      <li><a href="#sec-p2-1">2.1 什么是 React</a></li>
+      <li><a href="#sec-p2-2">2.2 JSX / 组件 / 虚拟 DOM</a></li>
+      <li><a href="#sec-p2-3">2.3 Hooks 原理</a></li>
+      <li><a href="#sec-p2-4">2.4 useState / useEffect</a></li>
+      <li><a href="#sec-p2-5">2.5 useRef / useMemo</a></li>
+      <li><a href="#sec-p2-6">2.6 状态提升与 Context</a></li>
+    </ul>
+
+    <h4>Part 3 · 实时 Web</h4>
+    <ul>
+      <li><a href="#sec-p3-1">3.1 HTTP / SSE 协议</a></li>
+      <li><a href="#sec-p3-2">3.2 WebSocket 协议</a></li>
+      <li><a href="#sec-p3-3">3.3 WS 重连与心跳</a></li>
+    </ul>
+
+    <h4>Part 4 · Python 后端</h4>
+    <ul>
+      <li><a href="#sec-p4-1">4.1 装饰器 / 上下文管理器</a></li>
+      <li><a href="#sec-p4-2">4.2 asyncio 协程</a></li>
+      <li><a href="#sec-p4-3">4.3 SQL 与关系数据库</a></li>
+      <li><a href="#sec-p4-4">4.4 ORM 与迁移</a></li>
+      <li><a href="#sec-p4-5">4.5 加密学基础</a></li>
+    </ul>
+
+    <h4>Part 5 · 系统设计</h4>
+    <ul>
+      <li><a href="#sec-p5-1">5.1 限流算法</a></li>
+      <li><a href="#sec-p5-2">5.2 SSRF 与 DNS Pin</a></li>
+      <li><a href="#sec-p5-3">5.3 一致性 / CAP / BASE</a></li>
+      <li><a href="#sec-p5-4">5.4 缓存策略</a></li>
+    </ul>
+  </aside>
+
+  <main>
+
+    <!-- HERO -->
+    <section id="sec-0">
+      <span class="section-tag tag-0">学习指南 · 渐进式</span>
+      <h1>从基础到原理:RealMock 技术渐进课程</h1>
+      <p class="lead">本书不只讲 RealMock 用到了什么技术,<strong>而是带你按依赖顺序,从一个概念走到下一个</strong>。<br/>
+      每个章节都从"前置基础"开始 → 然后讲"核心概念" → 最后用"RealMock 中的真实代码"收尾。<br/>
+      <strong>章节之间用「ⓘ 前置」链接串成一条学习路径</strong>,你可以按顺序读完,也能跳读。</p>
+
+      <h3 style="margin-top:30px">📚 学习路径(共 32 章 + 60 面试题)</h3>
+      <div class="grid grid-3">
+        <div class="card card-pri">
+          <h4>Part 0 · 软件基础 (6 章)</h4>
+          <p>程序、变量、类型、进程、内存、网络。<strong>完全没基础的同学从这里开始</strong>。</p>
+        </div>
+        <div class="card card-info">
+          <h4>Part 1 · AI 基础 (8 章)</h4>
+          <p>AI / ML / 神经网络 / Transformer / LLM / Token / Embedding / RAG / Function Calling / Agent。</p>
+        </div>
+        <div class="card">
+          <h4>Part 2 · React 基础 (6 章)</h4>
+          <p>React 是什么、JSX、组件、虚拟 DOM、Hooks 原理、useState/useEffect/useRef、状态管理。</p>
+        </div>
+        <div class="card card-ok">
+          <h4>Part 3 · 实时 Web (3 章)</h4>
+          <p>HTTP / SSE / WebSocket 协议,断线重连,心跳,纯前端实现。</p>
+        </div>
+        <div class="card card-warn">
+          <h4>Part 4 · Python 后端 (5 章)</h4>
+          <p>装饰器、asyncio、SQL、ORM、加密学基础。</p>
+        </div>
+        <div class="card card-pur">
+          <h4>Part 5 · 系统设计 (4 章)</h4>
+          <p>限流、SSRF 防御、CAP 定理、缓存策略。</p>
+        </div>
+        <div class="card card-danger">
+          <h4>面试题库 (60 题)</h4>
+          <p>基于项目实现,每题有参考答案 + 涉及章节链接。6 大方向分组。</p>
+        </div>
+      </div>
+
+      <blockquote class="tip">
+        <p><b>阅读方式</b>:每一节顶部都有 <span class="prereq-chip">ⓘ 前置</span> 标签,点链接直接跳到基础章节。完成后可点章节末尾的"下一章 →"继续。</p>
+      </blockquote>
+
+      <h3 style="margin-top:30px">🗺 全书知识依赖图</h3>
+      <p>下图是 32 章 + 面试题的<strong>前置依赖关系</strong>。箭头从"基础"指向"高级"。可以一眼看出"读这一章需要先学哪些"。</p>
+      <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;height:auto;margin:18px 0;font-family:var(--sans);">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+          </marker>
+          <linearGradient id="g0" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#94a3b8" stop-opacity="0.05"/>
+            <stop offset="100%" stop-color="#94a3b8" stop-opacity="0.18"/>
+          </linearGradient>
+          <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.1"/>
+            <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.25"/>
+          </linearGradient>
+          <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.1"/>
+            <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.25"/>
+          </linearGradient>
+          <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#34d399" stop-opacity="0.1"/>
+            <stop offset="100%" stop-color="#34d399" stop-opacity="0.25"/>
+          </linearGradient>
+          <linearGradient id="g4" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.1"/>
+            <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.25"/>
+          </linearGradient>
+          <linearGradient id="g5" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f87171" stop-opacity="0.1"/>
+            <stop offset="100%" stop-color="#f87171" stop-opacity="0.25"/>
+          </linearGradient>
+        </defs>
+
+        <!-- 第 1 行:Part 0 软件基础(基础层) -->
+        <rect x="40" y="30" width="200" height="64" rx="10" fill="url(#g0)" stroke="#cbd5e1" stroke-width="1.5"/>
+        <text x="140" y="55" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">Part 0 · 软件基础</text>
+        <text x="140" y="78" text-anchor="middle" font-size="11" fill="#475569">6 章 · 程序 / 变量 / 类型</text>
+        <text x="140" y="92" text-anchor="middle" font-size="11" fill="#475569">进程 / 内存 / 网络</text>
+
+        <!-- 右上:面试题库 -->
+        <rect x="660" y="30" width="200" height="64" rx="10" fill="url(#g5)" stroke="#fca5a5" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="760" y="55" text-anchor="middle" font-size="14" font-weight="700" fill="#7f1d1d">面试题库</text>
+        <text x="760" y="78" text-anchor="middle" font-size="11" fill="#991b1b">60 题 · 6 大方向</text>
+        <text x="760" y="92" text-anchor="middle" font-size="11" fill="#991b1b">基于项目实现</text>
+
+        <!-- 中部:3 个并排的 Part(箭头从 Part 0 出发) -->
+        <rect x="40" y="170" width="200" height="60" rx="10" fill="url(#g1)" stroke="#c4b5fd" stroke-width="1.5"/>
+        <text x="140" y="195" text-anchor="middle" font-size="14" font-weight="700" fill="#312e81">Part 1 · AI 基础</text>
+        <text x="140" y="216" text-anchor="middle" font-size="11" fill="#4338ca">8 章 · Transformer / LLM</text>
+
+        <rect x="290" y="170" width="160" height="60" rx="10" fill="url(#g2)" stroke="#93c5fd" stroke-width="1.5"/>
+        <text x="370" y="195" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">Part 2 · React</text>
+        <text x="370" y="216" text-anchor="middle" font-size="11" fill="#1d4ed8">6 章 · Hooks</text>
+
+        <rect x="500" y="170" width="160" height="60" rx="10" fill="url(#g3)" stroke="#86efac" stroke-width="1.5"/>
+        <text x="580" y="195" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">Part 3 · 实时 Web</text>
+        <text x="580" y="216" text-anchor="middle" font-size="11" fill="#15803d">3 章 · WS / SSE</text>
+
+        <rect x="710" y="170" width="150" height="60" rx="10" fill="url(#g4)" stroke="#fde68a" stroke-width="1.5"/>
+        <text x="785" y="195" text-anchor="middle" font-size="13" font-weight="700" fill="#854d0e">Part 4 · Python</text>
+        <text x="785" y="216" text-anchor="middle" font-size="11" fill="#92400e">5 章 · asyncio</text>
+
+        <!-- Part 0 → Part 1/2/3/4(垂直向上→向右) -->
+        <line x1="140" y1="94" x2="140" y2="145" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="140" y1="145" x2="140" y2="165" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="370" y1="145" x2="370" y2="165" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="580" y1="145" x2="580" y2="165" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="785" y1="145" x2="785" y2="165" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="140" y1="125" x2="785" y2="125" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 3"/>
+
+        <!-- 下部:Part 5 系统设计 -->
+        <rect x="370" y="320" width="160" height="60" rx="10" fill="url(#g1)" stroke="#c4b5fd" stroke-width="1.5"/>
+        <text x="450" y="345" text-anchor="middle" font-size="13" font-weight="700" fill="#312e81">Part 5 · 系统设计</text>
+        <text x="450" y="366" text-anchor="middle" font-size="11" fill="#4338ca">4 章 · CAP / 限流</text>
+
+        <!-- Part 1/2/3/4 → Part 5 -->
+        <line x1="140" y1="230" x2="140" y2="290" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 3"/>
+        <line x1="370" y1="230" x2="370" y2="315" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="580" y1="230" x2="580" y2="290" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 3"/>
+        <line x1="785" y1="230" x2="785" y2="290" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 3"/>
+        <line x1="140" y1="270" x2="785" y2="270" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 3"/>
+        <line x1="450" y1="290" x2="450" y2="315" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Part 5 → 面试题库 -->
+        <line x1="530" y1="350" x2="660" y2="80" stroke="#fca5a5" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+        <text x="600" y="220" font-size="10" fill="#991b1b" font-style="italic">所有内容都</text>
+        <text x="600" y="232" font-size="10" fill="#991b1b" font-style="italic">会聚到这</text>
+
+        <!-- 底部说明 -->
+        <rect x="40" y="400" width="820" height="46" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+        <text x="60" y="418" font-size="11" fill="#334155">▸ 实线箭头:必须的前置关系 · 虚线箭头:推荐的学习路径(非强制) · 红色虚线:面试题覆盖所有内容</text>
+        <text x="60" y="436" font-size="11" fill="#334155">▸ 32 章 + 60 题 · 颜色区分:灰=基础 / 紫=AI / 蓝=React / 绿=Web / 黄=后端 / 红=面试</text>
+      </svg>
+    </section>
+
+    <!-- ========================================================
+         PART 0 — 软件与编程基础
+         ======================================================== -->
+
+    <section id="sec-p0-1">
+      <h2><span class="num">0.1</span>什么是程序与代码</h2>
+      <span class="section-tag tag-0">Part 0 · 软件基础</span>
+      <p>这一章为完全没有编程基础的同学准备。如果你写过任何一种语言,可以跳过。</p>
+
+      <h3>前置:无</h3>
+
+      <h3>核心概念</h3>
+      <div class="learning-step">
+        <div class="step-num">1</div>
+        <div>
+          <h4>程序 = 一组指令</h4>
+          <p>CPU 只懂机器码(0/1 序列)。人类写的 Python / JS / Java 叫<strong>源代码</strong>,需要<strong>编译器</strong>或<strong>解释器</strong>翻译成机器码才能跑。</p>
+        </div>
+      </div>
+      <div class="learning-step">
+        <div class="step-num">2</div>
+        <div>
+          <h4>运行时 = 程序跑起来的状态</h4>
+          <p>编译型(C/C++/Rust)先编译再跑,运行快;解释型(Python/JS/Ruby)逐行翻译,慢但灵活。RealMock 用 Python + FastAPI → 解释型,但通过 asyncio 维持高并发。</p>
+        </div>
+      </div>
+      <div class="learning-step">
+        <div class="step-num">3</div>
+        <div>
+          <h4>进程 = 一次程序的执行实例</h4>
+          <p>你 <code>python main.py</code>,操作系统就 fork 出一个 Python 解释器进程。RealMock 启动后,3 个 FastAPI 服务都在<strong>同一个进程</strong>里跑(模块化单体),共享同一份内存与数据库连接池。</p>
+        </div>
+      </div>
+
+      <h3>RealMock 中怎么用</h3>
+      <p>RealMock 用 <code>uvicorn services.main:app</code> 启动一个 Python 进程,在该进程内由 FastAPI 路由所有 HTTP/WS 请求。进程退出 = 服务停止。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p0-2">下一章:0.2 变量、函数、异步 →</a></div>
+    </section>
+
+    <section id="sec-p0-2">
+      <h2><span class="num">0.2</span>变量、函数、异步</h2>
+      <span class="section-tag tag-0">Part 0</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-1">0.1 程序与代码</a>
+      </div>
+
+      <h3>基础 1:变量 = 命名的内存盒子</h3>
+      <p>每个变量是一块内存,有一个<strong>名字</strong>(标识符)、一个<strong>类型</strong>(盒子能装什么)、一个<strong>值</strong>(当前装的东西)。</p>
+<pre><code><span class="tk-com"># Python(动态类型)</span>
+age = <span class="tk-num">18</span>                 <span class="tk-com"># 整数</span>
+name = <span class="tk-str">"小明"</span>            <span class="tk-com"># 字符串</span>
+items = [<span class="tk-str">"a"</span>, <span class="tk-str">"b"</span>]    <span class="tk-com"># 列表</span>
+user = {<span class="tk-str">"id"</span>: <span class="tk-num">1</span>, <span class="tk-str">"name"</span>: <span class="tk-str">"Bob"</span>}  <span class="tk-com"># 字典(类似 JS 对象)</span>
+</code></pre>
+<pre><code><span class="tk-com">// TypeScript(静态类型)</span>
+<span class="tk-key">let</span> age: number = <span class="tk-num">18</span>
+<span class="tk-key">const</span> name: string = <span class="tk-str">"小明"</span>
+<span class="tk-key">const</span> items: string[] = [<span class="tk-str">"a"</span>, <span class="tk-str">"b"</span>]
+<span class="tk-key">const</span> user: { id: number; name: string } = { id: <span class="tk-num">1</span>, name: <span class="tk-str">"Bob"</span> }
+</code></pre>
+
+      <h3>基础 2:函数 = 可复用的代码块</h3>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">greet</span>(name: str) -&gt; str:
+    <span class="tk-key">return</span> <span class="tk-str">f"你好,{name}"</span>
+
+result = greet(<span class="tk-str">"RealMock"</span>)
+</code></pre>
+      <p>函数是一等公民:可以赋值给变量、传参、返回、放进数据结构。</p>
+
+      <h3>基础 3:异步(为什么需要)</h3>
+      <p>想象你去咖啡店点咖啡:</p>
+      <ul>
+        <li><b>同步</b>:你站在柜台前等,直到咖啡做好才动。</li>
+        <li><b>异步</b>:你点完拿到取餐号,去玩手机。咖啡好了叫号,你再去取。</li>
+      </ul>
+      <p>程序里的"等":是等网络请求、等磁盘读写、等用户输入。<strong>异步让一个线程能同时处理很多请求</strong>,而不是傻等。</p>
+
+      <h3>在 RealMock 中的体现</h3>
+      <p>RealMock 用 <code>asyncio</code>(Python 协程)实现"一个线程处理多个 WebSocket 客户端"。详见 <a href="#sec-p4-2">4.2 asyncio 协程</a>。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p0-3">下一章:0.3 类型系统 →</a></div>
+    </section>
+
+    <section id="sec-p0-3">
+      <h2><span class="num">0.3</span>类型系统</h2>
+      <span class="section-tag tag-0">Part 0</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 变量、函数</a>
+      </div>
+
+      <h3>静态类型 vs 动态类型</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>维度</th><th>动态类型(Python/JS)</th><th>静态类型(TS/Java/Rust)</th></tr></thead>
+        <tbody>
+          <tr><td>类型检查时机</td><td>运行时</td><td>编译时</td></tr>
+          <tr><td>写代码快慢</td><td>快(不写类型)</td><td>慢(要写类型)</td></tr>
+          <tr><td>运行快慢</td><td>慢(类型推断)</td><td>快(已知类型)</td></tr>
+          <tr><td>IDE 提示</td><td>弱</td><td>强</td></tr>
+          <tr><td>出错位置</td><td>运行时(用户能看到)</td><td>编译时(开发者能看到)</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Pydantic 是什么</h3>
+      <p>Pydantic 是 Python 的运行时类型校验库。<strong>结合了"动态语言的简洁"和"静态类型的安全"</strong>:</p>
+      <ul>
+        <li>用类型注解声明数据结构;</li>
+        <li>运行时自动校验入参;</li>
+        <li>校验失败返回 <code>ValidationError</code>;</li>
+        <li>FastAPI 用它做请求/响应序列化。</li>
+      </ul>
+      <p>详见 <a href="#sec-p4-3">4.3 SQL / Pydantic v2</a>。</p>
+
+      <h3>TS 类型 vs Pydantic 类型</h3>
+      <p>RealMock 同时用两套:Python 端 Pydantic v2、TypeScript 端手写 interface。详见 <a href="#sec-q">面试题库</a>。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p0-4">下一章:0.4 进程 / 线程 / 协程 →</a></div>
+    </section>
+
+    <section id="sec-p0-4">
+      <h2><span class="num">0.4</span>进程 / 线程 / 协程</h2>
+      <span class="section-tag tag-0">Part 0</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 变量、函数</a>
+        <a class="prereq-chip" href="#sec-p0-3">0.3 类型</a>
+      </div>
+
+      <h3>基础 1:进程 = 独立王国</h3>
+      <p>每个进程有<strong>独立虚拟地址空间</strong>(操作系统给每个进程画一个"假象":你独占全部内存)。进程间通信靠 IPC(管道、socket、共享内存、文件)。</p>
+
+      <h3>基础 2:线程 = 王国里的工人</h3>
+      <p>同一进程内可创建多个线程,<strong>共享堆(heap)但各自有栈</strong>。共享变量 = 数据竞争 → 要用<strong>锁</strong>。</p>
+
+      <h3>基础 3:协程 = 协作式工人</h3>
+      <p>协程(coroutine)是"可以暂停的函数"。单线程下多个协程通过<strong>主动让出</strong>实现并发(无锁)。</p>
+
+      <h3>Python 的 GIL 是什么</h3>
+      <p><strong>Global Interpreter Lock</strong>:Python 解释器强制同一时刻只有一个线程执行 Python 字节码(为了简化内存管理)。</p>
+      <p>后果:Python 多线程<strong>不能并行</strong>CPU 密集任务,只能并发 IO 密集任务。RealMock 是 IO 密集(Web 请求、STT/TTS 调用、LLM 调用),所以单线程 asyncio 是最优解。</p>
+
+      <h3>对比</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>维度</th><th>进程</th><th>线程</th><th>协程</th></tr></thead>
+        <tbody>
+          <tr><td>调度者</td><td>OS</td><td>OS</td><td>Runtime(用户态)</td></tr>
+          <tr><td>并行</td><td>真</td><td>Python 中受限 GIL</td><td>并发(单线程)</td></tr>
+          <tr><td>通信</td><td>IPC</td><td>共享变量 + 锁</td><td>直接传参</td></tr>
+          <tr><td>适合</td><td>CPU 密集</td><td>IO 密集(Java/Go)</td><td>IO 密集(Python asyncio)</td></tr>
+        </tbody>
+      </table></div>
+      <p>详见 <a href="#sec-p4-2">4.2 asyncio 协程</a>。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p0-5">下一章:0.5 内存 / 栈 / 堆 →</a></div>
+    </section>
+
+    <section id="sec-p0-5">
+      <h2><span class="num">0.5</span>内存 / 栈 / 堆</h2>
+      <span class="section-tag tag-0">Part 0</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-4">0.4 进程 / 线程</a>
+      </div>
+
+      <h3>栈(Stack):函数调用链</h3>
+      <p>每调用一个函数,就在栈顶"压入"一个<strong>栈帧</strong>(含参数、局部变量、返回地址)。函数返回时"弹出"。LIFO(后进先出)。</p>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">A</span>():
+    <span class="tk-fn">B</span>()
+    <span class="tk-key">return</span> <span class="tk-str">"A done"</span>
+<span class="tk-key">def</span> <span class="tk-fn">B</span>():
+    <span class="tk-fn">C</span>()
+<span class="tk-key">def</span> <span class="tk-fn">C</span>():
+    <span class="tk-key">print</span>(<span class="tk-str">"hi"</span>)
+
+A()  <span class="tk-com"># 栈: [A 帧] → [A 帧, B 帧] → [A 帧, B 帧, C 帧] → 弹出 C → 弹出 B → 弹出 A</span>
+</code></pre>
+      <p><strong>栈溢出</strong>(stack overflow)= 递归太深,栈帧太多超出栈大小。Python 默认栈大小 1MB。</p>
+
+      <h3>堆(Heap):动态分配的对象</h3>
+      <p>程序用 <code>new</code>、<code>list.append</code>、<code>dict[key]=val</code> 等创建的对象都活在<strong>堆</strong>上。GC(垃圾回收)负责回收没有引用的对象。</p>
+<pre><code>items = []           <span class="tk-com"># items 引用了 [] 对象,[] 在堆上</span>
+items.append(<span class="tk-num">1</span>)     <span class="tk-com"># 堆上的 [] 多了元素</span>
+<span class="tk-key">del</span> items           <span class="tk-com"># 引用消失 → [] 变垃圾 → 下次 GC 回收</span>
+</code></pre>
+
+      <h3>栈 vs 堆</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>维度</th><th>栈</th><th>堆</th></tr></thead>
+        <tbody>
+          <tr><td>分配速度</td><td>极快(指针移动)</td><td>慢(找空闲块)</td></tr>
+          <tr><td>大小</td><td>有限(几 MB)</td><td>大(受物理内存限制)</td></tr>
+          <tr><td>生命周期</td><td>函数返回即释放</td><td>由 GC 决定</td></tr>
+          <tr><td>放什么</td><td>局部变量、参数、返回地址</td><td>长生命周期的对象</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Python 的引用计数</h3>
+      <p>Python GC 主要靠<strong>引用计数</strong>(每个对象有个 refcount),归零就回收。循环引用(list 内部互相引)走<strong>分代 GC</strong>。</p>
+
+      <h3>RealMock 中的内存管理</h3>
+      <ul>
+        <li>音频缓冲上限 5MB(<code>interview_service/realtime/voice_pipeline.py</code>),防止浏览器上传 100MB 撑爆内存</li>
+        <li>TTS 队列上限 50 句(<code>_MAX_QUEUE_SIZE = 50</code>),队列超就丢最早的</li>
+        <li>agent_state 每个字段都有上限(weak_points 30 / followup_clues 60),防止 LLM 写到无界</li>
+      </ul>
+
+      <div class="next-chapter">⏭ <a href="#sec-p0-6">下一章:0.6 网络基础 →</a></div>
+    </section>
+
+    <section id="sec-p0-6">
+      <h2><span class="num">0.6</span>网络基础(TCP / HTTP / DNS)</h2>
+      <span class="section-tag tag-0">Part 0</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-1">0.1 程序与代码</a>
+      </div>
+
+      <h3>OSI 7 层(简化版)</h3>
+      <ol>
+        <li><b>应用层</b>:HTTP / WS / DNS / SMTP(数据格式)</li>
+        <li><b>传输层</b>:TCP(可靠) / UDP(快)(端口号)</li>
+        <li><b>网络层</b>:IP(路由器之间寻址)</li>
+        <li><b>链路层</b>:以太网 / Wi-Fi(同一网段内传输)</li>
+      </ol>
+
+      <h3>TCP 是什么</h3>
+      <p><strong>面向连接</strong>的可靠字节流。3 次握手建立连接,4 次挥手关闭。保证数据按序到达(丢了重传)。HTTP 和 WS 都跑在 TCP 上。</p>
+<pre><code>客户端 → 服务端  [SYN, seq=x]                       <span class="tk-com"># 1. 客户端:我想连</span>
+服务端 → 客户端  [SYN, ACK=x+1, seq=y]               <span class="tk-com"># 2. 服务端:我同意 + 编号 y</span>
+客户端 → 服务端  [ACK=y+1]                          <span class="tk-com"># 3. 客户端:好的,开始发吧</span>
+</code></pre>
+
+      <h3>HTTP 是什么</h3>
+      <p>HTTP = "请给我这个 URL 的资源"。</p>
+      <ul>
+        <li><b>方法</b>:GET(读) / POST(写) / PUT(改) / DELETE(删)</li>
+        <li><b>状态码</b>:200 OK / 404 Not Found / 500 Internal Error</li>
+        <li><b>Header</b>:Content-Type / Authorization / Cookie</li>
+      </ul>
+      <p>HTTP 是<strong>无状态</strong>协议:服务端不记得你是谁。Session / Cookie / Token 都是应用层加的。</p>
+
+      <h3>DNS 是什么</h3>
+      <p>把 <code>api.openai.com</code> 翻译成 <code>104.18.32.47</code>。分层:</p>
+      <ul>
+        <li>浏览器 → 系统解析器 → 根 DNS → 顶级域(.com) → 权威 DNS(api.openai.com) → 返回 IP</li>
+        <li>通常有几秒到几小时的 TTL 缓存</li>
+      </ul>
+
+      <h3>DNS Rebinding 攻击</h3>
+      <p>攻击者控制 <code>evil.com</code>:</p>
+      <ol>
+        <li>第一次解析返回 <code>1.2.3.4</code>(公网 IP)→ 服务端校验 URL 合法,通过 ✓</li>
+        <li>建立 TCP 连接时再解析一次 → 返回 <code>127.0.0.1</code>(localhost)→ 实际打到本机</li>
+      </ol>
+      <p>RealMock 用 <strong>DNS Pin</strong> 防御:一次解析后锁死 IP。详见 <a href="#sec-p5-2">5.2 SSRF 与 DNS Pin</a>。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-1">下一部分:Part 1 · AI 基础 →</a></div>
+    </section>
+
+    <!-- ========================================================
+         PART 1 — AI 基础
+         ======================================================== -->
+
+    <section id="sec-1">
+      <h2><span class="num">1.</span>Part 1 · AI 基础(8 章)</h2>
+      <span class="section-tag tag-1">Part 1</span>
+      <p>从最基础的"什么是 AI"一路走到"RealMock 怎么用 LLM"。每章都从它的前置基础开始。</p>
+      <blockquote class="prereq">
+        <p><b>开始本章需要的全部前置</b>:<a href="#sec-p0-1">0.1 程序</a>、<a href="#sec-p0-2">0.2 变量函数</a>。其他章节按需查阅。</p>
+      </blockquote>
+      <p>路线:1.1 AI 是什么 → 1.2 神经网络 → 1.3 Transformer → 1.4 LLM → 1.5 Token → 1.6 RAG → 1.7 Function Calling → 1.8 Agent。</p>
+    </section>
+
+    <section id="sec-p1-1">
+      <h2><span class="num">1.1</span>什么是 AI / ML / 深度学习</h2>
+      <span class="section-tag tag-1">Part 1</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-1">0.1 程序与代码</a>
+      </div>
+
+      <h3>三个概念</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>术语</th><th>含义</th><th>例子</th></tr></thead>
+        <tbody>
+          <tr><td>AI(人工智能)</td><td>让机器做"通常需要人类智能"的事</td><td>下棋、开车、写诗</td></tr>
+          <tr><td>ML(机器学习)</td><td>不写规则,让机器从数据中<strong>学</strong>出规则</td><td>垃圾邮件分类(喂 1000 封邮件,自动学"含 X 词的更可能是垃圾")</td></tr>
+          <tr><td>DL(深度学习)</td><td>ML 的一个分支:用<strong>多层神经网络</strong>学</td><td>图像识别(像素 → 卷积 → 分类)</td></tr>
+          <tr><td>LLM(大语言模型)</td><td>用海量文本训练出来的"超大深度学习模型"</td><td>GPT-4 / Claude / MiniMax-M3</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>关键直觉</h3>
+      <p>ML = 用数据替换人写规则。深度学习 = 用很多层神经网络"自动"找特征。LLM = 在巨量文本上做下一个 token 预测的深度学习。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p1-2">下一章:1.2 神经网络基础 →</a></div>
+    </section>
+
+    <section id="sec-p1-2">
+      <h2><span class="num">1.2</span>神经网络基础</h2>
+      <span class="section-tag tag-1">Part 1</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p1-1">1.1 AI / ML / DL</a>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 函数</a>
+      </div>
+
+      <h3>神经元 = 加权和 + 激活</h3>
+      <p>灵感来自生物神经元:多个输入 → 加权求和 → 激活函数 → 输出。</p>
+<pre><code><span class="tk-com"># 单个神经元的"代码化"</span>
+<span class="tk-key">def</span> <span class="tk-fn">neuron</span>(x, w, b):
+    z = sum(x_i * w_i <span class="tk-key">for</span> i) + b       <span class="tk-com"># 加权和 + 偏置</span>
+    <span class="tk-key">return</span> relu(z)              <span class="tk-com"># ReLU: max(0, z)</span>
+</code></pre>
+      <p>把多个神经元排成<strong>层</strong>(layer),多层叠加 = "深度"网络。训练 = 调权重 <code>w</code> 让输出接近期望值。</p>
+
+      <h3>训练 = 反向传播(Backprop)</h3>
+      <p>"预测错了多少" → 损失函数(Loss)。从输出层往输入层倒推每个权重对 Loss 的贡献 → 用梯度下降更新权重。</p>
+      <p>不需要懂数学公式,只需知道:<strong>训练 = 大量数据 + 反复调权重 + 衡量 Loss 越来越小</strong>。</p>
+
+      <h3>为什么需要"深度"</h3>
+      <p>浅层网络只能学线性关系;深层网络能组合多个简单特征(边缘→形状→物体),表达力指数级增长。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p1-3">下一章:1.3 Transformer 架构 →</a></div>
+    </section>
+
+    <section id="sec-p1-3">
+      <h2><span class="num">1.3</span>Transformer 架构(Attention Is All You Need)</h2>
+      <span class="section-tag tag-1">Part 1</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p1-2">1.2 神经网络基础</a>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 变量函数(内积)</a>
+      </div>
+
+      <h3>问题:语言为什么需要"上下文"</h3>
+      <p>"it" 在 "the animal didn't cross the road because <strong>it</strong> was too wide" 里指什么?人要懂上下文才能猜。模型要懂 → 需要"注意力"机制。</p>
+
+      <h3>Self-Attention:每个词看其他所有词</h3>
+      <p>对每个 token,生成 3 个向量:</p>
+      <ul>
+        <li><b>Query (Q)</b>:"我想找什么"</li>
+        <li><b>Key (K)</b>:"我能提供什么"</li>
+        <li><b>Value (V)</b>:"我的实际信息"</li>
+      </ul>
+      <p>计算 attention = Q·K 相似度 → softmax → 加权求和 V:</p>
+<pre><code><span class="tk-com"># Self-Attention 简化实现(伪代码)</span>
+Q = x @ W_q   <span class="tk-com"># (seq, d) @ (d, d_k) → (seq, d_k)</span>
+K = x @ W_k
+V = x @ W_v
+scores = Q @ K.T / sqrt(d_k)         <span class="tk-com"># 缩放防 softmax 饱和</span>
+weights = softmax(scores)            <span class="tk-com"># (seq, seq),每行 = 一个 token 的注意力分布</span>
+output = weights @ V                 <span class="tk-com"># (seq, d_v),带上下文的输出</span>
+</code></pre>
+
+      <h3>Multi-Head:多视角</h3>
+      <p>一组 Q/K/V 只能学一种关系。多头 = 多组 Q/K/V 并行,每头关注不同方面(语法、语义、长距离),最后拼接。</p>
+<pre><code><span class="tk-com"># Multi-Head Attention</span>
+heads = [self_attention(x, W_q_i, W_k_i, W_v_i) <span class="tk-key">for</span> i <span class="tk-key">in</span> range(n_heads)]
+output = concat(heads) @ W_o
+</code></pre>
+
+      <h3>Transformer Block = Attention + FFN + 残差 + Norm</h3>
+<pre><code><span class="tk-com"># 一个 Transformer block(简化)</span>
+x = x + MultiHeadAttention(LayerNorm(x))    <span class="tk-com"># sublayer 1 + 残差 + 预归一化</span>
+x = x + FFN(LayerNorm(x))                  <span class="tk-com"># sublayer 2 + 残差 + 预归一化</span>
+</code></pre>
+
+      <h3>为什么 Transformer 改变了 AI</h3>
+      <ul>
+        <li>并行:不像 RNN 必须等前一个,所有 token 同时算</li>
+        <li>长距离:任意两个 token 直接相连(O(1) 距离)</li>
+        <li>可堆叠:堆 96 层就是 GPT-3;堆 1000+ 层就是前沿 LLM</li>
+      </ul>
+
+      <h3>GPT vs BERT</h3>
+      <ul>
+        <li>GPT = Decoder-only(只看上文,适合生成)</li>
+        <li>BERT = Encoder-only(看双向上下文,适合理解)</li>
+        <li>T5 / BART = Encoder-Decoder(翻译、摘要)</li>
+      </ul>
+      <p>RealMock 用任何"openai_chat / anthropic_messages / openai_responses"协议的模型(基本都是 Decoder-only)。</p>
+
+      <blockquote class="tip">
+        <p><b>进一步阅读</b>:论文 <i>Attention Is All You Need</i>(Vaswani et al., 2017)。<a href="https://weaviate.io/blog/introduction-to-rag" target="_blank" rel="noopener">Weaviate RAG 入门</a> 对 RAG 与 Transformer 关系讲得很清楚。</p>
+      </blockquote>
+
+      <div class="next-chapter">⏭ <a href="#sec-p1-4">下一章:1.4 LLM 基础 →</a></div>
+    </section>
+
+    <section id="sec-p1-4">
+      <h2><span class="num">1.4</span>LLM 基础:它是怎么"思考"的</h2>
+      <span class="section-tag tag-1">Part 1</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p1-3">1.3 Transformer</a>
+      </div>
+
+      <h3>LLM = 下一个 token 预测器</h3>
+      <p>LLM 训练时做"给定前文,预测下一个 token"。<strong>没有"思考"或"推理"</strong>,只是统计意义上的"最可能下一个"。</p>
+
+      <h3>三大阶段</h3>
+      <ol>
+        <li><b>预训练(Pre-training)</b>:用万亿 token 文本训,学"语言规律"。成本千万美元。</li>
+        <li><b>微调(Supervised Fine-Tuning, SFT)</b>:用人工标注的"指令-回答"对训,让模型"听指令"。</li>
+        <li><b>RLHF / DPO</b>:用人类偏好排序训练奖励模型,让模型回答更"有用 / 安全"。</li>
+      </ol>
+
+      <h3>为什么"涌现"会出现</h3>
+      <p>模型大到某个临界点(参数 ~10B+,训练 token ~1T+),原本不会的能力突然出现:多步推理、代码生成、思维链。这是 LLM 最反直觉但最强大的特性。</p>
+
+      <h3>关键参数</h3>
+      <dl class="kv">
+        <dt>temperature</dt><dd>采样随机性。0 = 永远选概率最高的(确定);1 = 按概率采样(更"有创意")</dd>
+        <dt>top_p</dt><dd>只从概率前 P% 的 token 里采样;截断长尾</dd>
+        <dt>max_tokens</dt><dd>最多生成多少 token(单次响应上限)</dd>
+        <dt>context_window</dt><dd>上下文窗口大小(LLM 一次能看多少 token,128k 是常见上限)</dd>
+        <dt>frequency_penalty</dt><dd>重复惩罚(防止模型说"嗯那个那个")</dd>
+        <dt>presence_penalty</dt><dd>主题新鲜度(鼓励引入新话题)</dd>
+      </dl>
+
+      <h3>RealMock 怎么用</h3>
+      <div class="code-cap"><span class="file">shared/capabilities/ai/llm/client/llm_client.py</span><span class="tag">LLMClient</span></div>
+<pre><code><span class="tk-key">async def</span> <span class="tk-fn">chat</span>(<span class="tk-key">self</span>, messages, temperature=<span class="tk-num">0.7</span>, *, max_tokens=<span class="tk-key">None</span>):
+    payload = {
+        <span class="tk-str">"model"</span>: <span class="tk-key">self</span>.model,
+        <span class="tk-str">"messages"</span>: messages,
+        <span class="tk-str">"max_tokens"</span>: max_tokens <span class="tk-key">if</span> max_tokens <span class="tk-key">is not None else</span> <span class="tk-key">self</span>.max_tokens,
+        <span class="tk-str">"temperature"</span>: temperature,
+    }
+    ...
+</code></pre>
+      <p>面试 Agent 用 temperature=0.75(适中有变化),报告生成用 0.3(稳定输出 JSON)。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p1-5">下一章:1.5 Tokenization & Embedding →</a></div>
+    </section>
+
+    <section id="sec-p1-5">
+      <h2><span class="num">1.5</span>Tokenization & Embedding</h2>
+      <span class="section-tag tag-1">Part 1</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p1-4">1.4 LLM</a>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 变量</a>
+      </div>
+
+      <h3>前置:为什么不能直接喂字符串</h3>
+      <p>神经网络只懂数字。<strong>第一步必须把文本转成数字序列</strong>。这叫<strong>tokenization</strong>。</p>
+
+      <h3>BPE(Byte-Pair Encoding)</h3>
+      <p>最常用的算法。从字符出发,反复合并"出现频率最高的对"。最终:高频词一个 token,低频词拆成多个 token。</p>
+<pre><code><span class="tk-com"># BPE 合并过程(示意)</span>
+<span class="tk-com"># 语料:low lower lowest new newer</span>
+<span class="tk-com"># 初始: l o w _ l o w e r _ l o w e s t _ n e w _ n e w e r</span>
+<span class="tk-com"># 第 1 步合并 e r → er</span>
+<span class="tk-com"># 第 2 步合并 er _ → er_</span>
+<span class="tk-com"># 第 3 步合并 n e → ne, ne w → new</span>
+<span class="tk-com"># ...</span>
+<span class="tk-com"># 最终: "low" / "lower" / "lowest" / "new" / "newer" / "newest_ly"</span>
+</code></pre>
+
+      <h3>Token 与字符的关系</h3>
+      <p>经验值:<strong>中文 1 字 ≈ 1.5 token;英文 1 词 ≈ 1.3 token;代码 ≈ 0.5 词/行 ≈ 5-10 token</strong>。这正是 RealMock 估算 token 的依据:</p>
+      <div class="code-cap"><span class="file">shared/capabilities/ai/context_manager.py</span><span class="tag">estimate_tokens</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">estimate_tokens</span>(text: str) -&gt; int:
+    <span class="tk-key">if not</span> text: <span class="tk-key">return</span> <span class="tk-num">0</span>
+    <span class="tk-key">return</span> max(<span class="tk-num">1</span>, int(len(text) / <span class="tk-num">1.5</span>))   <span class="tk-com"># 中文 1 字符 ≈ 1.5 token</span>
+</code></pre>
+
+      <h3>Embedding = token → 高维向量</h3>
+      <p>token id 是整数(0, 1, 2, ...),但整数没有"含义"。Embedding 把每个 token 映射成<strong>高维向量</strong>(GPT-3 用 12288 维,Claude 约 8000 维),使"语义相近的 token 在向量空间里也近"。</p>
+<pre><code><span class="tk-com"># Embedding 矩阵 = 大表 (vocab_size × d_model)</span>
+<span class="tk-com"># token 5 → 第 5 行 = [0.12, -0.45, 0.88, ...]</span>
+</code></pre>
+
+      <h3>Embedding 的两大用途</h3>
+      <ol>
+        <li><b>作为模型输入</b>:第一层把 token id 查表成向量,送进 Transformer</li>
+        <li><b>语义检索</b>:把文本编码成向量,计算"语义相似度"(见 <a href="#sec-p1-6">1.6 RAG</a>)</li>
+      </ol>
+
+      <h3>RealMock 中的实现</h3>
+      <p>RealMock 不自己训 embedding,直接调 LLM 提供商的 <code>/embeddings</code> 端点:</p>
+      <div class="code-cap"><span class="file">llm_client.py</span> · <span class="lineno">L439-490</span><span class="tag">embed</span></div>
+<pre><code><span class="tk-key">async def</span> <span class="tk-fn">embed</span>(<span class="tk-key">self</span>, texts: list[str], *, model=<span class="tk-key">None</span>) -&gt; list[list[float]]:
+    settings = get_settings()
+    base = settings.effective_embeddings_base   <span class="tk-com"># 独立 embeddings base</span>
+    url = <span class="tk-str">f"{base}/embeddings"</span>
+    payload = {<span class="tk-str">"model"</span>: model <span class="tk-key">or</span> settings.effective_embeddings_model, <span class="tk-str">"input"</span>: texts}
+    ...
+    <span class="tk-key">return</span> [item[<span class="tk-str">"embedding"</span>] <span class="tk-key">for</span> item <span class="tk-key">in</span> data[<span class="tk-str">"data"</span>]]
+</code></pre>
+
+      <div class="next-chapter">⏭ <a href="#sec-p1-6">下一章:1.6 RAG 原理 →</a></div>
+    </section>
+
+    <section id="sec-p1-6">
+      <h2><span class="num">1.6</span>RAG 原理</h2>
+      <span class="section-tag tag-1">Part 1</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p1-5">1.5 Token & Embedding</a>
+        <a class="prereq-chip" href="#sec-p0-5">0.5 内存</a>
+      </div>
+
+      <h3>前置:LLM 的两大硬伤</h3>
+      <ul>
+        <li><b>知识陈旧</b>:训练完就"封存",不知道 2026 年的事</li>
+        <li><b>幻觉</b>(Hallucination):编造看似合理但错误的内容,尤其在专业领域</li>
+      </ul>
+
+      <h3>RAG(Retrieval-Augmented Generation)是什么</h3>
+      <p>让 LLM 在回答前,先从<strong>外部知识库</strong>中检索相关文档,把"问题 + 检索到的文档"一起塞进 prompt。</p>
+
+      <h3>两阶段流程</h3>
+<pre><code>阶段 1:Ingestion(预处理,离线)
+  文档 → 切块(chunking) → embedding → 存入向量数据库
+  例子:7 家公司 × 4 切片 = 28 条
+
+阶段 2:Inference(推理时,在线)
+  用户 query → embedding → 向量数据库相似度检索 → top-K 文档
+  → 与 query 一起塞进 prompt → LLM 生成回答
+</code></pre>
+
+      <h3>向量数据库 = 高维向量的搜索引擎</h3>
+      <p>传统数据库(B-Tree 索引)擅长精确匹配;向量数据库(HNSW 索引)擅长"找最近邻"。常见:Chroma / Milvus / Pinecone / Weaviate。</p>
+      <p>RealMock 用 <strong>Chroma(嵌入式)</strong>:</p>
+      <div class="code-cap"><span class="file">interview_service/capabilities/rag/local_backend.py</span> · <span class="lineno">L60-72</span><span class="tag">build_index</span></div>
+<pre><code><span class="tk-key">async def</span> <span class="tk-fn">build_index</span>(<span class="tk-key">self</span>, force: <span class="tk-key">bool</span> = <span class="tk-key">False</span>) -&gt; int:
+    <span class="tk-key">if</span> force <span class="tk-key">and</span> <span class="tk-key">self</span>._collection.count() &gt; <span class="tk-num">0</span>: <span class="tk-key">self</span>._delete_all()
+    <span class="tk-key">if</span> <span class="tk-key">self</span>._collection.count() &gt; <span class="tk-num">0</span>: <span class="tk-key">return</span> <span class="tk-key">self</span>._collection.count()
+    texts, metadatas, ids = _build_documents()      <span class="tk-com"># 7 家公司 × 4 切片</span>
+    embeddings = <span class="tk-key">await</span> <span class="tk-key">self</span>._llm.embed(texts)         <span class="tk-com"># 调 /embeddings</span>
+    <span class="tk-key">self</span>._collection.add(documents=texts, embeddings=embeddings, metadatas=metadatas, ids=ids)
+    <span class="tk-key">return</span> len(texts)
+</code></pre>
+
+      <h3>切片策略(决定 RAG 质量)</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>切片粒度</th><th>优点</th><th>缺点</th></tr></thead>
+        <tbody>
+          <tr><td>整文档一片</td><td>保留完整上下文</td><td>检索噪声大、token 浪费</td></tr>
+          <tr><td>每段一片(常 200-500 token)</td><td>检索精准</td><td>失去段落间逻辑</td></tr>
+          <tr><td>每句一片</td><td>最细</td><td>失去上下文,语义不完整</td></tr>
+          <tr><td><b>语义切片</b>(每章/每节)</td><td>保留逻辑</td><td>实现复杂</td></tr>
+        </tbody>
+      </table></div>
+      <p>RealMock 选<strong>每家公司 4 切片</strong>(style / focus_areas / sample_questions / flow),样题每题一片。</p>
+
+      <h3>距离阈值 = 质量门</h3>
+      <div class="code-cap"><span class="file">interview_service/services/interview/tool_round_runner.py</span> · <span class="lineno">L45-86</span><span class="tag">maybe_retrieve_rag</span></div>
+<pre><code>hits = [h <span class="tk-key">for</span> h <span class="tk-key">in</span> hits <span class="tk-key">if</span> h.get(<span class="tk-str">"distance"</span>, <span class="tk-num">1.0</span>) &lt; <span class="tk-num">0.5</span>]   <span class="tk-com"># 余弦距离 &lt; 0.5 才用</span>
+<span class="tk-key">if not</span> hits: <span class="tk-key">return</span> <span class="tk-key">None</span>   <span class="tk-com"># 太弱就不注入,免得噪声干扰</span>
+</code></pre>
+      <p>不设阈值的话,弱匹配也会被注入 prompt,反而降低答案质量。</p>
+
+      <blockquote class="tip">
+        <p><b>深入</b>:Weaviate 团队 2024 综述列出 72 种 RAG 变体(GraphRAG / Self-RAG / Agentic RAG 等),核心思想都是"更智能的检索 + 更智能的生成"。</p>
+      </blockquote>
+
+      <div class="next-chapter">⏭ <a href="#sec-p1-7">下一章:1.7 Function Calling →</a></div>
+    </section>
+
+    <section id="sec-p1-7">
+      <h2><span class="num">1.7</span>Function Calling(工具调用)</h2>
+      <span class="section-tag tag-1">Part 1</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p1-4">1.4 LLM</a>
+        <a class="prereq-chip" href="#sec-p1-6">1.6 RAG</a>
+      </div>
+
+      <h3>前置:LLM 只能"说话",不能"做事"</h3>
+      <p>LLM 本身只能生成文本,不能查数据库、读文件、发请求。<strong>Function Calling 让 LLM 能"决定"调什么工具,由应用去真执行</strong>。</p>
+
+      <h3>OpenAI 协议流程</h3>
+      <ol>
+        <li>应用把 <code>tools</code> 描述发给 LLM(每个工具的 name / description / parameters schema)</li>
+        <li>LLM 决定:"我需要查候选人 GitHub",返回 <code>tool_calls</code> JSON</li>
+        <li>应用<strong>真的执行</strong>工具(如调 <code>gh.get_user()</code>)</li>
+        <li>把结果以 <code>role: "tool"</code> 消息回喂给 LLM</li>
+        <li>LLM 在下一轮继续(可能再调工具,或直接生成回答)</li>
+      </ol>
+
+      <h3>为什么不让 LLM 直接执行</h3>
+      <ol>
+        <li><b>沙箱化</b>:LLM 不能访问文件系统/网络</li>
+        <li><b>权限</b>:扣款/删 DB 副作用大,不能给 LLM 全权</li>
+        <li><b>审计与限流</b>:应用层能做"每用户 1 次/秒"</li>
+        <li><b>可恢复</b>:LLM 不知道当前代码,应用知道</li>
+      </ol>
+
+      <h3>RealMock 9 个 GitHub 工具示例</h3>
+      <div class="code-cap"><span class="file">shared/capabilities/integrations/github/tools.py</span><span class="tag">工具定义</span></div>
+<pre><code>GITHUB_TOOL_DEFINITIONS = [
+    {<span class="tk-str">"type"</span>: <span class="tk-str">"function"</span>, <span class="tk-str">"function"</span>: {
+        <span class="tk-str">"name"</span>: <span class="tk-str">"github_get_user"</span>,
+        <span class="tk-str">"description"</span>: <span class="tk-str">"获取 GitHub 用户公开资料...用于核实候选人身份与活跃度。"</span>,
+        <span class="tk-str">"parameters"</span>: {<span class="tk-str">"type"</span>: <span class="tk-str">"object"</span>, <span class="tk-str">"properties"</span>: {<span class="tk-str">"username"</span>: {<span class="tk-str">"type"</span>: <span class="tk-str">"string"</span>}}, <span class="tk-str">"required"</span>: [<span class="tk-str">"username"</span>]}
+    }},
+    ...
+    {<span class="tk-str">"name"</span>: <span class="tk-str">"github_get_readme"</span>, <span class="tk-str">"description"</span>: <span class="tk-str">"读取仓库 README 文本。用于深入追问项目背景与架构。"</span>, ...},
+    {<span class="tk-str">"name"</span>: <span class="tk-str">"github_list_commits"</span>, <span class="tk-str">"description"</span>: <span class="tk-str">"列出仓库最近 commit。用于核验候选人是否真实参与开发..."</span>, ...},
+    ...
+]
+</code></pre>
+
+      <h3>工具循环的关键设计</h3>
+      <div class="code-cap"><span class="file">interview_service/services/interview/tool_round_runner.py</span> · <span class="lineno">L107-194</span><span class="tag">run_tool_rounds</span></div>
+<pre><code>max_rounds = min(settings.interview_max_tool_rounds, MAX_TOOL_ROUNDS)  <span class="tk-com"># 默认 3</span>
+<span class="tk-key">for</span> round_i <span class="tk-key">in</span> range(max_rounds):
+    msg = <span class="tk-key">await</span> <span class="tk-key">self</span>.llm.chat_message(working, tools=tools)
+    tool_calls = msg.get(<span class="tk-str">"tool_calls"</span>) <span class="tk-key">or</span> []
+    <span class="tk-key">if not</span> tool_calls:
+        <span class="tk-key">if</span> msg.get(<span class="tk-str">"content"</span>) <span class="tk-key">and not</span> any_tool_used:
+            <span class="tk-key">return</span> working, str(msg[<span class="tk-str">"content"</span>])  <span class="tk-com"># 首轮无工具直接返回</span>
+        <span class="tk-key">break</span>
+    <span class="tk-com"># 并行执行本轮所有 tool_calls</span>
+    results = <span class="tk-key">await</span> asyncio.gather(*[execute_interview_tool(name, args, db=db, ...) <span class="tk-key">for</span> tc <span class="tk-key">in</span> tool_calls])
+    <span class="tk-key">for</span> result <span class="tk-key">in</span> results:
+        working.append({<span class="tk-str">"role"</span>: <span class="tk-str">"tool"</span>, <span class="tk-str">"tool_call_id"</span>: ..., <span class="tk-str">"content"</span>: result})
+</code></pre>
+
+      <h3>三协议差异</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>协议</th><th>tool_call 格式</th><th>tool_result 字段</th></tr></thead>
+        <tbody>
+          <tr><td>OpenAI Chat</td><td><code>tool_calls[].function</code></td><td><code>role: "tool", tool_call_id</code></td></tr>
+          <tr><td>Anthropic</td><td><code>content[].type: "tool_use"</code></td><td><code>content[].type: "tool_result"</code></td></tr>
+          <tr><td>OpenAI Responses</td><td><code>input[].type: "function_call"</code></td><td><code>input[].type: "function_call_output"</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>RealMock 的 <code>UnifiedLLMClient</code> 统一了三种协议的转换。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p1-8">下一章:1.8 Agent 模式 →</a></div>
+    </section>
+
+    <section id="sec-p1-8">
+      <h2><span class="num">1.8</span>Agent 模式</h2>
+      <span class="section-tag tag-1">Part 1</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p1-7">1.7 Function Calling</a>
+        <a class="prereq-chip" href="#sec-p0-4">0.4 进程线程</a>
+      </div>
+
+      <h3>什么是 Agent</h3>
+      <p><b>Agent = LLM + 工具 + 循环 + 记忆</b>。让 LLM 不只回答,还能<strong>自主决策下一步做什么</strong>。</p>
+
+      <h3>4 大经典模式</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>模式</th><th>核心</th><th>RealMock 例子</th></tr></thead>
+        <tbody>
+          <tr><td><b>ReAct</b></td><td>思考→行动→观察→思考…(循环)</td><td><code>tool_round_runner.run_tool_rounds</code></td></tr>
+          <tr><td><b>CoT</b></td><td>让 LLM 在脑内分步思考</td><td>System prompt 末尾加 "请一步步思考"</td></tr>
+          <tr><td><b>Plan-and-Execute</b></td><td>先规划全步骤,再逐步执行</td><td>3 套工作流(技术/HR/管理)各 8-9 阶段</td></tr>
+          <tr><td><b>Reflection</b></td><td>自己审视输出,挑错再改</td><td><code>followup.analyze</code> 规则化追问</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>RealMock 的 ReAct 实现</h3>
+<pre><code>Round 1: 思考(LLM 决定调 github_get_user)
+  → 行动(应用真调 GitHub API)
+  → 观察(返回用户资料 JSON)
+Round 2: 思考(发现 user 有个项目,值得深挖)
+  → 行动(调 github_list_repos)
+  → 观察(拿到 5 个仓库列表)
+Round 3: 思考(选 README 最长的那个深入问)
+  → 行动(调 github_get_readme)
+  → 观察(README 摘要)
+Round 4: 思考(够了,生成问题)
+  → 行动(直接生成文本)
+  → 循环结束
+</code></pre>
+
+      <h3>RealMock 的 Plan-and-Execute(隐式)</h3>
+      <p>3 套工作流(<code>workflows.py</code>)预定义阶段顺序,LLM 在每阶段内自由发问。这是 "soft" Plan-and-Execute:</p>
+      <ul>
+        <li><b>Plan</b> = 工作流定义(代码层)</li>
+        <li><b>Execute</b> = 每阶段内 LLM 用 ReAct 模式</li>
+        <li><b>阶段推进</b> = <code>[PHASE_COMPLETE]</code> 标记 或 题数达 max</li>
+      </ul>
+
+      <h3>系统级学习反哺(长期记忆)</h3>
+      <p>每场面试结束后,<code>growth/learning.py</code> 写入 <code>system_learning.json</code>(同公司均分、有效追问线索等),下次面试开场注入 system prompt:</p>
+      <div class="code-cap"><span class="file">interview_service/services/interview/agent.py</span> · <span class="lineno">L163-212</span><span class="tag">_system_learning_section</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">_system_learning_section</span>(<span class="tk-key">self</span>) -&gt; str:
+    insights = get_system_insights(limit=<span class="tk-num">5</span>)
+    company_avg = insights.get(<span class="tk-str">"avg_scores_by_company"</span>, {}).get(<span class="tk-key">self</span>.session.company)
+    <span class="tk-key">if</span> company_avg <span class="tk-key">is not None and</span> company_avg &lt; <span class="tk-num">80</span>:
+        <span class="tk-com"># 公司均分低 → Agent 加大深挖</span>
+        <span class="tk-key">return</span> <span class="tk-str">f"目标公司「{self.session.company}」历史面试均分 {company_avg},建议适度加大深挖..."</span>
+    <span class="tk-key">return</span> ...
+</code></pre>
+      <p>这是一个非常优雅的"系统自学习"反哺闭环。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-2">下一部分:Part 2 · React 基础 →</a></div>
+    </section>
+
+    <!-- ========================================================
+         PART 2 — React 基础
+         ======================================================== -->
+
+    <section id="sec-2">
+      <h2><span class="num">2.</span>Part 2 · React 基础(6 章)</h2>
+      <span class="section-tag tag-2">Part 2</span>
+      <blockquote class="prereq">
+        <p><b>开始本章需要的全部前置</b>:<a href="#sec-p0-1">0.1 程序</a>、<a href="#sec-p0-2">0.2 变量函数</a>、<a href="#sec-p0-3">0.3 类型</a>、<a href="#sec-p0-6">0.6 网络</a>。其他按需。</p>
+      </blockquote>
+      <p>路线:2.1 是什么 → 2.2 JSX/组件 → 2.3 Hooks 原理 → 2.4 useState/useEffect → 2.5 useRef/useMemo → 2.6 状态管理。</p>
+    </section>
+
+    <section id="sec-p2-1">
+      <h2><span class="num">2.1</span>什么是 React</h2>
+      <span class="section-tag tag-2">Part 2</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 变量函数</a>
+        <a class="prereq-chip" href="#sec-p0-6">0.6 网络 / HTTP</a>
+      </div>
+
+      <h3>前置:浏览器怎么显示网页</h3>
+      <ol>
+        <li>浏览器发 HTTP 请求到服务器 → 拿到 HTML 文本</li>
+        <li>解析 HTML → 生成 DOM 树</li>
+        <li>解析 CSS → 生成 CSSOM</li>
+        <li>DOM + CSSOM → 渲染树 → 布局 → 绘制</li>
+      </ol>
+
+      <h3>jQuery 时代的问题</h3>
+      <p>直接操作 DOM:<code>$('#btn').text('clicked')</code>。复杂应用里:<strong>状态散落各处</strong>、<strong>改一处要同步多处</strong>、<strong>性能靠手动优化</strong>。</p>
+
+      <h3>React 的核心思想</h3>
+      <p><strong>声明式 UI</strong>:<code>&lt;h1&gt;{count}&lt;/h1&gt;</code>(描述"应该是什么"),而不是"做这个改动"。React 内部用"diff 算法"决定如何高效更新真实 DOM。</p>
+      <p><strong>组件化</strong>:<code>&lt;Button onClick=...&gt;</code> 把 UI + 行为打包成可复用的"积木"。</p>
+      <p><strong>单向数据流</strong>:数据从父组件流向子组件(props down);事件从子组件流回父组件(callback up)。永远单向,可预测。</p>
+
+      <h3>RealMock 用 React 做什么</h3>
+      <p>RealMock 前端是 Next.js 14 + React 18,所有页面(<code>app/</code>)、可复用组件(<code>components/</code>)、技术能力封装(<code>features/</code>)都是 React 组件。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p2-2">下一章:2.2 JSX / 组件 / 虚拟 DOM →</a></div>
+    </section>
+
+    <section id="sec-p2-2">
+      <h2><span class="num">2.2</span>JSX / 组件 / 虚拟 DOM</h2>
+      <span class="section-tag tag-2">Part 2</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p2-1">2.1 什么是 React</a>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 变量函数</a>
+      </div>
+
+      <h3>JSX = 在 JS 里写 HTML</h3>
+      <p>JSX 是语法糖,浏览器不认。babel/SWC 把它转成 <code>React.createElement()</code>:</p>
+<pre><code><span class="tk-com">// 你写:</span>
+<span class="tk-key">const</span> el = &lt;h1 className=<span class="tk-str">"title"</span>&gt;Hello, {name}!&lt;/h1&gt;
+
+<span class="tk-com">// 编译后:</span>
+<span class="tk-key">const</span> el = React.createElement(<span class="tk-str">"h1"</span>, { className: <span class="tk-str">"title"</span> }, <span class="tk-str">"Hello, "</span>, name, <span class="tk-str">"!"</span>)
+</code></pre>
+      <p>优点:可读、静态检查、IDE 智能提示。</p>
+
+      <h3>组件:可复用的 UI 单元</h3>
+<pre><code><span class="tk-key">function</span> <span class="tk-fn">Welcome</span>({ name }: { name: string }) {
+  <span class="tk-key">return</span> &lt;h1&gt;Hello, {name}!&lt;/h1&gt;
+}
+
+<span class="tk-com">// 使用</span>
+&lt;Welcome name=<span class="tk-str">"RealMock"</span> /&gt;
+</code></pre>
+
+      <h3>虚拟 DOM = 真实 DOM 的内存镜像</h3>
+      <p>React 维护一棵"虚拟"的 DOM 树,每次 state 变化时:</p>
+      <ol>
+        <li>生成新虚拟 DOM 树</li>
+        <li>与旧树 diff(找差异)</li>
+        <li>把差异部分批量更新到真实 DOM</li>
+      </ol>
+      <p>为什么不直接改真实 DOM?因为 <strong>DOM 操作极慢</strong>(reflow + repaint),批量最小化更新 = 大幅提升性能。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p2-3">下一章:2.3 Hooks 原理(规则、为什么有)→</a></div>
+    </section>
+
+    <section id="sec-p2-3">
+      <h2><span class="num">2.3</span>Hooks 原理(规则、为什么有)</h2>
+      <span class="section-tag tag-2">Part 2</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p2-2">2.2 JSX / 组件</a>
+        <a class="prereq-chip" href="#sec-p0-4">0.4 协程 / 调用栈</a>
+      </div>
+
+      <h3>前置:React 用"调用顺序"识别 Hook</h3>
+      <p>React 内部为每个组件维护一个 <strong>Hook 链表(Linked List)</strong>。每次渲染按调用顺序挂节点:</p>
+<pre><code>组件首次渲染:
+  useState("Bob")     → 链表第 1 节点: {value: "Bob", setter}
+  useEffect(fn, [])   → 链表第 2 节点: {fn, deps: []}
+  useState(0)         → 链表第 3 节点: {value: 0, setter}
+
+组件 re-render 时:
+  useState("Bob")     → 取第 1 节点的值
+  useEffect(fn, [])   → 取第 2 节点
+  useState(0)         → 取第 3 节点
+</code></pre>
+
+      <h3>两条规则(都不是"官僚主义")</h3>
+      <div class="card card-danger">
+        <h4>❌ 不要在 if / for / 嵌套函数里调 Hook</h4>
+        <p>因为 React 靠"调用顺序"对应"链表节点",条件调用会让"这次调的第 N 个 Hook"映射到"上次第 N 个 Hook"的节点 → state 串了,error: <em>"Rendered fewer hooks than expected"</em>。</p>
+      </div>
+      <div class="card card-ok">
+        <h4>✅ 解决:把条件放进 Hook <em>里面</em></h4>
+<pre><code><span class="tk-com">// 错</span>
+<span class="tk-key">if</span> (loggedIn) { <span class="tk-key">const</span> [n, setN] = useState(<span class="tk-str">""</span>) }   <span class="tk-com"># 顺序漂移</span>
+<span class="tk-key">const</span> [c, setC] = useState(<span class="tk-num">0</span>)
+
+<span class="tk-com">// 对</span>
+<span class="tk-key">const</span> [n, setN] = useState(<span class="tk-str">""</span>)   <span class="tk-com"># 永远按同一顺序调</span>
+<span class="tk-key">const</span> [c, setC] = useState(<span class="tk-num">0</span>)
+<span class="tk-key">if</span> (loggedIn) { <span class="tk-fn">setN</span>(<span class="tk-str">"x"</span>) }          <span class="tk-com"># 条件在 Hook 后面</span>
+</code></pre>
+      </div>
+      <div class="card card-info">
+        <h4>✅ 只在 React 函数里调</h4>
+        <p>类组件、普通 JS 函数、事件 handler 内不能调。ESLint 插件 <code>react-hooks/rules-of-hooks</code> 会自动检测。</p>
+      </div>
+
+      <h3>为什么用链表而不是 Map/WeakMap</h3>
+      <p>链表简单、显式、O(1) 追加;Map 需要键名,但 Hook 故意不让你起名(防止用户依赖名字,鼓励按位置匹配)。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p2-4">下一章:2.4 useState / useEffect →</a></div>
+    </section>
+
+    <section id="sec-p2-4">
+      <h2><span class="num">2.4</span>useState / useEffect</h2>
+      <span class="section-tag tag-2">Part 2</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p2-3">2.3 Hooks 原理</a>
+      </div>
+
+      <h3>useState = 组件的"局部变量"</h3>
+<pre><code><span class="tk-key">const</span> [count, setCount] = useState(<span class="tk-num">0</span>)
+<span class="tk-com">// count: 当前值</span>
+<span class="tk-com">// setCount: 修改函数(触发 re-render)</span>
+
+&lt;button onClick={() =&gt; setCount(count + <span class="tk-num">1</span>)}&gt;{count}&lt;/button&gt;
+</code></pre>
+      <p><strong>关键</strong>:改 state 一定触发 re-render(不是直接改 DOM,React 内部 diff 决定怎么改)。</p>
+
+      <h3>useEffect = 副作用钩子</h3>
+      <p>"副作用" = 渲染之外的事(网络请求、订阅、DOM 操作、计时器)。</p>
+<pre><code>useEffect(() =&gt; {
+  <span class="tk-com">// 1. 每次 mount 后跑</span>
+  <span class="tk-com">// 2. 每次 deps 变化时,先跑 cleanup 再重跑</span>
+  <span class="tk-com">// 3. 组件 unmount 时跑 cleanup</span>
+  <span class="tk-key">const</span> sub = ws.subscribe(handler)
+  <span class="tk-key">return</span> () =&gt; sub.unsubscribe()   <span class="tk-com"># cleanup</span>
+}, [sessionId])
+</code></pre>
+
+      <h3>依赖数组 3 种写法</h3>
+      <ul>
+        <li><code>[]</code>:只在 mount + unmount 时跑</li>
+        <li><code>[a, b]</code>:a 或 b 变化时跑</li>
+        <li><b>不传</b>:每次 render 都跑(几乎不要用)</li>
+      </ul>
+
+      <h3>cleanup 在什么时候跑</h3>
+      <ol>
+        <li>组件 unmount(卸载)</li>
+        <li>下次 effect 跑<strong>之前</strong>(deps 变了)</li>
+        <li>Strict Mode 开发环境:挂载→卸载→再挂载(故意双调用)</li>
+      </ol>
+
+      <h3>Strict Mode 双调用的真实案例</h3>
+      <p>React 19 升级后有团队报告 useEffect cleanup 漏跑导致 1.2GB/h 内存泄漏。原因:cleanup 涉及微任务时,React 19 把 cleanup 推迟到微任务队列排空后,组件已经 unmount,interval 还在跑。</p>
+      <p><strong>教训</strong>:cleanup 一定要同步 + 立即释放。RealMock 的 <code>useInterviewWS</code> 在 cleanup 中 <code>ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.close(1000)</code>,正是这个模式。</p>
+
+      <h3>RealMock 完整例子</h3>
+      <div class="code-cap"><span class="file">apps/web/src/features/media/useInterviewWS.ts</span> · <span class="lineno">L98-130</span><span class="tag">WS effect + cleanup</span></div>
+<pre><code>useEffect(() =&gt; {
+  <span class="tk-key">const</span> generation = ++generationRef.current   <span class="tk-com"># 世代号</span>
+  <span class="tk-key">const</span> isCurrent = () =&gt; generationRef.current === generation
+
+  <span class="tk-key">const</span> connect = () =&gt; { ... }
+  connect()
+
+  <span class="tk-key">return</span> () =&gt; {
+    generationRef.current += <span class="tk-num">1</span>            <span class="tk-com"># cleanup:让旧 effect 的回调失效</span>
+    <span class="tk-key">const</span> ws = wsRef.current
+    wsRef.current = <span class="tk-key">null</span>
+    <span class="tk-key">if</span> (ws) {
+      ws.onclose = <span class="tk-key">null</span>; ws.onerror = <span class="tk-key">null</span>; ws.onmessage = <span class="tk-key">null</span>   <span class="tk-com"># 解绑避免回调</span>
+      ws.close(<span class="tk-num">1000</span>, <span class="tk-str">"client_cancel"</span>)
+    }
+  }
+}, [sessionId, maxRetries, reconnectKey, clearRetryTimer])
+</code></pre>
+
+      <div class="next-chapter">⏭ <a href="#sec-p2-5">下一章:2.5 useRef / useMemo →</a></div>
+    </section>
+
+    <section id="sec-p2-5">
+      <h2><span class="num">2.5</span>useRef / useMemo</h2>
+      <span class="section-tag tag-2">Part 2</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p2-4">2.4 useState/useEffect</a>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 变量</a>
+      </div>
+
+      <h3>useRef = 可变的盒子(不触发重渲染)</h3>
+      <p>返回一个 <code>{current: ...}</code> 对象。改 <code>.current</code> <strong>不触发</strong> re-render。</p>
+<pre><code><span class="tk-key">const</span> ref = useRef(<span class="tk-num">0</span>)
+ref.current = <span class="tk-num">1</span>      <span class="tk-com"># 改了但组件不 re-render</span>
+</code></pre>
+
+      <h3>useState vs useRef</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>维度</th><th>useState</th><th>useRef</th></tr></thead>
+        <tbody>
+          <tr><td>改值触发重渲染?</td><td>✓</td><td>✗</td></tr>
+          <tr><td>读取时机</td><td>渲染期</td><td>任意(包括异步回调)</td></tr>
+          <tr><td>适合</td><td>UI 要显示的数据</td><td>计时器 ID、WS 实例、缓存</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>RealMock 中 11 个 ref</h3>
+      <p>看 <code>useTTSPlayer</code> 的初始化:</p>
+      <div class="code-cap"><span class="file">apps/web/src/features/media/useTTSPlayer.ts</span> · <span class="lineno">L10-30</span><span class="tag">TTS refs</span></div>
+<pre><code><span class="tk-key">const</span> queueRef = useRef(Promise.resolve())          <span class="tk-com"># 链式 promise 队列</span>
+<span class="tk-key">const</span> currentAudioRef = useRef&lt;HTMLAudioElement&gt;(<span class="tk-key">null</span>)   <span class="tk-com"># 当前播放的 audio</span>
+<span class="tk-key">const</span> speakingRef = useRef(<span class="tk-key">false</span>)            <span class="tk-com"># 上一帧是否在播</span>
+<span class="tk-key">const</span> pendingCountRef = useRef(<span class="tk-num">0</span>)
+<span class="tk-key">const</span> unlockedRef = useRef(<span class="tk-key">false</span>)            <span class="tk-com"># 用户手势是否解锁音频</span>
+<span class="tk-key">const</span> epochRef = useRef(<span class="tk-num">0</span>)                <span class="tk-com"># 打断世代</span>
+<span class="tk-key">const</span> audioCtxRef = useRef&lt;AudioContext&gt;(<span class="tk-key">null</span>)
+<span class="tk-key">const</span> analyserRef = useRef&lt;AnalyserNode&gt;(<span class="tk-key">null</span>)
+<span class="tk-key">const</span> levelRafRef = useRef&lt;number&gt;(<span class="tk-key">null</span>)    <span class="tk-com"># requestAnimationFrame id</span>
+<span class="tk-key">const</span> heldQueueRef = useRef&lt;string[]&gt;([])       <span class="tk-com"># 未解锁时的缓冲</span>
+<span class="tk-key">const</span> [queueDepth, setQueueDepth] = useState(<span class="tk-num">0</span>)   <span class="tk-com"># 唯一要重渲染的</span>
+</code></pre>
+
+      <h3>useMemo / useCallback = 缓存</h3>
+<pre><code><span class="tk-key">const</span> sorted = useMemo(() =&gt; items.sort((a, b) =&gt; a.id - b.id), [items])   <span class="tk-com"># 缓存计算结果</span>
+<span class="tk-key">const</span> onClick = useCallback(() =&gt; doSomething(id), [id])   <span class="tk-com"># 缓存函数引用</span>
+</code></pre>
+      <p>何时用:① 大列表 filter/sort;② 给 memo 子组件传稳定引用。否则不用,会增加心智负担。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p2-6">下一章:2.6 状态提升与 Context →</a></div>
+    </section>
+
+    <section id="sec-p2-6">
+      <h2><span class="num">2.6</span>状态提升与 Context</h2>
+      <span class="section-tag tag-2">Part 2</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p2-4">2.4 useState</a>
+      </div>
+
+      <h3>问题:prop drilling</h3>
+      <p>A → B → C → D 都要传同一个 state。每层都得显式 prop。</p>
+
+      <h3>解 1:状态提升(Lifting State Up)</h3>
+      <p>提到最近的共同祖先:</p>
+<pre><code><span class="tk-key">function</span> <span class="tk-fn">Parent</span>() {
+  <span class="tk-key">const</span> [v, setV] = useState(<span class="tk-num">0</span>)
+  <span class="tk-key">return</span> &lt;&gt;&lt;ChildA v={v} onChange={setV} /&gt;&lt;ChildB v={v} /&gt;&lt;/&gt;
+}
+</code></pre>
+
+      <h3>解 2:Context(穿透传递)</h3>
+<pre><code><span class="tk-key">const</span> ThemeCtx = createContext(<span class="tk-str">"light"</span>)
+&lt;ThemeCtx.Provider value=<span class="tk-str">"dark"</span>&gt;...&lt;/ThemeCtx.Provider&gt;
+<span class="tk-com">// 任何子组件</span>
+<span class="tk-key">const</span> theme = useContext(ThemeCtx)
+</code></pre>
+
+      <h3>RealMock 的选择:少用 Context,多 props</h3>
+      <p>RealMock 顶层用 ThemeProvider + Sidebar context,但业务页面里几乎不用 Context,因为 Context value 变化会触发<strong>所有消费者重渲染</strong>。</p>
+      <p>替代方案:<strong>把状态放离它最近的父组件</strong> + 自定义 hook 封装:</p>
+      <div class="code-cap"><span class="file">apps/web/src/features/media/useInterviewWS.ts</span><span class="tag">自定义 hook</span></div>
+<pre><code><span class="tk-key">export function</span> <span class="tk-fn">useInterviewWS</span>(sessionId, handlers, options) {
+  <span class="tk-com"># 封装所有 WS 逻辑:连接 / 心跳 / 重连 / 状态</span>
+  <span class="tk-key">return</span> { connected, turnState, send, on, cancel, retryNow }
+}
+
+<span class="tk-com">// 使用方只关心返回值,不需要懂内部</span>
+<span class="tk-key">const</span> { connected, turnState, send } = useInterviewWS(sessionId, { turn_state: (m) =&gt; ... })
+</code></pre>
+
+      <div class="next-chapter">⏭ <a href="#sec-3">下一部分:Part 3 · 实时 Web →</a></div>
+    </section>
+
+    <!-- ========================================================
+         PART 3 — 实时 Web
+         ======================================================== -->
+
+    <section id="sec-3">
+      <h2><span class="num">3.</span>Part 3 · 实时 Web(3 章)</h2>
+      <span class="section-tag tag-3">Part 3</span>
+      <blockquote class="prereq">
+        <p><b>开始本章需要的全部前置</b>:<a href="#sec-p0-6">0.6 TCP / HTTP / DNS</a>、<a href="#sec-p2-1">2.1 React</a>、<a href="#sec-p2-3">2.3 Hooks</a>。</p>
+      </blockquote>
+      <p>路线:3.1 HTTP/SSE → 3.2 WebSocket 协议 → 3.3 WS 重连与心跳。</p>
+    </section>
+
+    <section id="sec-p3-1">
+      <h2><span class="num">3.1</span>HTTP / SSE 协议</h2>
+      <span class="section-tag tag-3">Part 3</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-6">0.6 HTTP 基础</a>
+      </div>
+
+      <h3>HTTP 1.1 vs HTTP/2 vs HTTP/3</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>维度</th><th>HTTP 1.1</th><th>HTTP/2</th><th>HTTP/3</th></tr></thead>
+        <tbody>
+          <tr><td>多路复用</td><td>✗ (队头阻塞)</td><td>✓ (单连接多 stream)</td><td>✓ (基于 QUIC/UDP)</td></tr>
+          <tr><td>首字节延迟</td><td>~50-200ms</td><td>~20-100ms</td><td>~5-50ms</td></tr>
+          <tr><td>头部压缩</td><td>✗</td><td>HPACK</td><td>QPACK</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>SSE(Server-Sent Events):单向流</h3>
+      <p>HTTP 1.1 chunked transfer + <code>text/event-stream</code> 头 = 服务端可以持续推送。</p>
+<pre><code>HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+
+data: {"token": "你好"}
+data: {"token": "，"}
+
+data: [DONE]
+</code></pre>
+
+      <h3>SSE vs WebSocket vs 轮询</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>特性</th><th>SSE</th><th>WebSocket</th><th>长轮询</th></tr></thead>
+        <tbody>
+          <tr><td>方向</td><td>服务端 → 客户端</td><td>双向</td><td>客户端拉</td></tr>
+          <tr><td>协议</td><td>HTTP chunked</td><td>ws:// 升级</td><td>HTTP keep-alive</td></tr>
+          <tr><td>代理友好</td><td>✓</td><td>需要 Upgrade 头</td><td>✓</td></tr>
+          <tr><td>适合</td><td>LLM token 流、通知</td><td>聊天、协作</td><td>老旧后端</td></tr>
+        </tbody>
+      </table></div>
+      <p>RealMock 的 <code>agentService.prepMessageStream</code>(面试辅导)用 SSE。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p3-2">下一章:3.2 WebSocket 协议 →</a></div>
+    </section>
+
+    <section id="sec-p3-2">
+      <h2><span class="num">3.2</span>WebSocket 协议</h2>
+      <span class="section-tag tag-3">Part 3</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-6">0.6 TCP</a>
+        <a class="prereq-chip" href="#sec-p3-1">3.1 HTTP</a>
+      </div>
+
+      <h3>本质:HTTP 的"升级"</h3>
+      <p>WebSocket <strong>不是独立协议</strong>,而是把 HTTP 连接"升级"成全双工二进制协议。</p>
+<pre><code><span class="tk-com">// 客户端请求</span>
+GET /ws/interview/123 HTTP/1.1
+Host: localhost:8081
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Protocol: mock.&lt;access_token&gt;   <span class="tk-com"># 子协议传令牌</span>
+
+<span class="tk-com">// 服务端响应</span>
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: ...
+</code></pre>
+
+      <h3>帧(Frame)结构</h3>
+      <p>每条消息是一个或多个 frame。每个 frame 头部最小 2 字节:</p>
+      <ul>
+        <li>第 1 字节:FIN 位 + opcode(0x0=continuation, 0x1=text, 0x2=binary, 0x8=close, 0x9=ping, 0xA=pong)</li>
+        <li>第 2 字节:MASK + payload length(7 bit / 16 bit / 64 bit)</li>
+      </ul>
+
+      <h3>控制帧:ping/pong/close</h3>
+      <p>协议层就有心跳机制(<code>opcode=0x9 ping</code>),但 RealMock 用<strong>应用层心跳</strong>(发 <code>{type: "server_ping"}</code> 业务消息),因为浏览器 WebSocket API 没暴露原生 ping/pong。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p3-3">下一章:3.3 WS 重连与心跳 →</a></div>
+    </section>
+
+    <section id="sec-p3-3">
+      <h2><span class="num">3.3</span>WS 重连与心跳</h2>
+      <span class="section-tag tag-3">Part 3</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p3-2">3.2 WebSocket</a>
+        <a class="prereq-chip" href="#sec-p2-3">2.3 Hooks 原理</a>
+        <a class="prereq-chip" href="#sec-p0-4">0.4 进程/线程</a>
+      </div>
+
+      <h3>为什么 WS 一定会断</h3>
+      <p>生产环境的 WS 杀手:① 移动网络切换(4G→WiFi);② 防火墙 idle timeout(60s);③ LB 维护;④ 服务器重启;⑤ 客户端浏览器切到后台。</p>
+      <p><strong>结论:必须主动重连</strong>。RealMock 重连设计 5 道防线:</p>
+
+      <h3>防线 1:服务端心跳</h3>
+      <div class="code-cap"><span class="file">shared/core/constants.py</span><span class="tag">心跳参数</span></div>
+<pre><code>HEARTBEAT_TIMEOUT_SEC = <span class="tk-num">30.0</span>   <span class="tk-com"># 30s 无消息 → ping</span>
+HEARTBEAT_MAX_MISSES = <span class="tk-num">3</span>      <span class="tk-com"># 累计 3 次未响应 → 关闭</span>
+</code></pre>
+      <div class="code-cap"><span class="file">interview_service/realtime/connection_lifecycle.py</span> · <span class="lineno">L280-305</span><span class="tag">主循环心跳</span></div>
+<pre><code>miss_count = <span class="tk-num">0</span>
+<span class="tk-key">while not</span> self._superseded:
+    <span class="tk-key">try</span>:
+        data = <span class="tk-key">await</span> asyncio.wait_for(<span class="tk-key">self</span>.ws.receive_json(), timeout=<span class="tk-num">30.0</span>)
+    <span class="tk-key">except</span> asyncio.TimeoutError:
+        miss_count += <span class="tk-num">1</span>
+        <span class="tk-key">if</span> miss_count &gt;= <span class="tk-num">3</span>:
+            <span class="tk-key">await</span> <span class="tk-key">self</span>.send(<span class="tk-str">"error"</span>, message=<span class="tk-str">"心跳超时"</span>, code=<span class="tk-str">"B2002"</span>)
+            <span class="tk-key">break</span>
+        <span class="tk-key">await</span> <span class="tk-key">self</span>.send(<span class="tk-str">"server_ping"</span>, t=...)
+</code></pre>
+
+      <h3>防线 2:客户端指数退避</h3>
+      <div class="code-cap"><span class="file">apps/web/src/features/media/useInterviewWS.ts</span> · <span class="lineno">L145-175</span><span class="tag">断线重连</span></div>
+<pre><code>retryCountRef.current += <span class="tk-num">1</span>
+<span class="tk-key">if</span> (retryCountRef.current &gt; maxRetries) {                  <span class="tk-com"># 5 次后切 failed</span>
+    setConnectionState(<span class="tk-str">"failed"</span>)
+    retryTimerRef.current = window.setTimeout(connect, <span class="tk-num">20_000</span>)   <span class="tk-com"># 长间隔保活</span>
+    <span class="tk-key">return</span>
+}
+<span class="tk-key">const</span> delay = Math.min(<span class="tk-num">1000</span> * <span class="tk-num">2</span> ** (retryCountRef.current - <span class="tk-num">1</span>), <span class="tk-num">8000</span>)   <span class="tk-com"># 1s→2s→4s→8s</span>
+retryTimerRef.current = window.setTimeout(connect, delay)
+</code></pre>
+
+      <h3>防线 3:世代号防 Strict Mode 双连接</h3>
+      <p>(详见 <a href="#sec-p2-3">2.3 Hooks 原理</a>)</p>
+
+      <h3>防线 4:幂等性</h3>
+      <p>重连后可能重复发送同一消息,后端必须能处理重复(RealMock 的"候选答案 + session_id 唯一约束")。</p>
+
+      <h3>防线 5:多 tab 单会话</h3>
+      <p>RealMock 用 <code>claim_session_connection</code> 顶替旧连接,避免多 tab 抢同一个 session:</p>
+      <div class="code-cap"><span class="file">interview_service/realtime/session_registry.py</span><span class="tag">租约</span></div>
+<pre><code><span class="tk-key">async def</span> <span class="tk-fn">claim_session_connection</span>(handler):
+    <span class="tk-key">async with</span> _registry_lock:
+        old = _active_handlers.get(handler.session_id)
+        _active_handlers[handler.session_id] = handler
+    <span class="tk-key">if</span> old <span class="tk-key">is not None and</span> old <span class="tk-key">is not</span> handler:
+        <span class="tk-key">await</span> old.send(<span class="tk-str">"error"</span>, message=<span class="tk-str">"该面试已在其他窗口打开"</span>, code=<span class="tk-str">"B2003"</span>)
+        <span class="tk-key">await</span> old.ws.close(code=<span class="tk-num">4000</span>)
+</code></pre>
+
+      <div class="next-chapter">⏭ <a href="#sec-4">下一部分:Part 4 · Python 后端 →</a></div>
+    </section>
+
+    <!-- ========================================================
+         PART 4 — Python 后端
+         ======================================================== -->
+
+    <section id="sec-4">
+      <h2><span class="num">4.</span>Part 4 · Python 后端(5 章)</h2>
+      <span class="section-tag tag-4">Part 4</span>
+      <blockquote class="prereq">
+        <p><b>开始本章需要的全部前置</b>:<a href="#sec-p0-1">0.1 程序</a>、<a href="#sec-p0-2">0.2 变量函数</a>、<a href="#sec-p0-3">0.3 类型</a>、<a href="#sec-p0-4">0.4 进程线程协程</a>、<a href="#sec-p0-6">0.6 网络</a>、<a href="#sec-p1-6">1.6 RAG</a>、<a href="#sec-p3-2">3.2 WebSocket</a>。</p>
+      </blockquote>
+      <p>路线:4.1 装饰器 → 4.2 asyncio → 4.3 SQL → 4.4 ORM → 4.5 加密学。</p>
+    </section>
+
+    <section id="sec-p4-1">
+      <h2><span class="num">4.1</span>装饰器 / 上下文管理器</h2>
+      <span class="section-tag tag-4">Part 4</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 函数</a>
+      </div>
+
+      <h3>装饰器 = 函数的包装</h3>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">my_decorator</span>(func):
+    <span class="tk-key">def</span> <span class="tk-fn">wrapper</span>(*args, **kwargs):
+        <span class="tk-fn">print</span>(<span class="tk-str">"before"</span>)
+        result = func(*args, **kwargs)
+        <span class="tk-fn">print</span>(<span class="tk-str">"after"</span>)
+        <span class="tk-key">return</span> result
+    <span class="tk-key">return</span> wrapper
+
+<span class="tk-key">@my_decorator</span>
+<span class="tk-key">def</span> <span class="tk-fn">say_hello</span>():
+    <span class="tk-fn">print</span>(<span class="tk-str">"hi"</span>)
+
+<span class="tk-com"># 等价于: say_hello = my_decorator(say_hello)</span>
+</code></pre>
+
+      <h3>RealMock 用到的装饰器</h3>
+      <ul>
+        <li><code>@asynccontextmanager</code>(<code>shared/app_factory.py</code>):lifespan</li>
+        <li><code>@lru_cache(maxsize=128)</code>(<code>shared/config.py</code>、<code>shared/core/secrets.py</code>):缓存单例</li>
+        <li><code>@property</code>(<code>shared/models/__init__.py</code>):<code>tech_domains_list</code></li>
+        <li><code>@dataclass</code>(<code>interview_service/services/interview/agent.py</code>):状态类</li>
+      </ul>
+
+      <h3>上下文管理器:成对操作</h3>
+      <p>用 <code>with</code> 语法保证"打开/关闭"成对执行(即使抛异常)。</p>
+<pre><code><span class="tk-key">class</span> <span class="tk-cls">DBConnection</span>:
+    <span class="tk-key">def</span> <span class="tk-fn">__enter__</span>(<span class="tk-key">self</span>):
+        <span class="tk-key">self</span>.conn = connect()
+        <span class="tk-key">return</span> <span class="tk-key">self</span>.conn
+    <span class="tk-key">def</span> <span class="tk-fn">__exit__</span>(<span class="tk-key">self</span>, *exc):
+        <span class="tk-key">self</span>.conn.close()
+        <span class="tk-key">return</span> <span class="tk-key">False</span>
+
+<span class="tk-key">with</span> DBConnection() <span class="tk-key">as</span> conn:
+    conn.query(<span class="tk-str">"..."</span>)
+<span class="tk-com"># 不管中间抛什么,conn.close() 一定执行</span>
+</code></pre>
+
+      <p>FastAPI 的 <code>Depends(get_db)</code> 实际上就是上下文管理器模式(见 <a href="#sec-p4-4">4.4 ORM</a>)。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p4-2">下一章:4.2 asyncio 协程 →</a></div>
+    </section>
+
+    <section id="sec-p4-2">
+      <h2><span class="num">4.2</span>asyncio 协程</h2>
+      <span class="section-tag tag-4">Part 4</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-4">0.4 进程/线程/协程</a>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 异步函数</a>
+      </div>
+
+      <h3>事件循环 = 单线程调度器</h3>
+      <p>asyncio 只有一个线程,但能"同时"处理很多 IO 任务(因为 IO 大部分时间在"等")。</p>
+
+      <h3>3 个关键关键字</h3>
+      <ul>
+        <li><b>async def</b>:定义协程函数</li>
+        <li><b>await</b>:等待可等待对象(协程、Task、Future)完成;等待时让出控制权</li>
+        <li><b>asyncio.gather</b>:并发运行多个协程</li>
+      </ul>
+
+      <h3>3 个并发原语</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>原语</th><th>行为</th><th>RealMock 用法</th></tr></thead>
+        <tbody>
+          <tr><td><code>asyncio.gather(*tasks)</code></td><td>并发跑,任一异常会传播(除非 <code>return_exceptions=True</code>)</td><td>并发执行多个 tool call</td></tr>
+          <tr><td><code>asyncio.create_task(coro)</code></td><td>fire-and-forget 后台任务</td><td>报告后台生成、WS 心跳 ping</td></tr>
+          <tr><td><code>asyncio.Lock</code></td><td>同协程串行化</td><td>报告生成防双打</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>RealMock 的 4 个模式</h3>
+      <h4>① to_thread:把阻塞 IO 丢到线程池</h4>
+      <pre><code><span class="tk-key">await</span> asyncio.to_thread(_bootstrap_db_and_seed)   <span class="tk-com"># 同步磁盘 IO 不阻塞事件循环</span></code></pre>
+
+      <h4>② gather:并发执行</h4>
+      <pre><code>results = <span class="tk-key">await</span> asyncio.gather(*[self._run_tool_call_safe(tc, db) <span class="tk-key">for</span> tc <span class="tk-key">in</span> limited])</code></pre>
+
+      <h4>③ create_task + done_callback</h4>
+      <pre><code>task = asyncio.create_task(coro)
+self._bg_tasks.add(task)
+task.add_done_callback(<span class="tk-key">lambda</span> t: self._bg_tasks.discard(t))   <span class="tk-com"># 自动清理</span></code></pre>
+
+      <h4>④ ContextVar 跨协程传值</h4>
+      <pre><code>_trace_id_var = contextvars.ContextVar(<span class="tk-str">"trace_id"</span>, default=<span class="tk-str">""</span>)
+<span class="tk-key">def</span> <span class="tk-fn">set_trace_id</span>(value=<span class="tk-key">None</span>): <span class="tk-key">return</span> _trace_id_var.set(value <span class="tk-key">or</span> new_trace_id())</code></pre>
+
+      <div class="next-chapter">⏭ <a href="#sec-p4-3">下一章:4.3 SQL 与关系数据库 →</a></div>
+    </section>
+
+    <section id="sec-p4-3">
+      <h2><span class="num">4.3</span>SQL 与关系数据库</h2>
+      <span class="section-tag tag-4">Part 4</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-5">0.5 内存</a>
+      </div>
+
+      <h3>前置:为什么需要数据库</h3>
+      <p>程序结束内存就清空;多进程/多机要共享数据;数据要可查询、可过滤、可聚合。数据库 = 持久化 + 结构化 + 并发安全。</p>
+
+      <h3>SQL 4 句话</h3>
+<pre><code>SELECT id, name <span class="tk-key">FROM</span> resumes <span class="tk-key">WHERE</span> is_active = <span class="tk-num">1</span> <span class="tk-key">ORDER BY</span> created_at <span class="tk-key">DESC</span> <span class="tk-key">LIMIT</span> <span class="tk-num">10</span>;
+<span class="tk-key">INSERT INTO</span> resumes (filename, file_type, raw_text) <span class="tk-key">VALUES</span> (?, ?, ?);
+<span class="tk-key">UPDATE</span> resumes <span class="tk-key">SET</span> is_active = <span class="tk-num">1</span> <span class="tk-key">WHERE</span> id = ?;
+<span class="tk-key">DELETE FROM</span> resumes <span class="tk-key">WHERE</span> id = ?;
+</code></pre>
+
+      <h3>事务:要么全成,要么全败</h3>
+<pre><code><span class="tk-key">BEGIN</span>;
+  <span class="tk-key">UPDATE</span> users <span class="tk-key">SET</span> balance = balance - <span class="tk-num">100</span> <span class="tk-key">WHERE</span> id = <span class="tk-num">1</span>;
+  <span class="tk-key">UPDATE</span> users <span class="tk-key">SET</span> balance = balance + <span class="tk-num">100</span> <span class="tk-key">WHERE</span> id = <span class="tk-num">2</span>;
+<span class="tk-key">COMMIT</span>;   <span class="tk-com"># 都成功</span>
+
+<span class="tk-com"># 如果中间抛异常,自动 ROLLBACK</span>
+</code></pre>
+
+      <h3>4 种隔离级别</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>级别</th><th>脏读</th><th>不可重复读</th><th>幻读</th></tr></thead>
+        <tbody>
+          <tr><td>Read Uncommitted</td><td>✓</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Read Committed</td><td>✓</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Repeatable Read</td><td>—</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Serializable</td><td>—</td><td>—</td><td>—</td></tr>
+        </tbody>
+      </table></div>
+      <p>RealMock 用 SQLite,默认 <strong>Serializable</strong>(SQLite 是单写者锁库)。</p>
+
+      <h3>SQLite vs PostgreSQL</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>维度</th><th>SQLite</th><th>PostgreSQL</th></tr></thead>
+        <tbody>
+          <tr><td>安装</td><td>零(库即文件)</td><td>需装服务</td></tr>
+          <tr><td>并发</td><td>单写者(WAL 缓解)</td><td>多写者 MVCC</td></tr>
+          <tr><td>上限</td><td>~ 1 亿行/库</td><td>无硬限</td></tr>
+          <tr><td>网络</td><td>无</td><td>客户端/服务端</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>RealMock 切库的代价 = 0</h3>
+      <p>RealMock 用 SQLAlchemy 2.0 抽象,只换 <code>DATABASE_URL</code> 即可切到 Postgres。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p4-4">下一章:4.4 ORM 与迁移 →</a></div>
+    </section>
+
+    <section id="sec-p4-4">
+      <h2><span class="num">4.4</span>ORM 与迁移</h2>
+      <span class="section-tag tag-4">Part 4</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p4-3">4.3 SQL</a>
+        <a class="prereq-chip" href="#sec-p0-3">0.3 类型</a>
+      </div>
+
+      <h3>ORM = Object-Relational Mapping</h3>
+      <p>把 SQL 表映射成 Python 类,把行映射成对象。让你<strong>用面向对象方式操作数据库</strong>。</p>
+
+      <h3>SQLAlchemy 2.0 用法</h3>
+      <div class="code-cap"><span class="file">shared/models/__init__.py</span><span class="tag">UserProfile ORM</span></div>
+<pre><code><span class="tk-key">class</span> <span class="tk-cls">UserProfile</span>(Base):
+    __tablename__ = <span class="tk-str">"user_profiles"</span>
+    id: Mapped[int] = mapped_column(Integer, primary_key=<span class="tk-key">True</span>)
+    name: Mapped[str] = mapped_column(String(<span class="tk-num">100</span>), default=<span class="tk-str">"求职者"</span>)
+    self_intro: Mapped[str] = mapped_column(Text, default=<span class="tk-str">""</span>)
+    tech_domains: Mapped[str] = mapped_column(Text, default=<span class="tk-str">"[]"</span>)   <span class="tk-com"># JSON 字符串</span>
+</code></pre>
+<pre><code><span class="tk-com"># SQLAlchemy 2.0 查询(新风格)</span>
+profile = db.query(UserProfile).filter(UserProfile.id == <span class="tk-num">1</span>).first()
+profile = db.execute(select(UserProfile).where(UserProfile.id == <span class="tk-num">1</span>)).scalar_one_or_none()
+</code></pre>
+
+      <h3>Pydantic v2 + ORM 协作</h3>
+      <p>RealMock 同时用 Pydantic(API 边界)+ SQLAlchemy(DB 内部):</p>
+<pre><code><span class="tk-com"># API 边界用 Pydantic(校验输入/输出)</span>
+<span class="tk-key">class</span> <span class="tk-cls">UserProfileUpdate</span>(BaseModel):
+    name: str = <span class="tk-str">"求职者"</span>
+    self_intro: str = <span class="tk-str">""</span>
+
+<span class="tk-com"># 内部用 ORM(操作数据库)</span>
+profile = db.query(UserProfile).first()
+profile.name = body.name
+db.commit()
+
+<span class="tk-com"># 返回时 ORM → Pydantic 转换</span>
+<span class="tk-key">return</span> UserProfileResponse.model_validate(profile)
+</code></pre>
+
+      <h3>迁移:列级幂等 + Alembic</h3>
+      <div class="code-cap"><span class="file">shared/core/migrate.py</span><span class="tag">列级迁移</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">apply_column_migrations</span>(engine):
+    <span class="tk-key">for</span> table, statements <span class="tk-key">in</span> MIGRATIONS.items():
+        <span class="tk-key">if</span> table <span class="tk-key">not in</span> inspector.get_table_names(): ...
+        existing_cols = {c[<span class="tk-str">"name"</span>] <span class="tk-key">for</span> c <span class="tk-key">in</span> inspector.get_columns(table)}
+        to_apply = [s <span class="tk-key">for</span> s <span class="tk-key">in</span> statements
+                   <span class="tk-key">if</span> (col := _column_name_from_stmt(s)) <span class="tk-key">and</span> col <span class="tk-key">not in</span> existing_cols]
+        <span class="tk-key">for</span> stmt <span class="tk-key">in</span> to_apply:
+            conn.execute(text(stmt))
+</code></pre>
+      <p>RealMock 选<strong>列级幂等</strong>(不是 Alembic revision),加列只需往字典加一条 ALTER,启动时自动补。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p4-5">下一章:4.5 加密学基础 →</a></div>
+    </section>
+
+    <section id="sec-p4-5">
+      <h2><span class="num">4.5</span>加密学基础(AES-GCM / PBKDF2)</h2>
+      <span class="section-tag tag-4">Part 4</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-5">0.5 内存</a>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 变量</a>
+      </div>
+
+      <h3>前置:为什么需要加密</h3>
+      <p>数据库存的是"明文",丢了就被看光。加密后:即使丢文件,看到的也是"密文"。</p>
+
+      <h3>3 大概念</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>概念</th><th>作用</th><th>类比</th></tr></thead>
+        <tbody>
+          <tr><td><b>对称加密</b>(AES)</td><td>同密钥加密+解密</td><td>同一把锁,钥匙加密+开锁</td></tr>
+          <tr><td><b>密钥派生</b>(PBKDF2)</td><td>从弱密码/短 key 派生强 key</td><td>把"abc123"拉伸成"abc123abc123..."</td></tr>
+          <tr><td><b>认证加密 AEAD</b>(GCM)</td><td>加密+完整性校验(防篡改)</td><td>带签名的信封</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>RealMock 的实现</h3>
+      <div class="code-cap"><span class="file">shared/core/secrets.py</span> · <span class="lineno">L137-159</span><span class="tag">encrypt_secret</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">encrypt_secret</span>(plaintext):
+    <span class="tk-key">if</span> plaintext.startswith(<span class="tk-str">"enc:v2:"</span>): <span class="tk-key">return</span> plaintext  <span class="tk-com"># 已加密</span>
+    salt = os.urandom(<span class="tk-num">16</span>)       <span class="tk-com"># 16 字节随机盐(防彩虹表)</span>
+    nonce = os.urandom(<span class="tk-num">12</span>)      <span class="tk-com"># 12 字节 GCM nonce(必须唯一!)</span>
+    master = _master_bytes()              <span class="tk-com"># 从 SECRET_KEY / .secret.key</span>
+    key = _derive_key(master, salt)       <span class="tk-com"># PBKDF2 200k 迭代</span>
+    ct_with_tag = AESGCM(key).encrypt(nonce, plaintext.encode(), <span class="tk-key">None</span>)
+    <span class="tk-key">return</span> <span class="tk-str">f"enc:v2:{b64(salt)}:{b64(nonce)}:{b64(tag)}:{b64(ct)}"</span>
+</code></pre>
+
+      <h3>为什么 nonce 重复会灾难</h3>
+      <p>GCM 安全性基于 (key, nonce) 唯一。如果同一 nonce 加密两个明文,攻击者可恢复明文异或 + 伪造 tag。<strong>RealMock 用 os.urandom(12) = 96 bit 随机,生日攻击需要 2^48 次才碰撞</strong>。</p>
+
+      <h3>为什么 PBKDF2 200k 迭代</h3>
+      <p>OWASP 2023 推荐。每次派生 ~250ms。GPU 暴力破解 8 字符密码:1k 迭代 → 10^8/s,200k 迭代 → 500/s。</p>
+
+      <h3>prod 必须显式设 SECRET_KEY</h3>
+      <p>如果依赖自动生成的 <code>.secret.key</code>,机器迁移后密文不可解。RealMock 启动门禁 <code>_check_secret_key_policy</code> 在 prod 强制要求显式 env。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-5">下一部分:Part 5 · 系统设计 →</a></div>
+    </section>
+
+    <!-- ========================================================
+         PART 5 — 系统设计
+         ======================================================== -->
+
+    <section id="sec-5">
+      <h2><span class="num">5.</span>Part 5 · 系统设计(4 章)</h2>
+      <span class="section-tag tag-5">Part 5</span>
+      <blockquote class="prereq">
+        <p><b>开始本章需要的全部前置</b>:<a href="#sec-p0-6">0.6 TCP/HTTP/DNS</a>、<a href="#sec-p4-3">4.3 SQL</a>、<a href="#sec-p4-4">4.4 ORM</a>、<a href="#sec-p3-2">3.2 WebSocket</a>。</p>
+      </blockquote>
+      <p>路线:5.1 限流 → 5.2 SSRF/DNS Pin → 5.3 CAP/BASE → 5.4 缓存。</p>
+    </section>
+
+    <section id="sec-p5-1">
+      <h2><span class="num">5.1</span>限流算法</h2>
+      <span class="section-tag tag-5">Part 5</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-2">0.2 数组</a>
+      </div>
+
+      <h3>前置:为什么需要限流</h3>
+      <p>防止:<strong>DoS</strong>(恶意用户刷接口) / <strong>误用</strong>(写错循环) / <strong>供应商爆配额</strong>(LLM API 按 token 计费)。</p>
+
+      <h3>5 种算法对比</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>算法</th><th>实现</th><th>特点</th></tr></thead>
+        <tbody>
+          <tr><td><b>固定窗口</b></td><td>每秒/分计数,归零</td><td>简单;边界双倍流量</td></tr>
+          <tr><td><b>滑动窗口</b></td><td>deque 存时间戳,过期 pop</td><td>精确,内存 O(limit)</td></tr>
+          <tr><td><b>令牌桶</b></td><td>固定速率加 token,请求消耗</td><td>允许突发 + 平滑</td></tr>
+          <tr><td><b>漏桶</b></td><td>排队 + 固定速率出</td><td>严格平滑,无突发</td></tr>
+          <tr><td><b>滑动日志</b></td><td>所有时间戳 SortedSet 过期</td><td>最精确,内存大</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>RealMock 用滑动窗口</h3>
+      <div class="code-cap"><span class="file">shared/core/ratelimit.py</span><span class="tag">check_rate_limit_by_id</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">check_rate_limit_by_id</span>(*, key, client_id, limit, window_seconds=<span class="tk-num">60</span>):
+    bucket = _BUCKETS.get((key, client_id))
+    now = time.monotonic()
+    <span class="tk-key">while</span> bucket.timestamps <span class="tk-key">and</span> bucket.timestamps[<span class="tk-num">0</span>] &lt;= now - window_seconds:
+        bucket.timestamps.popleft()
+    <span class="tk-key">if</span> len(bucket.timestamps) &gt;= limit:
+        retry_after = <span class="tk-key">int</span>(window_seconds - (now - bucket.timestamps[<span class="tk-num">0</span>]))
+        <span class="tk-key">raise</span> ApiBusinessError(..., headers={<span class="tk-str">"Retry-After"</span>: <span class="tk-str">str(retry_after)</span>})
+    bucket.timestamps.append(now)
+</code></pre>
+
+      <h3>3 个默认桶</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>key</th><th>limit</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>通用</td><td>60/min</td><td>普通 HTTP 接口</td></tr>
+          <tr><td>llm</td><td>10/min</td><td>LLM 调用(保护供应商)</td></tr>
+          <tr><td>session_create</td><td>20/min</td><td>防批量刷会话</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>WS 友好版</h3>
+      <p>HTTP 路径限流超限抛 429;WS 路径用 <code>try_rate_limit_by_id</code> 返回 bool,不抛异常(避免破坏 WS 循环)。</p>
+
+      <div class="next-chapter">⏭ <a href="#sec-p5-2">下一章:5.2 SSRF 与 DNS Pin →</a></div>
+    </section>
+
+    <section id="sec-p5-2">
+      <h2><span class="num">5.2</span>SSRF 与 DNS Pin</h2>
+      <span class="section-tag tag-5">Part 5</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-6">0.6 DNS / HTTP</a>
+      </div>
+
+      <h3>SSRF 是什么</h3>
+      <p><b>S</b>erver-<b>S</b>ide <b>R</b>equest <b>F</b>orgery = 攻击者让你服务端<strong>代他请求</strong>内部资源。</p>
+      <p>例子:用户填 <code>image_url</code> 服务端去抓 → 改成 <code>http://169.254.169.254/...</code>(云 metadata) → 拿到云凭证。</p>
+
+      <h3>RealMock 的双重防御</h3>
+      <h4>第 1 层:URL 解析 + 黑名单</h4>
+      <div class="code-cap"><span class="file">shared/core/security/url.py</span> · <span class="lineno">L20-50</span><span class="tag">黑名单网段</span></div>
+<pre><code>_DEFAULT_BLOCKED_NETS = [
+    ipaddress.ip_network(<span class="tk-str">"127.0.0.0/8"</span>),     <span class="tk-com"># loopback</span>
+    ipaddress.ip_network(<span class="tk-str">"10.0.0.0/8"</span>),       <span class="tk-com"># 私网</span>
+    ipaddress.ip_network(<span class="tk-str">"172.16.0.0/12"</span>),
+    ipaddress.ip_network(<span class="tk-str">"192.168.0.0/16"</span>),
+    ipaddress.ip_network(<span class="tk-str">"169.254.0.0/16"</span>),  <span class="tk-com"># metadata</span>
+    ipaddress.ip_network(<span class="tk-str">"0.0.0.0/8"</span>),
+    ipaddress.ip_network(<span class="tk-str">"100.64.0.0/10"</span>),   <span class="tk-com"># CGNAT</span>
+    ...
+]
+_DEFAULT_ALLOWED_PORTS = frozenset({<span class="tk-num">80</span>, <span class="tk-num">443</span>})
+</code></pre>
+
+      <h4>第 2 层:DNS Pin(防 DNS Rebinding)</h4>
+      <p>经典攻击:</p>
+      <ol>
+        <li>第一次解析 <code>evil.com</code> → <code>1.2.3.4</code>(公网,过校验)</li>
+        <li>建连时再解析 → <code>127.0.0.1</code>(本机,绕过防火墙)</li>
+      </ol>
+      <p>RealMock 的 <code>make_pinned_async_client</code>:</p>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">make_pinned_async_client</span>(url, ...):
+    target = pin_safe_http_url(url, ...)        <span class="tk-com"># 单次解析,锁死 IP</span>
+    transport = PinnedHostTransport(
+        hostname=target.hostname, pinned_ip=target.pinned_ip,
+    )
+    <span class="tk-key">return</span> httpx.AsyncClient(transport=transport, ...)
+</code></pre>
+      <p>后续请求用 <code>PinnedHostTransport</code> 把请求重写到固定 IP,Host 头保留原 hostname,SNI 仍用原 hostname。</p>
+
+      <blockquote class="tip">
+        <p><b>迁移</b>:用 IP 库(如 <code>ip2region</code>) 在 URL 解析前再判一次,降低对 DNS 解析的依赖。</p>
+      </blockquote>
+
+      <div class="next-chapter">⏭ <a href="#sec-p5-3">下一章:5.3 CAP / BASE →</a></div>
+    </section>
+
+    <section id="sec-p5-3">
+      <h2><span class="num">5.3</span>CAP / BASE</h2>
+      <span class="section-tag tag-5">Part 5</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-4">0.4 进程</a>
+        <a class="prereq-chip" href="#sec-p0-6">0.6 网络</a>
+      </div>
+
+      <h3>CAP 定理</h3>
+      <p>分布式系统三选二:</p>
+      <ul>
+        <li><b>C</b>onsistency:所有节点同一时刻看到同一份数据</li>
+        <li><b>A</b>vailability:每个请求都能收到非错响应</li>
+        <li><b>P</b>artition tolerance:网络分区时仍能服务</li>
+      </ul>
+      <p><b>P 必选</b>(网络一定会断),所以 CP 或 AP。</p>
+
+      <h3>为什么只能二选一</h3>
+      <p>网络分区时:节点 A 收到写入,但 B 不知道(因为不通)。要 C → 拒绝 B 的读(丢 A);要 A → 各自服务(暂时不一致)。</p>
+
+      <h3>BASE 理论</h3>
+      <p>放弃强一致,换可用性:</p>
+      <ul>
+        <li><b>B</b>asically <b>A</b>vailable:基本可用</li>
+        <li><b>S</b>oft state:软状态(允许中间不一致)</li>
+        <li><b>E</b>ventually consistent:最终一致</li>
+      </ul>
+
+      <h3>3 大一致性模型</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>模型</th><th>保证</th><th>例子</th></tr></thead>
+        <tbody>
+          <tr><td><b>强一致</b></td><td>写完立刻读到最新值</td><td>etcd / ZooKeeper(CP)</td></tr>
+          <tr><td><b>因果一致</b></td><td>有因果关系的操作有序</td><td>聊天(自己消息按序)</td></tr>
+          <tr><td><b>最终一致</b></td><td>一段时间后所有人读到一致</td><td>DNS / DynamoDB(AP)</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>RealMock 的一致性选择</h3>
+      <p>RealMock 是<strong>单进程单数据库</strong> → 强一致。但有"假分布式"问题:</p>
+      <ul>
+        <li>多 worker → 报告生成防双打(<code>asyncio.Lock</code> + DB 哨兵)</li>
+        <li>WS 多 tab → 单会话单连接(顶替旧)</li>
+        <li><code>system_learning.json</code> → 跨进程文件锁</li>
+      </ul>
+
+      <div class="next-chapter">⏭ <a href="#sec-p5-4">下一章:5.4 缓存策略 →</a></div>
+    </section>
+
+    <section id="sec-p5-4">
+      <h2><span class="num">5.4</span>缓存策略</h2>
+      <span class="section-tag tag-5">Part 5</span>
+
+      <div class="prereq-list">
+        <span class="prereq-chip">ⓘ 前置:</span>
+        <a class="prereq-chip" href="#sec-p0-5">0.5 内存</a>
+      </div>
+
+      <h3>缓存的代价</h3>
+      <p>用空间换时间。但也有问题:<strong>一致性</strong>(数据过期多久?) / <strong>击穿</strong>(热点 key 过期,1000 个请求同时打 DB) / <strong>雪崩</strong>(大批 key 同时过期)。</p>
+
+      <h3>3 大模式</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>模式</th><th>做法</th><th>适合</th></tr></thead>
+        <tbody>
+          <tr><td><b>Cache-Aside</b></td><td>读:先 cache 后 DB;写:先 DB 再失效 cache</td><td>最常用</td></tr>
+          <tr><td><b>Write-Through</b></td><td>写同时写 cache 和 DB</td><td>一致性要求高</td></tr>
+          <tr><td><b>Write-Behind</b></td><td>写只写 cache,异步刷 DB</td><td>高写吞吐</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>RealMock 的"缓存"实践</h3>
+      <ul>
+        <li><b>配置缓存</b>:<code>@lru_cache</code> 缓存 <code>get_settings()</code> / <code>_master_bytes()</code> / <code>_whisper_model</code></li>
+        <li><b>RAG 索引</b>:<code>build_index</code> 一次性构建,后续 query 复用</li>
+        <li><b>company_knowledge</b>:内置数据,直接 import(零网络)</li>
+        <li><b>WS 短句 TTS 队列</b>:合成过的句子不重复合成(队列上限 50 防爆)</li>
+      </ul>
+
+      <div class="next-chapter">⏭ <a href="#sec-q">下一部分:面试题库 →</a></div>
+    </section>
+
+    <!-- ========================================================
+         PART 6 — 面试题库 (60 题)
+         ======================================================== -->
+
+    <section id="sec-q">
+      <h2><span class="num">Q</span>面试题库(60 题)</h2>
+      <span class="section-tag tag-6">面试题</span>
+      <p>基于项目实现,6 大方向。每题都有 <code>✅A</code> 参考答案,带章节链接(可回到前置学习)。</p>
+
+      <h3><span class="section-tag tag-ai">AI / Agent</span> Q1-Q12</h3>
+    </section>
+
+    <section>
+      <blockquote class="q-a">
+        <p><b>❓Q1. 什么是 Token?为什么中文 1 字 ≈ 1.5 token?答案在 <a href="#sec-p1-5">1.5</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:Token 是 LLM 的最小处理单元(BPE 等算法切出)。中文在 BPE 中平均 1~2 个 token,因为常用字 1 个、生僻字 2~3 个,所以 1.5 是经验估值。RealMock 用 <code>len(text)/1.5</code> 估算 context 占用,在 30% 阈值就触发压缩。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q2. 讲一下 Self-Attention 原理。Q/K/V 各自是什么?答案在 <a href="#sec-p1-3">1.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:对每个 token 算 3 个向量:<br/>
+        - <b>Query (Q)</b>:这个 token "想找什么"<br/>
+        - <b>Key (K)</b>:这个 token "能提供什么信息"<br/>
+        - <b>Value (V)</b>:这个 token "实际携带的信息"<br/>
+        计算 attention = <code>softmax(Q·K^T / √d_k)·V</code>。缩放因子 <code>√d_k</code> 防止点积过大导致 softmax 梯度消失。Multi-Head Attention 用多组 Q/K/V 并行,每头关注不同方面。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q3. RAG 的两阶段是什么?距离阈值有什么作用?答案在 <a href="#sec-p1-6">1.6</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        - <b>阶段 1 Ingestion(离线)</b>:文档→切块→embedding→存入向量库<br/>
+        - <b>阶段 2 Inference(在线)</b>:query→embedding→相似度搜索→top-K 文档→与 query 拼成 prompt→LLM 生成<br/>
+        <b>距离阈值</b>:RealMock 设 <code>distance &lt; 0.5</code> 才用,弱匹配丢弃。不设的话,弱相关文档会污染 prompt,反而降低答案质量。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q4. Function Calling 为什么不让 LLM 直接执行?答案在 <a href="#sec-p1-7">1.7</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① 沙箱化(LLM 不能访问 FS/网络);② 权限(扣款/删 DB 不能给 LLM);③ 审计(应用层可限流);④ 可恢复(LLM 不知道当前代码,应用知道)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q5. ReAct / CoT / Plan-and-Execute 区别?RealMock 怎么用?答案在 <a href="#sec-p1-8">1.8</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        - <b>CoT</b>:让 LLM 在脑内分步思考<br/>
+        - <b>ReAct</b>:思考→行动→观察循环,可调工具(RealMock 的 <code>tool_round_runner</code>)<br/>
+        - <b>Plan-and-Execute</b>:先规划全步骤再执行(RealMock 的 3 套工作流预定义阶段顺序)<br/>
+        RealMock 是 "soft" Plan-and-Execute:Plan 在代码层,Execute 在 ReAct 层。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q6. 工具循环的"无限循环"怎么防?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:四道防线:① <b>最大轮数</b>(<code>interview_max_tool_rounds=3</code>);② <b>每轮最大工具数</b>(<code>MAX_TOOLS_PER_ROUND=3</code>);③ <b>工具超时</b>(<code>asyncio.wait_for(tool, 18s)</code>);④ <b>白名单</b>(不调未注册的工具)。生产环境还要加 ⑤ 整体超时,⑥ 每次 LLM 调用的 token budget。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q7. 上下文压缩的 4 种策略?RealMock 用哪种?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        ① <b>滑窗</b>(留最近 N 条) ② <b>摘要</b>(LLM 总结早期) ③ <b>Token 截断</b> ④ <b>语义聚类</b>(embedding 去重)<br/>
+        RealMock 用①的简化版:阈值 30% 触发,保留 system + 最近 20 条 + "已压缩"说明。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q8. 如何防止 prompt 注入?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        RealMock 4 道防线:① 工具结果包含防御性指令(<code>"请勿编造搜索结果"</code>);② 在 system prompt 末尾追加硬约束(<code>with_agent_output_rules</code>);③ 工具返回截断+结构化;④ 拒绝接受未注册的 <code>tool_call</code>。无法完全防,只能减小攻击面。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q9. 什么是 SSE?LLM token 流为什么用它?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:Server-Sent Events = HTTP 1.1 chunked transfer + <code>text/event-stream</code> 头,服务端可以持续推送。<br/>
+        优势:① 单向够用(LLM 只输出);② 协议简单(HTTP 友好,代理/Nginx 容易支持);③ 浏览器有 <code>EventSource</code> API。RealMock 的 <code>prepMessageStream</code>(辅导流式)用 SSE。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q10. 流式响应断了怎么办?能重试吗?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        关键原则:<strong>已发 token 不重试</strong>(避免重复)。<br/>
+        RealMock 实践:① 0 token 失败时指数退避重试(0.5/1/2s);② 已发 token 失败 → 抛错而非重试;③ 客户端用 <code>done</code> 事件收尾;④ 客户端按 token 渲染,丢了就显示到当前位置。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q11. 什么是 capability token?和 session token 区别?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        - <b>Session Token</b> = "我是谁"<br/>
+        - <b>Capability Token</b> = "我能做什么",通常 32+ 字节随机,绑定资源 ID<br/>
+        RealMock 不做多用户登录,创建会话/辅导时下发 <code>secrets.token_urlsafe(32)</code> 写 HttpOnly Cookie,后续可变操作必验。优势:① 不可枚举;② 可独立撤销;③ 写 URL 日志也不泄漏(prod 拒绝 query <code>?token=</code>)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q12. 解释一下 RAG 中 metadata 过滤的作用。RealMock 怎么用?答案在 <a href="#sec-p1-6">1.6</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        Embedding 检索是"语义相似",但用户要的可能不是"语义最相似",而是"这个公司 / 这个角色 / 这个时间窗口的"。metadata 过滤 = 在向量搜索前先按结构化字段过滤,缩小搜索空间。<br/>
+        RealMock 每条文档带 <code>company_id</code> metadata,检索时 <code>where={"company_id": "bytedance"}</code> 限定到当前目标公司,避免"腾讯面试问题"污染"字节面试"。</p>
+      </blockquote>
+
+      <h3><span class="section-tag tag-2">React / 前端</span> Q13-Q24</h3>
+
+      <blockquote class="q-a">
+        <p><b>❓Q13. 为什么 Hook 不能写在 if 里?答案在 <a href="#sec-p2-3">2.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:React 内部为每个组件维护<strong>调用顺序链表</strong>。条件调用让"这次调的第 N 个 Hook"对应不到"上次第 N 个 Hook"的节点 → state 串了 → 报 <em>"Rendered fewer hooks than expected"</em>。<br/>
+        不是"官僚主义",是 React 用调用顺序对应 state 槽位的唯一实现方式。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q14. useEffect 的 cleanup 什么时候跑?答案在 <a href="#sec-p2-4">2.4</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① 组件 unmount;② 下次 effect 跑之前(deps 变了);③ Strict Mode 开发环境:挂载→卸载→再挂载(故意双调用)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q15. useState vs useRef 区别?答案在 <a href="#sec-p2-5">2.5</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        - <code>useState</code> 改值触发重渲染(需要显示在 UI 的数据)<br/>
+        - <code>useRef</code> 改 .current 不触发(计时器 ID、WS 实例、缓存)<br/>
+        RealMock 的 <code>useTTSPlayer</code> 用 11 个 ref + 仅 2 个 state,把"不需要触发重渲染"的状态全放 ref。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q16. React Strict Mode 故意双挂载,RealMock 怎么防 WS 无限重连?答案在 <a href="#sec-p2-4">2.4</a> + <a href="#sec-p3-3">3.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:用 <code>generationRef</code>。每次 effect 跑时 <code>generation = ++generationRef.current</code>。所有异步回调里判断 <code>generationRef.current === generation</code>,不一致就丢弃。cleanup 时 <code>generationRef.current += 1</code> 让旧 effect 的所有回调失效。<br/>
+        还加了一层保险:判断 <code>wsRef.current !== ws</code>(实例相等)。两层保护防止任何 race。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q17. 什么时候用 useMemo / useCallback?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        <b>用</b>:① 给 <code>React.memo</code> 子组件传稳定 props;② 大列表 filter/sort;③ 创建昂贵对象(订阅、IO 资源)。<br/>
+        <b>不用</b>:① 小列表(100 项以下);② 简单 JSX;③ 一次性事件 handler。<br/>
+        原则:先正确,后优化。用 <code>React DevTools Profiler</code> 看实际开销再决定。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q18. WebSocket 怎么设计断线重连?RealMock 的指数退避公式?答案在 <a href="#sec-p3-3">3.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        RealMock: <code>delay = min(1000 * 2^(retryCount-1), 8000)</code> → 1s→2s→4s→8s,5 次后切 failed 但 20s 长间隔保活。<br/>
+        生产环境建议:① 加 30% 抖动(防雪崩);② 区分主动关闭(code 1000)与异常关闭;③ 重连后用"上次消息序号"补缺。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q19. 浏览器怎么录音并以 base64 上行?答案在 <a href="#sec-0-2">0.2</a> + <a href="#sec-p3-1">3.1</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        ① <code>navigator.mediaDevices.getUserMedia({audio: true})</code> 拿 <code>MediaStream</code><br/>
+        ② <code>AudioContext + MediaStreamAudioSourceNode + ScriptProcessorNode</code><br/>
+        ③ <code>onaudioprocess</code> 拿 Float32 采样 → 转 Int16 PCM → 重采样到 16kHz<br/>
+        ④ <code>Buffer → base64</code> → 通过 WebSocket 发送<br/>
+        RealMock 的 <code>useAudioRecorder</code> 就是这个流程。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q20. SameSite 三种模式?CSRF 怎么防?答案在 <a href="#sec-p2-1">2.1</a> + <a href="#sec-p3-1">3.1</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        <b>SameSite</b>:Strict(完全跨站不带)/ Lax(顶层 GET 带)/ None(都带,需 Secure + HTTPS)。<br/>
+        <b>CSRF 防御</b>:① SameSite=Lax/Strict;② CSRF Token;③ 检查 Origin/Referer;④ 关键操作二次验证。<br/>
+        RealMock:SameSite=Lax + Origin 白名单 + HttpOnly Cookie + WebSocket 子协议传令牌(避免 URL 日志泄漏)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q21. 什么是 Server Component?什么时候不该用?答案在 <a href="#sec-p2-1">2.1</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        Server Component 在服务端渲染成 wire format 发送,不能有 useState/useEffect/事件处理。<br/>
+        <b>不该用</b>:需要 onClick / useState / Web Audio / Three.js 等浏览器 API。<br/>
+        <b>优势</b>:首屏快、bundle 小、可直接 await 数据库;RSC 把它渲染成 wire format,客户端无须再跑一遍。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q22. Next.js App Router 与 Pages Router 区别?答案在 <a href="#sec-p2-1">2.1</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        <b>Pages</b>:文件即路由,全部 Client Component,数据获取用 <code>getServerSideProps</code><br/>
+        <b>App Router</b>:目录即路由,默认 Server Component,"use client" 启用 Client;Layout / Loading / Error / Not Found 都是约定文件。优势:RSC 减少首屏 bundle、原生 streaming、支持 async 组件、嵌套 layout。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q23. 浏览器怎么避免回采(扬声器被自己录进)?答案在 <a href="#sec-p0-5">0.5</a> + <a href="#sec-p2-4">2.4</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① <b>武装延时</b>(<code>CAPTURE_ARM_DELAY_MS=450ms</code>):面试官播完 450ms 后才开始采;② <b>打断后缩短武装</b>(200ms);③ <b>环形缓冲</b>(2.5s);④ <b>打断时高 RMS 阈值</b>(0.028 vs 普通 0.006);⑤ <b>回采检测</b>(SequenceMatcher 相似度 ≥ 0.55 丢弃)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q24. 怎么保证 effect 代码"幂等"?答案在 <a href="#sec-p2-4">2.4</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        常见雷区:① 重复发请求(加 idempotency key 或 AbortController);② 重复订阅事件(cleanup 显式 unsubscribe);③ 重复 WS 连接(用 generationRef);④ 重复插入 DOM 节点;⑤ 重复加载本地存储;⑥ 重复 LLM 调用(检查 session_id + 时间窗)。<br/>
+        RealMock 的 <code>useInterviewWS</code> 是教科书级别的"幂等连接"实现。</p>
+      </blockquote>
+
+      <h3><span class="section-tag tag-4">Python 后端</span> Q25-Q36</h3>
+
+      <blockquote class="q-a">
+        <p><b>❓Q25. FastAPI 依赖注入(Depends)怎么工作?每次请求都调吗?答案在 <a href="#sec-p4-1">4.1</a> + <a href="#sec-p4-4">4.4</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:FastAPI 解析路由签名时识别 <code>Depends(callable)</code>。每次请求 callable 都被调用(除非 <code>use_cache=True</code> 缓存为 request-scope singleton)。<br/>
+        <b>常见用途</b>:<code>Depends(get_db)</code> 拿 Session(自动 close);<code>Depends(require_local_peer)</code> 限 loopback;嵌套依赖(A 依赖 B,C)深度优先 resolve。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q26. asyncio.gather vs create_task 区别?答案在 <a href="#sec-p4-2">4.2</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        - <b>create_task</b>:fire-and-forget,异常会"丢失"(变 Unhandled)<br/>
+        - <b>gather</b>:等待所有任务完成,任一异常会立刻传播(除非 <code>return_exceptions=True</code>)<br/>
+        RealMock:工具循环用 <code>gather(*[self._run_tool_call_safe(tc, db) for tc in limited])</code> 并发执行;后台任务用 <code>create_task</code> + 自行 <code>add_done_callback</code> 处理异常。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q27. Pydantic v2 与 v1 区别?答案在 <a href="#sec-p0-3">0.3</a> + <a href="#sec-p4-4">4.4</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        <b>性能</b>:v2 用 Rust 实现,快 5-50 倍<br/>
+        <b>API</b>:v1 <code>@validator</code> → v2 <code>@field_validator</code>;v1 <code>@root_validator</code> → v2 <code>@model_validator(mode="after")</code><br/>
+        <b>类型</b>:v2 用 <code>field_validator</code> 而不是 <code>validator</code><br/>
+        <b>严格</b>:v2 移除 <code>Config.extra = "allow"</code> 默认值</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q28. SQLAlchemy Session 线程安全吗?Web 怎么用?答案在 <a href="#sec-p4-3">4.3</a> + <a href="#sec-p4-4">4.4</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        <b>不线程安全</b>。Web 框架标准做法:<b>每个请求一个 Session</b>(request-scoped),请求结束(无论成功失败)关闭。<br/>
+        FastAPI 通过 <code>Depends(get_db)</code> 实现:<code>yield db</code> 在请求前创建,finally 关闭。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q29. SQLAlchemy <code>with_for_update()</code> 是什么?SQLite 支持吗?答案在 <a href="#sec-p4-3">4.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<code>SELECT ... FOR UPDATE</code> = 悲观锁,锁定 SELECT 出的行,事务结束才释放。<br/>
+        SQLite 通过<strong>整个数据库的写锁</strong>(BEGIN IMMEDIATE)模拟,会阻塞所有写。PostgreSQL/MySQL InnoDB 是行级锁。<br/>
+        RealMock 简历激活用 <code>with_for_update()</code>,因为 SQLite 单写所以不会真并发,但代码跨库可移植。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q30. SQLite WAL 为什么能并发读写?答案在 <a href="#sec-p4-3">4.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        默认 rollback journal 模式下,写时把原页写到 <code>-journal</code>、锁库、写。读阻塞直到写完。<br/>
+        WAL(Write-Ahead Log):写追加到 <code>-wal</code> 文件(顺序写,极快),不阻塞读。读看 wal 再看主文件,得到一致快照。<br/>
+        RealMock: <code>journal_mode=WAL</code> + <code>busy_timeout=5000</code> + <code>synchronous=NORMAL</code>。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q31. AES-GCM nonce 重复会怎样?答案在 <a href="#sec-p4-5">4.5</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<b>灾难性</b>。GCM 安全性基于 (key, nonce) 唯一,如果重复:① 攻击者可恢复明文异或;② 可伪造认证 tag。等于完全失守。<br/>
+        RealMock 用 <code>os.urandom(12)</code> = 96 bit 随机,生日攻击需 2^48 次才碰撞。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q32. PBKDF2 是什么?为什么 RealMock 用 200k 迭代?答案在 <a href="#sec-p4-5">4.5</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:PBKDF2 用 HMAC-SHA256 + 盐 + 大量迭代,把弱密码派生为强 32 字节 AES 密钥。<br/>
+        <b>200k 迭代</b>是 OWASP 2023 推荐下限,目的让单次派生 ~250ms(防暴力)。如果 1k 迭代,GPU 可每秒跑 ~10^8 次;200k 后降到 ~500 次。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q33. SSRF 怎么防?DNS rebinding 怎么破?答案在 <a href="#sec-p5-2">5.2</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        <b>SSRF</b>:① URL 解析 + 黑名单网段(127/10/172.16/192.168/169.254);② 多 A 记录遍历,任一不安全即拒;③ 协议限定 http/https;④ 端口限定 80/443;⑤ prod 强制 https。<br/>
+        <b>DNS Rebinding</b>:单次解析后锁死 IP。<br/>
+        <b>破解</b>:DNS Pin。RealMock 的 <code>make_pinned_async_client</code> 把请求重写到固定 IP,Host 头保留原 hostname,SNI 用原 hostname。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q34. 限流算法有哪些?RealMock 用哪种?答案在 <a href="#sec-p5-1">5.1</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:固定窗口 / 滑动窗口 / 令牌桶 / 漏桶 / 滑动日志。<br/>
+        RealMock 用<strong>滑动窗口</strong>(deque 存时间戳,过期 pop),支持 WS 友好的 <code>try_rate_limit_by_id</code>。三个默认桶:通用 60/min、LLM 10/min、建会话 20/min。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q35. 进程内锁 + DB 哨兵 两层防双打怎么实现?答案在 <a href="#sec-p5-3">5.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        场景:WS 自动 finish + HTTP 手动 /finish + 报告页 GET,三路并发触发报告生成。<br/>
+        ① <b>进程内锁</b>:<code>asyncio.Lock</code> 字典 <code>{session_id: lock}</code>,同进程内串行<br/>
+        ② <b>DB 哨兵</b>:<code>UPDATE session SET report = '{"_generating":true}' WHERE id = ? AND report IS NULL OR '{}'</code>,谁 UPDATE 成功谁拿到任务<br/>
+        ③ <b>失败清理</b>:任何路径异常都清哨兵,避免永久卡住<br/>
+        ④ <b>轮询</b>:抢不到的路径 sleep 0.2s × 30 次,等别人写完</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q36. SQLAlchemy 2.0 与 1.x 区别?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        - 移除 <code>Query.select()</code> → 用 <code>Session.execute(select(...))</code><br/>
+        - 统一 <code>session.scalars()</code> 返回 ORM 对象<br/>
+        - <code>select(User).where(User.id == 1)</code> 取代 <code>session.query(User)</code><br/>
+        性能更好(更显式的 cursor API),类型注解支持 <code>Mapped[Type]</code>。</p>
+      </blockquote>
+
+      <h3><span class="section-tag tag-5">传统 CS</span> Q37-Q48</h3>
+
+      <blockquote class="q-a">
+        <p><b>❓Q37. 进程 vs 线程 vs 协程?答案在 <a href="#sec-p0-4">0.4</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:进程 = OS 调度,独立地址空间,IPC 通信;线程 = OS 调度,共享堆,共享变量(需锁);协程 = 用户态 runtime 调度,单线程合作式多任务。<br/>
+        Python 因 GIL,CPU bound 只能多进程;IO bound 用 asyncio 协程最高效。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q38. TCP 三次握手为什么不是两次?答案在 <a href="#sec-p0-6">0.6</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:两次只能确认"客户端发 + 服务端收"。无法确认客户端"能收到服务端发的"。三次后双方都确认了"双向可达"。<br/>
+        防止"失效的连接请求报文"被服务端误接收(网络延迟下旧 SYN 报文可能迟到)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q39. HTTP 1.1 流水线 vs HTTP/2 多路复用?答案在 <a href="#sec-p3-1">3.1</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        HTTP 1.1:同一连接同一时刻只能处理 1 个请求(响应未完不能发下一个)<br/>
+        HTTP 1.1 流水线:同一连接可连续发,但响应顺序必须一致(队头阻塞)<br/>
+        HTTP/2:同一连接多路复用,每个请求带 stream id,响应可乱序。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q40. 数据库 4 种隔离级别,RealMock 关注什么?答案在 <a href="#sec-p4-3">4.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        Read Uncommitted / Read Committed / Repeatable Read / Serializable<br/>
+        RealMock 用 SQLite,默认 <strong>Serializable</strong>(SQLite 实现是全库锁)。所以 RealMock 不需要担心幻读;真正的并发控制靠<strong>进程内 asyncio.Lock + DB 哨兵</strong>。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q41. 乐观锁 vs 悲观锁?答案在 <a href="#sec-p4-3">4.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        - <b>悲观锁</b>(<code>SELECT ... FOR UPDATE</code>):先取锁,操作,提交;冲突概率高时高效<br/>
+        - <b>乐观锁</b>(<code>UPDATE ... WHERE version = ?</code>):不加锁,提交时检查 version;冲突概率低时高效<br/>
+        RealMock 简历激活用悲观锁;报告生成用乐观锁思想(哨兵)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q42. LRU 缓存怎么实现?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<b>HashMap + 双向链表</b>:HashMap 给 O(1) 查找,双向链表维护访问顺序(头部最新,尾部最旧),容量满时淘汰尾部。<br/>
+        Python 直接用 <code>@functools.lru_cache(maxsize=128)</code>。<br/>
+        RealMock:① <code>get_settings</code> 用 <code>@lru_cache</code>;② <code>_master_bytes</code> 用 <code>@lru_cache</code>;③ Whisper 模型用模块级 <code>_whisper_model</code> + <code>set_whisper_model</code> 切换。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q43. 一致性哈希?为什么需要?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:普通 hash(key) % N 在 N 变化时(加/减节点)几乎所有 key 都要重新映射(缓存雪崩)。<br/>
+        一致性哈希:把 hash 值映射到 0~2^32 圆环,节点也映射到圆环,key 沿环找到最近的节点。增删节点只影响相邻一小段。<br/>
+        常用于分布式缓存(Redis Cluster)、CDN、负载均衡。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q44. 漏桶 vs 令牌桶?答案在 <a href="#sec-p5-1">5.1</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        - <b>漏桶</b>:请求排队,固定速率出。无法应对突发<br/>
+        - <b>令牌桶</b>:固定速率往桶里加 token,每个请求消耗 1 个。允许"突发"<br/>
+        Guava RateLimiter / Sentinel 都用令牌桶。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q45. CAP 定理为什么只能二选一?答案在 <a href="#sec-p5-3">5.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:P(分区容忍)必选:实际网络一定会分区。要 C(强一致)→ 拒绝部分写/读,失去 A;要 A → 各节点独立服务,牺牲 C。<br/>
+        现实系统是 AP + 最终一致(如 DynamoDB / Cassandra)或 CP(如 etcd / ZooKeeper)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q46. Raft 与 Paxos 区别?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:Paxos 太晦涩难懂,各种变体难以推理。Raft 设计目标 = 易理解:① 强领导(任何时候最多 1 个 leader);② 任期(term)单调递增;③ 日志复制 = leader 把日志条目发到所有 follower,过半确认才提交。<br/>
+        Raft 三子问题:领导选举、日志复制、安全性。<br/>
+        etcd / Consul / TiKV 都用 Raft。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q47. 什么是 2PC?它阻塞在哪?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:两阶段提交:① 协调者问所有参与者"能不能提交",参与者锁资源写日志回 OK;② 协调者发"提交",所有参与者提交。<br/>
+        <b>阻塞点</b>:协调者在第一阶段后崩溃 → 参与者锁了资源但没人说"提交还是回滚",永久阻塞。<br/>
+        <b>3PC</b>引入预提交+超时,但仍有边界情况。<br/>
+        实际:分布式事务普遍用<strong>最终一致</strong>(Saga / 事件溯源)而非 2PC。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q48. 什么是 TLS 1.3 的 0-RTT?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:传统 TLS 1.2 至少 2-RTT。TLS 1.3 简化为 1-RTT(客户端在第一帧就发密钥共享)。<br/>
+        <b>0-RTT</b>:如果客户端之前连过,可在第一条消息就发加密数据(用 PSK 密钥)。代价:可重放攻击(中间人重发第一帧),所以只用于幂等请求(如 GET)。</p>
+      </blockquote>
+
+      <h3><span class="section-tag tag-3">系统设计 / 综合</span> Q49-Q60</h3>
+
+      <blockquote class="q-a">
+        <p><b>❓Q49. 如何设计一个"实时面试"系统?主要模块和挑战。</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        <b>模块</b>:① API 网关(CORS / 限流 / 鉴权);② WebSocket 服务(长连接 / 心跳 / 消息分发);③ LLM 引擎(流式 + 工具循环);④ STT 服务;⑤ TTS 服务;⑥ 报告服务;⑦ 候选人档案 + 简历存储。<br/>
+        <b>挑战</b>:① 流式响应断在中间的容错;② WS 多标签页顶替;③ 候选人打断面试官;④ 报告三路并发的防双打;⑤ LLM Key 与 ASR Key 隔离;⑥ 隐私(PII、SSRF)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q50. 如何让 Agent "有记忆"?答案在 <a href="#sec-p1-8">1.8</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① <b>短期</b>(messages):当前会话;② <b>长期</b>(DB / 文件):跨会话;③ <b>结构化</b>(字段):<code>weak_points</code>、<code>asked_questions</code>;④ <b>检索</b>(RAG):相关记忆当工具调出。<br/>
+        RealMock 三层都用:<code>agent_state</code> 字段、<code>prep_sessions.messages</code>、<code>system_learning.json</code> 跨场次反哺。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q51. WebSocket 心跳为什么 30s?答案在 <a href="#sec-p3-3">3.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① 太短浪费流量;② 太长发现断线慢;③ 主流 LB(Nginx / Cloudflare)默认 60s idle timeout,留 30s 缓冲。<br/>
+        RealMock 客户端 30s + 3 次 miss ≈ 90s 才发现断线,生产可接受。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q52. 如何防止 LLM API Key 泄漏?答案在 <a href="#sec-p4-5">4.5</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① <b>BYOK 加密落库</b>(AES-256-GCM + PBKDF2);② <b>出站前脱敏</b>(<code>RedactFilter</code> 替换 sk-/Bearer);③ <b>不存前端</b>(Cookie HttpOnly + Secure + SameSite=Lax);④ <b>SSRF 防御</b>;⑤ <b>旧格式检测</b>(enc:v1 拒绝静默迁移);⑥ <b>轮转</b>(定期更换 master key)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q53. 为什么 RealMock 不用 Postgres?SQLite 的极限在哪?答案在 <a href="#sec-p4-3">4.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:本地优先、零运维、文件即库。SQLite 上限:① <b>单写者</b>(WAL 缓解);② <b>无网络</b>;③ <b>~ 1 亿行/库</strong>;④ <b>无内置复制/分片</b>。<br/>
+        切到 Postgres 的信号:并发写入 ≥ 5/s、数据量 > 100GB、需要跨实例访问。RealMock 用 SQLAlchemy 2.0 抽象,<code>DATABASE_URL</code> 即可平滑迁移。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q54. 单页面 940 行的"上帝组件"如何重构?答案在 <a href="#sec-p2-6">2.6</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① <b>按业务域切</b>(features/interview/{hooks,components}):<br/>
+        &nbsp;&nbsp;- <code>useInterviewRoom</code>:会话生命周期<br/>
+        &nbsp;&nbsp;- <code>useInterviewAudio</code>:录音 + TTS<br/>
+        &nbsp;&nbsp;- <code>useInterviewHints</code>:参考提纲<br/>
+        ② <b>组件切</b>:<code>ChatPanel</code> / <code>ControlBar</code> / <code>AvatarStage</code> / <code>VideoPanel</code><br/>
+        ③ <b>页只做组装</b>;<br/>
+        ④ <b>状态按生命周期分</b>:<code>useReducer</code> 复杂状态机,useState 局部;<br/>
+        ⑤ <b>避免 Context</b>(全 props + hooks 传)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q55. 实时系统的"数据一致性"如何保证?答案在 <a href="#sec-p5-3">5.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        RealMock 场景:WS 写状态、报告生成、GET 报告页三路并发:<br/>
+        ① <b>幂等</b>:同一操作可重入不破坏(报告生成用 CAS 哨兵)<br/>
+        ② <b>状态机</b>:状态转移有合法集合(<code>pending → active → completed</code>)<br/>
+        ③ <b>锁</b>:进程内 <code>asyncio.Lock</code> + DB 哨兵<br/>
+        ④ <b>最终一致</b>:不追求 100% 准确,允许短暂不一致</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q56. 估算 LLM 服务成本上限?</b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① <b>单次成本</b> = prompt_tokens × input_price + completion_tokens × output_price;② <b>用户数 × 平均会话数 × 平均回合 × 平均 tokens</b>;③ <b>加 buffer 30%</b>(系统 prompt + 工具结果);④ 限流配额 + 告警;⑤ 自建 token 计数器 + Prometheus;⑥ RealMock 限流:LLM 10/min、session_create 20/min。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q57. 微服务 vs 模块化单体?RealMock 选了哪个?答案在 <a href="#sec-0-1">0.1</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        <b>微服务</b>:独立部署、独立伸缩、技术栈异构;代价:运维复杂度、分布式事务、网络不可靠。<br/>
+        <b>模块化单体</b>:一个进程,模块边界清晰,各自 <code>main.py</code> 可独立启动,演进到微服务时改 base URL 即可。<br/>
+        RealMock 选<strong>模块化单体</strong>:<code>api_service</code> / <code>agent_service</code> / <code>interview_service</code> 业务零循环,仅共享 <code>shared/</code>。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q58. 怎么测试 LLM 应用?答案在 <a href="#sec-p1-8">1.8</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:① <b>单测</b>:工具函数(检索、解析、压缩)、纯逻辑(<code>followup.analyze</code>);② <b>集成</b>:整链路 + WS;③ <b>Contract 测试</b>:用 fake LLM 测"如果返回 X,系统行为 Y";④ <b>稳定性</b>:固定 seed、相同输入多次跑结果一致;⑤ <b>回归</b>:用"好回答"基准集;⑥ <b>Eval</b>:不靠 LLM 自评(主观、漂移、贵)。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q59. 解释一下 RealMock 的"系统级学习反哺闭环"如何工作?答案在 <a href="#sec-p1-8">1.8</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        ① 每场报告生成后,<code>record_interview_learning</code> 写 <code>system_learning.json</code>(公司均分、有效追问线索、追问类别统计、工具调用统计)<br/>
+        ② 文件锁保证多进程并发安全(进程内互斥锁 + 跨进程 file_lock)<br/>
+        ③ 下场面试开场,<code>_system_learning_section</code> 读取后注入 system prompt:同公司均分低 → 加大深挖;相关追问线索 → 主动参考<br/>
+        这是工业级的"系统自学习"模式。</p>
+      </blockquote>
+
+      <blockquote class="q-a">
+        <p><b>❓Q60. 如果让你重新设计 RealMock 的实时层,你会怎么改?答案在 <a href="#sec-p2-3">2.3</a> + <a href="#sec-p3-3">3.3</a></b></p>
+      </blockquote>
+      <blockquote class="tip">
+        <p><b>✅A</b>:<br/>
+        ① <b>显式 ConnectionContext</b>:把 5 个 mixin 隐式字段契约(<code>TYPE_CHECKING</code> 声明)改成 dataclass 传参,IDE 可导航,单测可独立 mock<br/>
+        ② <b>前后端类型生成</b>:用 <code>openapi-typescript</code> 或 Pydantic-to-TS 自动同步 <code>types/index.ts</code><br/>
+        ③ <b>重试与幂等</b>:WS 消息带"上次已确认序号",重连后补缺;后端去重表<br/>
+        ④ <b>限流分级</b>:per-session、per-user、per-IP 三级,WS 单独的桶<br/>
+        ⑤ <b>可观测</b>:打点每条 WS 消息的延迟、丢弃数;前端展示连接质量</p>
+      </blockquote>
+
+    <footer class="colophon">
+      <p>本书为 RealMock <strong>渐进式</strong>学习指南。<br/>
+      每个章节都从"前置基础"开始,带你按依赖顺序从 0 学到 60 道面试题。<br/>
+      所有代码示例均直接来自项目源码(<code>services/</code> 与 <code>apps/web/src/</code>)。</p>
+      <p class="muted small">最后更新:2026-08-28 · 配合 <code>PROJECT_INTRO_REALMOCK.html</code>(项目本身)与 <code>PROJECT_TECH_HANDBOOK.html</code>(技术手册)使用</p>
+    </footer>
+
+  </main>
+</div>
+
+<button class="back-top" id="back-top" title="回到顶部" aria-label="回到顶部">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+</button>
+
+<script>
+  /* 主题 */
+  const themeBtn = document.getElementById('theme');
+  const themeIcon = document.getElementById('theme-icon');
+  const root = document.documentElement;
+  const STORAGE_KEY = 'realmock-learn-theme';
+
+  function applyTheme(t) {
+    root.setAttribute('data-theme', t);
+    themeIcon.innerHTML = t === 'dark'
+      ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>'
+      : '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+  }
+  const saved = localStorage.getItem(STORAGE_KEY) ||
+                (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  applyTheme(saved);
+  themeBtn.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem(STORAGE_KEY, next);
+  });
+
+  /* 回到顶部 */
+  const backTop = document.getElementById('back-top');
+  window.addEventListener('scroll', () => {
+    backTop.classList.toggle('show', window.scrollY > 400);
+  });
+  backTop.addEventListener('click', () => {
+    document.getElementById('top').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  /* 目录高亮 */
+  const tocLinks = Array.from(document.querySelectorAll('aside.sidebar a[href^="#sec-"]'));
+  const sectionMap = new Map();
+  tocLinks.forEach(link =&gt; {
+    const id = link.getAttribute('href').slice(1);
+    const sec = document.getElementById(id);
+    if (sec) sectionMap.set(id, link);
+  });
+  const obs = new IntersectionObserver((entries) =&gt; {
+    entries.forEach(e =&gt; {
+      const link = sectionMap.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        tocLinks.forEach(l =&gt; l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -65% 0px', threshold: 0 });
+  sectionMap.forEach((_, id) =&gt; {
+    const sec = document.getElementById(id);
+    if (sec) obs.observe(sec);
+  });
+
+  /* 搜索高亮 */
+  const searchInput = document.getElementById('search');
+  const sections = Array.from(document.querySelectorAll('section[id]'));
+  const headingsMap = new Map();
+  sections.forEach(sec =&gt; {
+    const title = sec.querySelector('h2')?.textContent || '';
+    const sub = Array.from(sec.querySelectorAll('h3, h4')).map(h =&gt; h.textContent).join(' | ');
+    const codeSyms = Array.from(sec.querySelectorAll('code')).map(c =&gt; c.textContent).slice(0, 30).join(' ');
+    const blob = (title + ' ' + sub + ' ' + codeSyms).toLowerCase();
+    blob.split(/[^a-z0-9_]+/).forEach(tok =&gt; {
+      if (tok.length &gt;= 2) {
+        if (!headingsMap.has(tok)) headingsMap.set(tok, new Set());
+        headingsMap.get(tok).add(sec.id);
+      }
+    });
+  });
+  searchInput.addEventListener('input', () =&gt; {
+    const q = searchInput.value.trim().toLowerCase();
+    if (q.length < 2) { clearHighlights(); return; }
+    const token = q.split(/\s+/)[0];
+    const hits = headingsMap.get(token) || new Set();
+    sections.forEach(sec =&gt; {
+      if (hits.has(sec.id)) {
+        sec.style.opacity = '1';
+        sec.style.outline = '2px solid var(--primary)';
+        sec.style.borderRadius = '10px';
+      } else {
+        sec.style.opacity = '0.35';
+        sec.style.outline = '';
+      }
+    });
+    if (hits.size) {
+      const first = document.getElementById([...hits][0]);
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+  searchInput.addEventListener('blur', () =&gt; {
+    if (searchInput.value.trim().length < 2) clearHighlights();
+  });
+  function clearHighlights() {
+    sections.forEach(sec =&gt; { sec.style.opacity = ''; sec.style.outline = ''; sec.style.borderRadius = ''; });
+  }
+</script>
+
+</body>
+</html>

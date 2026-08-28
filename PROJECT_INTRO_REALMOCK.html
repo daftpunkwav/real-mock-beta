@@ -1,0 +1,2883 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>RealMock 项目深度解读 · 一份给新人的完整手册</title>
+<style>
+  /* ===========================================================
+   * 主题：浅色 / 深色 双模
+   * 强调长篇可读性，章节密度高，强调代码片段忠实于源码
+   * =========================================================== */
+
+  :root {
+    --bg: #f8f9fb;
+    --bg-alt: #ffffff;
+    --bg-soft: #f1f3f7;
+    --bg-code: #0f1117;
+    --bg-code-soft: #1a1d27;
+    --bg-mark: #fff3c4;
+    --ink: #15171c;
+    --ink-muted: #4b5160;
+    --ink-soft: #6b7280;
+    --line: #e3e6ed;
+    --line-soft: #eef0f4;
+    --primary: #4f46e5;
+    --primary-soft: #eef0ff;
+    --primary-ink: #312e81;
+    --success: #10b981;
+    --success-soft: #d1fae5;
+    --warning: #f59e0b;
+    --warning-soft: #fef3c7;
+    --danger: #ef4444;
+    --danger-soft: #fee2e2;
+    --info: #0ea5e9;
+    --info-soft: #e0f2fe;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow-sm: 0 1px 2px rgba(15, 17, 23, 0.04);
+    --shadow-md: 0 4px 14px rgba(15, 17, 23, 0.06);
+    --shadow-lg: 0 12px 40px rgba(15, 17, 23, 0.08);
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: "Inter", "PingFang SC", "Microsoft Yahei", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0b0d12;
+    --bg-alt: #11141b;
+    --bg-soft: #161a23;
+    --bg-code: #06080d;
+    --bg-code-soft: #131722;
+    --bg-mark: #4a3b00;
+    --ink: #e6e8ee;
+    --ink-muted: #a8aebd;
+    --ink-soft: #7e8597;
+    --line: #232838;
+    --line-soft: #1a1f2c;
+    --primary: #818cf8;
+    --primary-soft: #1e1f3a;
+    --primary-ink: #c7d2fe;
+    --success: #34d399;
+    --success-soft: #052e22;
+    --warning: #fbbf24;
+    --warning-soft: #3b2c0a;
+    --danger: #f87171;
+    --danger-soft: #3a1212;
+    --info: #38bdf8;
+    --info-soft: #0c2a3a;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    font-size: 15px;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code, pre, kbd { font-family: var(--mono); }
+  :not(pre) > code {
+    background: var(--bg-soft);
+    color: var(--primary-ink);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    border: 1px solid var(--line-soft);
+  }
+  kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--bg-alt);
+    font-size: 0.85em;
+    color: var(--ink-muted);
+  }
+  mark { background: var(--bg-mark); color: inherit; padding: 0 2px; border-radius: 2px; }
+
+  /* ================= 顶栏 ================= */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1320px; margin: 0 auto; padding: 12px 24px;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -0.01em;
+  }
+  .brand-dot {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--primary), var(--info));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 35%, transparent);
+    position: relative;
+  }
+  .brand-dot::after {
+    content: ""; position: absolute; inset: 6px; border-radius: 4px;
+    background: var(--bg);
+  }
+  .brand-name { font-size: 15px; }
+  .brand-sub { font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.12em; }
+
+  .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .search-wrap { position: relative; }
+  .search-wrap input {
+    width: 280px; padding: 7px 12px 7px 32px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg-alt); color: var(--ink);
+    font-size: 13px; outline: none; transition: border 0.15s;
+  }
+  .search-wrap input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .search-wrap svg {
+    position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+    color: var(--ink-soft);
+  }
+  .icon-btn {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg-alt); color: var(--ink-muted); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { color: var(--primary); border-color: var(--primary); }
+
+  /* ================= 整体布局 ================= */
+  .layout {
+    max-width: 1320px; margin: 0 auto; padding: 28px 24px 100px;
+    display: grid; grid-template-columns: 260px minmax(0, 1fr);
+    gap: 32px;
+  }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } aside.sidebar { display: none; } }
+
+  /* ================= 侧边目录 ================= */
+  aside.sidebar {
+    position: sticky; top: 76px; align-self: start;
+    max-height: calc(100vh - 100px); overflow: auto;
+    padding: 18px; border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--bg-alt); box-shadow: var(--shadow-sm);
+  }
+  aside.sidebar h4 {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--ink-soft); margin: 18px 8px 6px;
+  }
+  aside.sidebar h4:first-child { margin-top: 0; }
+  aside.sidebar ul { list-style: none; padding: 0; margin: 0; }
+  aside.sidebar li a {
+    display: block; padding: 5px 8px; border-radius: 6px;
+    color: var(--ink-muted); font-size: 13px; line-height: 1.4;
+    overflow-wrap: anywhere; word-break: break-word;
+  }
+  aside.sidebar li a:hover { background: var(--bg-soft); color: var(--ink); text-decoration: none; }
+  aside.sidebar li a.active { background: var(--primary-soft); color: var(--primary-ink); font-weight: 600; }
+  aside.sidebar .toc-h3 { padding-left: 16px; font-size: 12.5px; }
+
+  /* ================= 正文 ================= */
+  main { min-width: 0; }
+
+  .hero {
+    padding: 36px 36px 40px; border-radius: 16px;
+    background:
+      radial-gradient(ellipse 60% 80% at 100% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 60%),
+      radial-gradient(ellipse 50% 80% at 0% 100%, color-mix(in srgb, var(--info) 10%, transparent), transparent 60%),
+      var(--bg-alt);
+    border: 1px solid var(--line); box-shadow: var(--shadow-md);
+    margin-bottom: 36px;
+  }
+  .hero h1 {
+    font-size: 32px; line-height: 1.25; margin: 0 0 8px;
+    letter-spacing: -0.02em;
+  }
+  .hero .sub {
+    color: var(--ink-muted); font-size: 15px; margin: 0 0 18px;
+  }
+  .hero-meta {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px; font-size: 12px;
+    background: var(--bg-soft); color: var(--ink-muted);
+    border: 1px solid var(--line-soft);
+  }
+  .chip-primary { background: var(--primary-soft); color: var(--primary-ink); border-color: transparent; }
+  .chip-success { background: var(--success-soft); color: var(--success); border-color: transparent; }
+  .chip-warning { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+  .chip-danger  { background: var(--danger-soft);  color: var(--danger);  border-color: transparent; }
+  .chip-info    { background: var(--info-soft);    color: var(--info);    border-color: transparent; }
+
+  .hero-cta {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--bg-alt);
+    color: var(--ink); font-size: 13.5px; font-weight: 500;
+    text-decoration: none !important;
+  }
+  .btn:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .btn-primary:hover { background: color-mix(in srgb, var(--primary) 88%, black); color: white; }
+
+  /* ================= 通用章节 ================= */
+  section { padding-top: 16px; }
+  h2 {
+    font-size: 24px; line-height: 1.3; margin: 48px 0 18px;
+    letter-spacing: -0.01em; padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+  h2 .num {
+    display: inline-block; font-size: 12px; font-weight: 600; color: var(--ink-soft);
+    margin-right: 10px; letter-spacing: 0.06em;
+  }
+  h3 { font-size: 18px; line-height: 1.3; margin: 30px 0 12px; }
+  h4 { font-size: 15px; line-height: 1.3; margin: 22px 0 10px; color: var(--ink); }
+  p { margin: 8px 0 14px; }
+  ul, ol { margin: 8px 0 14px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  blockquote {
+    margin: 14px 0; padding: 12px 16px;
+    border-left: 3px solid var(--primary);
+    background: var(--primary-soft); color: var(--primary-ink);
+    border-radius: 0 8px 8px 0;
+  }
+  blockquote p { margin: 4px 0; }
+  hr { border: 0; border-top: 1px dashed var(--line); margin: 30px 0; }
+
+  /* ================= 卡片 / 网格 ================= */
+  .grid { display: grid; gap: 14px; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 920px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+  .card {
+    padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--bg-alt); box-shadow: var(--shadow-sm);
+  }
+  .card h4 { margin-top: 0; }
+  .card p:last-child { margin-bottom: 0; }
+  .card-tinted-primary { background: var(--primary-soft); border-color: transparent; color: var(--primary-ink); }
+  .card-tinted-success { background: var(--success-soft); border-color: transparent; color: var(--success); }
+  .card-tinted-warning { background: var(--warning-soft); border-color: transparent; color: var(--warning); }
+  .card-tinted-danger  { background: var(--danger-soft);  border-color: transparent; color: var(--danger); }
+  .card-tinted-info    { background: var(--info-soft);    border-color: transparent; color: var(--info); }
+
+  .stat {
+    display: flex; flex-direction: column; gap: 4px; padding: 16px 18px;
+    border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--bg-alt);
+  }
+  .stat .v { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .stat .l { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  /* ================= 表格 ================= */
+  .table-wrap { overflow-x: auto; margin: 12px 0 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-alt); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+  th { background: var(--bg-soft); color: var(--ink); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+  table .muted { color: var(--ink-soft); }
+
+  /* ================= 代码块 ================= */
+  pre {
+    background: var(--bg-code); color: #d8dee9;
+    border-radius: 10px; padding: 14px 16px; margin: 10px 0 18px;
+    overflow-x: auto; font-size: 12.5px; line-height: 1.65;
+    box-shadow: var(--shadow-sm);
+  }
+  pre code { background: none; color: inherit; padding: 0; border: 0; }
+  .code-block { position: relative; }
+  .code-cap {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 12px; color: var(--ink-soft);
+    margin-top: 10px; margin-bottom: -6px; padding: 0 4px;
+  }
+  .code-cap .file { color: var(--ink-muted); }
+  .code-cap .lineno { color: var(--ink-soft); }
+  .code-cap .tag {
+    margin-left: auto; padding: 1px 8px; border-radius: 999px;
+    background: var(--bg-soft); color: var(--ink-muted);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+
+  /* 简易高亮 token */
+  .tk-com { color: #6b7280; font-style: italic; }
+  .tk-key { color: #c084fc; }
+  .tk-str { color: #86efac; }
+  .tk-num { color: #fbbf24; }
+  .tk-fn  { color: #60a5fa; }
+  .tk-cls { color: #f0abfc; }
+  .tk-dec { color: #fda4af; }
+  [data-theme="dark"] .tk-com { color: #6b7388; }
+
+  /* ================= 流程图 / 树形 ================= */
+  .tree { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-soft); overflow-x: auto; }
+  .tree-comment { color: var(--ink-soft); }
+  .tree-dir { color: var(--primary-ink); font-weight: 600; }
+  .tree-file { color: var(--ink-muted); }
+
+  /* ================= 标签条 ================= */
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 14px; }
+
+  /* ================= 列表样式 ================= */
+  .check { list-style: none; padding-left: 0; }
+  .check li { padding-left: 24px; position: relative; }
+  .check li::before {
+    content: ""; position: absolute; left: 4px; top: 9px;
+    width: 14px; height: 14px; border-radius: 4px;
+    background: var(--success-soft); border: 1.5px solid var(--success);
+  }
+  .check li::after {
+    content: ""; position: absolute; left: 8px; top: 12px;
+    width: 5px; height: 8px;
+    border-right: 2px solid var(--success); border-bottom: 2px solid var(--success);
+    transform: rotate(45deg);
+  }
+  .cross { list-style: none; padding-left: 0; }
+  .cross li { padding-left: 24px; position: relative; }
+  .cross li::before {
+    content: ""; position: absolute; left: 4px; top: 9px;
+    width: 14px; height: 14px; border-radius: 4px;
+    background: var(--danger-soft); border: 1.5px solid var(--danger);
+  }
+  .cross li::after {
+    content: ""; position: absolute; left: 8px; top: 12px;
+    width: 8px; height: 2px; background: var(--danger); transform: rotate(45deg);
+    box-shadow: 0 3px 0 0 var(--danger);
+  }
+  .arrow li::before {
+    content: "→"; color: var(--primary); margin-right: 6px; font-weight: 700;
+  }
+
+  /* ================= 数据流图 ================= */
+  .seq {
+    display: grid; grid-template-columns: 130px 1fr; gap: 8px 12px;
+    padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--bg-soft); font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+  }
+  .seq .who { color: var(--primary-ink); font-weight: 600; text-align: right; }
+  .seq .msg { color: var(--ink); }
+  .seq .msg em { color: var(--ink-soft); font-style: normal; }
+  .seq .msg b { color: var(--success); }
+  .seq .msg.warn { color: var(--warning); }
+
+  /* ================= Footer ================= */
+  footer.colophon {
+    margin-top: 60px; padding: 32px 24px; text-align: center;
+    border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12.5px;
+  }
+
+  /* ================= Anchor ================= */
+  .anchor { display: block; position: relative; top: -80px; visibility: hidden; }
+
+  /* ================= 顶部返回 ================= */
+  .back-top {
+    position: fixed; right: 24px; bottom: 24px; z-index: 40;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--primary); color: white; border: 0;
+    box-shadow: var(--shadow-md); cursor: pointer; display: none;
+    align-items: center; justify-content: center;
+  }
+  .back-top.show { display: inline-flex; }
+
+  /* ================= 工具类 ================= */
+  .muted { color: var(--ink-soft); }
+  .small { font-size: 12.5px; }
+  .lead { font-size: 16px; color: var(--ink-muted); }
+  .mt-0 { margin-top: 0 !important; }
+  .mb-0 { margin-bottom: 0 !important; }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .nowrap { white-space: nowrap; }
+
+  /* ================= Mermaid 风格时序图(纯 CSS) ================= */
+  .archmap {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+    margin: 14px 0 22px;
+  }
+  .arch-col {
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg-alt); padding: 14px 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .arch-col h5 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink-soft); margin: 0 0 4px;
+  }
+  .arch-col .row {
+    background: var(--bg-soft); border-radius: 8px; padding: 8px 10px;
+    font-size: 13px;
+  }
+  .arch-col .row b { color: var(--primary-ink); }
+
+  /* ================= Tab ================= */
+  .tabs { display: flex; flex-direction: column; gap: 0; margin: 12px 0 18px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .tabs-head { display: flex; background: var(--bg-soft); border-bottom: 1px solid var(--line); }
+  .tabs-head button {
+    flex: 1; padding: 10px 14px; background: transparent; border: 0;
+    color: var(--ink-muted); cursor: pointer; font-size: 13px; font-weight: 500;
+    border-right: 1px solid var(--line);
+  }
+  .tabs-head button:last-child { border-right: 0; }
+  .tabs-head button.active { color: var(--primary-ink); background: var(--primary-soft); }
+  .tabs-body { padding: 14px 16px; font-size: 13.5px; }
+  .tabs-body pre { margin: 0; }
+  .tabs-body [data-pane] { display: none; }
+  .tabs-body [data-pane].show { display: block; }
+
+  /* ================= Definition list ================= */
+  dl.kv { display: grid; grid-template-columns: 220px 1fr; gap: 6px 18px; }
+  dl.kv dt { font-family: var(--mono); color: var(--primary-ink); font-weight: 600; }
+  dl.kv dd { margin: 0; color: var(--ink-muted); }
+  @media (max-width: 720px) { dl.kv { grid-template-columns: 1fr; } }
+
+  /* ================= Print ================= */
+  @media print {
+    aside.sidebar, .back-top, .topbar-actions { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    body { font-size: 12px; }
+    pre { font-size: 10.5px; }
+    h2 { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-dot" aria-hidden></div>
+      <div>
+        <div class="brand-name">RealMock 项目深度解读</div>
+        <div class="brand-sub">AI Mock Interview · Complete Walkthrough</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search" placeholder="搜索章节或代码符号…" />
+      </div>
+      <button class="icon-btn" id="theme" title="切换深色/浅色主题" aria-label="切换主题">
+        <svg id="theme-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a class="btn btn-primary" href="#top" title="回到顶部">↑ 顶部</a>
+    </div>
+  </div>
+</header>
+
+<span id="top" class="anchor"></span>
+<div class="layout">
+  <!-- 侧边目录 -->
+  <aside class="sidebar">
+    <h4>总览</h4>
+    <ul>
+      <li><a href="#sec-1">1. 一句话定位</a></li>
+      <li><a href="#sec-2">2. 速读：5 分钟掌握全貌</a></li>
+      <li><a href="#sec-3">3. 关键数字</a></li>
+    </ul>
+    <h4>架构</h4>
+    <ul>
+      <li><a href="#sec-arch">4. 总体架构</a></li>
+      <li><a href="#sec-aggregate">5. 聚合入口 services/main.py</a></li>
+      <li><a href="#sec-services">6. 三个服务域的边界</a></li>
+      <li><a href="#sec-shared">7. shared 共享层</a></li>
+      <li><a href="#sec-dataflow">8. 数据流：典型一次模拟面试</a></li>
+    </ul>
+    <h4>核心模块</h4>
+    <ul>
+      <li><a href="#sec-llm">9. LLM 客户端与多协议</a></li>
+      <li><a href="#sec-voice">10. 语音管线（STT / TTS）</a></li>
+      <li><a href="#sec-rag">11. 企业知识库 RAG</a></li>
+      <li><a href="#sec-llm-tools">12. LLM 工具集（GitHub / Web Search / Resume）</a></li>
+      <li><a href="#sec-interview-engine">13. 面试引擎：Runner / Agent / Workflow</a></li>
+      <li><a href="#sec-realtime">14. 实时层：WebSocket / 话轮 / 打断</a></li>
+      <li><a href="#sec-report">15. 报告生成与系统学习</a></li>
+      <li><a href="#sec-prep">16. 面试准备教练（prep）</a></li>
+    </ul>
+    <h4>基础设施</h4>
+    <ul>
+      <li><a href="#sec-security">17. 安全：SSRF / 加密 / 限流 / Token</a></li>
+      <li><a href="#sec-errors">18. 错误码体系</a></li>
+      <li><a href="#sec-db">19. 数据库与迁移</a></li>
+      <li><a href="#sec-config">20. 配置与启动流程</a></li>
+      <li><a href="#sec-prompts">21. 提示词与中文化约束</a></li>
+    </ul>
+    <h4>前端</h4>
+    <ul>
+      <li><a href="#sec-frontend">22. 前端：Next.js 14 应用</a></li>
+      <li><a href="#sec-frontend-stack">23. 前端栈与关键 hook</a></li>
+      <li><a href="#sec-frontend-avatar">24. 3D 形象 / 场景 / 视觉</a></li>
+    </ul>
+    <h4>运维 & 质量</h4>
+    <ul>
+      <li><a href="#sec-files">25. 关键文件功能索引</a></li>
+      <li><a href="#sec-deps">26. 依赖关系</a></li>
+      <li><a href="#sec-tests">27. 测试覆盖</a></li>
+      <li><a href="#sec-issues">28. 已知问题与改进建议</a></li>
+      <li><a href="#sec-deploy">29. 部署 / 运维</a></li>
+      <li><a href="#sec-onboard">30. 新人上手指南</a></li>
+    </ul>
+  </aside>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero">
+      <h1>把整套模拟面试系统拆给你看</h1>
+      <p class="sub">RealMock 是一个<strong>模块化单体</strong>的 AI 模拟面试平台：BYOK 接入任意 LLM，提供上传简历、AI 模拟面试、报告与跨场次成长、WebSocket 实时语音/视频流、企业知识库 RAG、GitHub 项目核实、面经检索。整套代码集中在 <code>D:/daftpunkwav/04-MyProjects/real-mock</code>，前端 Next.js 14、后端 Python 3.12 + FastAPI，单进程聚合启动，单 SQLite 文件落库。</p>
+      <div class="hero-meta">
+        <span class="chip chip-primary">FastAPI</span>
+        <span class="chip chip-primary">Next.js 14</span>
+        <span class="chip chip-info">SQLite + SQLAlchemy 2.0</span>
+        <span class="chip chip-info">WebSocket</span>
+        <span class="chip chip-info">Edge TTS</span>
+        <span class="chip chip-info">faster-whisper</span>
+        <span class="chip chip-info">Chroma</span>
+        <span class="chip chip-success">AES-256-GCM</span>
+        <span class="chip chip-success">SSRF Pin</span>
+        <span class="chip chip-warning">BYOK</span>
+        <span class="chip chip-warning">多 LLM 协议</span>
+        <span class="chip chip-warning">3D 形象</span>
+      </div>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#sec-1">从这里开始 →</a>
+        <a class="btn" href="#sec-files">📁 关键文件功能索引</a>
+        <a class="btn" href="#sec-dataflow">🔁 一次模拟面试的数据流</a>
+        <a class="btn" href="#sec-realtime">🎙️ 实时层架构</a>
+        <a class="btn" href="#sec-onboard">🚀 新人上手</a>
+      </div>
+    </section>
+
+    <!-- ============ 1. 一句话定位 ============ -->
+    <section id="sec-1">
+      <h2><span class="num">1</span>一句话定位</h2>
+      <p>RealMock = <strong>本地优先、BYOK、三服务模块化单体</strong>的 AI 模拟面试平台。<strong>后端</strong>由 <code>services/main.py</code> 聚合 <code>api_service</code>、<code>agent_service</code>、<code>interview_service</code> 三个 FastAPI 路由，共享 <code>shared/</code> 平台能力；<strong>前端</strong>由 <code>apps/web/</code> 下的 Next.js 14 应用承载面试房间、报告页、辅导页、3D 形象与全套语音/视频/动效。</p>
+      <p>它想解决的核心问题：<em>"在没有真人面试官时，候选人也需要一遍近乎真实、覆盖全流程、且能被打分和复盘的模拟面试。"</em>由此派生三条主线：</p>
+      <ul class="arrow">
+        <li><b>让对话真实</b>：基于工作流（technical / hr / management）多阶段推进；候选公司决定面试风格；人设（5 种）与风格（4 种）共同塑形。</li>
+        <li><b>让对话有依据</b>：候选人简历被解析为结构化档案；GitHub MCP 风格工具核验项目；RAG 注入企业知识库；联网检索面经；函数调用循环最多 3 轮。</li>
+        <li><b>让对话可复盘</b>：每场生成结构化报告、评分维度、训练计划；候选人成长库（<code>GrowthRecord</code>）跨场次沉淀弱项；系统级学习（<code>system_learning.json</code>）反哺后续面试官提示。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 2. 速读 ============ -->
+    <section id="sec-2">
+      <h2><span class="num">2</span>速读：5 分钟掌握全貌</h2>
+      <p>如果你只能读一段，请看下面这张"鸟瞰图"：</p>
+      <div class="archmap">
+        <div class="arch-col">
+          <h5>前端 (Next.js 14)</h5>
+          <div class="row"><b>app/</b><br/>页面路由（/、/profile、/resume、/prep、/interview、/history、/growth、/settings）</div>
+          <div class="row"><b>features/</b><br/>useInterviewWS / useAudioRecorder / useTTSPlayer / TalkingHeadAvatar</div>
+          <div class="row"><b>lib/api/</b><br/>apiService / agentService / interviewService 三个 service client</div>
+        </div>
+        <div class="arch-col">
+          <h5>聚合网关 (services/main.py)</h5>
+          <div class="row"><b>FastAPI app</b><br/>统一 CORS / trace_id / 异常 handler / 路由聚合</div>
+          <div class="row"><b>lifespan</b><br/>建表 + 列迁移 + seed + RAG 索引</div>
+          <div class="row"><b>/api/v1</b><br/>三服务的纯路由，<code>/api</code> 兼容别名</div>
+        </div>
+        <div class="arch-col">
+          <h5>后端 (FastAPI 三服务)</h5>
+          <div class="row"><b>api_service</b><br/>profile / resume / settings</div>
+          <div class="row"><b>agent_service</b><br/>prep 面试准备教练 (SSE 流式)</div>
+          <div class="row"><b>interview_service</b><br/>interview / reports / ws / realtime</div>
+        </div>
+      </div>
+      <p class="muted small">一句话："<em>客户端浏览器跑 React 组件 + 录制 PCM + 连 WebSocket；服务端跑一个聚合进程，内部三服务各管一摊；它们都共享同一个 SQLite 与同一份加密后的 LLM Key。</em>"</p>
+    </section>
+
+    <!-- ============ 3. 关键数字 ============ -->
+    <section id="sec-3">
+      <h2><span class="num">3</span>关键数字（来自代码静态统计）</h2>
+      <div class="grid grid-4">
+        <div class="stat"><span class="v">138</span><span class="l">生产 Python 文件</span></div>
+        <div class="stat"><span class="v">45</span><span class="l">测试文件 / 328 用例</span></div>
+        <div class="stat"><span class="v">~70%</span><span class="l">import 指向 shared</span></div>
+        <div class="stat"><span class="v">3</span><span class="l">三层子服务（api / agent / interview）</span></div>
+        <div class="stat"><span class="v">3</span><span class="l">三阶段处理器（recognize/reason/speak）</span></div>
+        <div class="stat"><span class="v">3</span><span class="l">工作流（technical / hr / management）</span></div>
+        <div class="stat"><span class="v">~16</span><span class="l">阶段（身份/自我介绍/基础/项目/技术/系统/情景/反问/...）</span></div>
+        <div class="stat"><span class="v">5</span><span class="l">人格 + 4 风格 + 6 形象 + 6 场景 + 5 音色</span></div>
+        <div class="stat"><span class="v">10</span><span class="l">STT 供应商（含 1 个 local Whisper）</span></div>
+        <div class="stat"><span class="v">6</span><span class="l">TTS 供应商（含 1 个 native + 4 个 OpenAI 兼容）</span></div>
+        <div class="stat"><span class="v">9</span><span class="l">GitHub MCP 风格工具</span></div>
+        <div class="stat"><span class="v">3</span><span class="l">RAG 后端（local / stepfun / none）</span></div>
+      </div>
+      <p class="muted small">数字来源：项目代码、<code>docs/architecture-review-2026-08-28.md</code> 中以代码为真相的统计。</p>
+    </section>
+
+    <!-- ============ 4. 总体架构 ============ -->
+    <section id="sec-arch">
+      <h2><span class="num">4</span>总体架构</h2>
+      <p>整体采用 <strong>模块化单体 (modular monolith)</strong> 形态:一个进程内跑 <code>api_service</code> + <code>agent_service</code> + <code>interview_service</code> 三个服务,<strong>彼此业务零循环依赖</strong>,仅共享 <code>shared/</code> 平台层。</p>
+
+      <h3 style="margin-top:24px">🏗 完整系统架构图</h3>
+      <svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;height:auto;margin:18px 0;font-family:var(--sans);">
+        <defs>
+          <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+          </marker>
+          <linearGradient id="grad-browser" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#818cf8" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#6366f1" stop-opacity="0.08"/>
+          </linearGradient>
+          <linearGradient id="grad-gw" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#34d399" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="#10b981" stop-opacity="0.08"/>
+          </linearGradient>
+          <linearGradient id="grad-svc" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.08"/>
+          </linearGradient>
+          <linearGradient id="grad-shared" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.08"/>
+          </linearGradient>
+          <linearGradient id="grad-storage" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fb923c" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#f97316" stop-opacity="0.08"/>
+          </linearGradient>
+          <linearGradient id="grad-llm" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="#0891b2" stop-opacity="0.08"/>
+          </linearGradient>
+        </defs>
+
+        <!-- 第 1 行:浏览器 -->
+        <rect x="40" y="20" width="820" height="56" rx="10" fill="url(#grad-browser)" stroke="#a5b4fc" stroke-width="1.5"/>
+        <text x="60" y="42" font-size="13" font-weight="700" fill="#312e81">🌐 浏览器(Next.js 14 App Router)</text>
+        <text x="60" y="62" font-size="11" fill="#475569">app/ · features/ · components/ · lib/api/</text>
+
+        <!-- 浏览器内 4 个小盒子 -->
+        <rect x="320" y="32" width="120" height="32" rx="6" fill="white" stroke="#a5b4fc" stroke-width="1"/>
+        <text x="380" y="52" text-anchor="middle" font-size="11" fill="#1e293b">页面路由</text>
+        <rect x="450" y="32" width="120" height="32" rx="6" fill="white" stroke="#a5b4fc" stroke-width="1"/>
+        <text x="510" y="52" text-anchor="middle" font-size="11" fill="#1e293b">useInterviewWS</text>
+        <rect x="580" y="32" width="120" height="32" rx="6" fill="white" stroke="#a5b4fc" stroke-width="1"/>
+        <text x="640" y="52" text-anchor="middle" font-size="11" fill="#1e293b">useAudioRecorder</text>
+        <rect x="710" y="32" width="130" height="32" rx="6" fill="white" stroke="#a5b4fc" stroke-width="1"/>
+        <text x="775" y="52" text-anchor="middle" font-size="11" fill="#1e293b">useTTSPlayer</text>
+
+        <!-- 箭头 浏览器 → 网关 -->
+        <line x1="450" y1="76" x2="450" y2="105" stroke="#475569" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="460" y="93" font-size="10" fill="#64748b">fetch / WebSocket</text>
+
+        <!-- 第 2 行:聚合网关 -->
+        <rect x="40" y="105" width="820" height="56" rx="10" fill="url(#grad-gw)" stroke="#86efac" stroke-width="1.5"/>
+        <text x="60" y="127" font-size="13" font-weight="700" fill="#166534">🚪 聚合网关 services/main.py (FastAPI app)</text>
+        <text x="60" y="147" font-size="11" fill="#15803d">CORS · trace_id · 异常 envelope · /api/v1 + /api 路由聚合 · lifespan(建表/迁移/seed/RAG)</text>
+
+        <!-- 箭头 网关 → 三服务 -->
+        <line x1="450" y1="161" x2="450" y2="190" stroke="#475569" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- 第 3 行:三服务(并排) -->
+        <rect x="40" y="190" width="260" height="80" rx="10" fill="url(#grad-svc)" stroke="#fde68a" stroke-width="1.5"/>
+        <text x="170" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#854d0e">api_service</text>
+        <text x="170" y="232" text-anchor="middle" font-size="10" fill="#92400e">profile / resume / settings</text>
+        <text x="170" y="248" text-anchor="middle" font-size="10" fill="#92400e">纯 HTTP / 无 WS</text>
+        <text x="170" y="263" text-anchor="middle" font-size="10" fill="#92400e">Pydantic v2 强校验</text>
+
+        <rect x="320" y="190" width="260" height="80" rx="10" fill="url(#grad-svc)" stroke="#fde68a" stroke-width="1.5"/>
+        <text x="450" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#854d0e">agent_service</text>
+        <text x="450" y="232" text-anchor="middle" font-size="10" fill="#92400e">面试准备教练 prep</text>
+        <text x="450" y="248" text-anchor="middle" font-size="10" fill="#92400e">SSE 流式响应</text>
+        <text x="450" y="263" text-anchor="middle" font-size="10" fill="#92400e">3 轮工具循环</text>
+
+        <rect x="600" y="190" width="260" height="80" rx="10" fill="url(#grad-svc)" stroke="#fde68a" stroke-width="1.5"/>
+        <text x="730" y="212" text-anchor="middle" font-size="12" font-weight="700" fill="#854d0e">interview_service</text>
+        <text x="730" y="232" text-anchor="middle" font-size="10" fill="#92400e">WS 实时面试 / Runner</text>
+        <text x="730" y="248" text-anchor="middle" font-size="10" fill="#92400e">报告生成 / 成长</text>
+        <text x="730" y="263" text-anchor="middle" font-size="10" fill="#92400e">5 mixin 组合 WS</text>
+
+        <!-- 箭头 三服务 → shared -->
+        <line x1="450" y1="270" x2="450" y2="300" stroke="#475569" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="460" y="288" font-size="10" fill="#64748b">共享平台能力</text>
+
+        <!-- 第 4 行:shared -->
+        <rect x="40" y="300" width="820" height="60" rx="10" fill="url(#grad-shared)" stroke="#c4b5fd" stroke-width="1.5"/>
+        <text x="60" y="322" font-size="13" font-weight="700" fill="#312e81">🧱 shared/ 平台能力(三个 service 共用)</text>
+
+        <!-- shared 内部 6 个子模块 -->
+        <rect x="60" y="332" width="120" height="20" rx="4" fill="white" stroke="#c4b5fd"/>
+        <text x="120" y="346" text-anchor="middle" font-size="10" fill="#1e1b4b">DB / ORM</text>
+        <rect x="195" y="332" width="120" height="20" rx="4" fill="white" stroke="#c4b5fd"/>
+        <text x="255" y="346" text-anchor="middle" font-size="10" fill="#1e1b4b">LLM 客户端</text>
+        <rect x="330" y="332" width="120" height="20" rx="4" fill="white" stroke="#c4b5fd"/>
+        <text x="390" y="346" text-anchor="middle" font-size="10" fill="#1e1b4b">语音 (STT/TTS)</text>
+        <rect x="465" y="332" width="120" height="20" rx="4" fill="white" stroke="#c4b5fd"/>
+        <text x="525" y="346" text-anchor="middle" font-size="10" fill="#1e1b4b">RAG (Chroma)</text>
+        <rect x="600" y="332" width="120" height="20" rx="4" fill="white" stroke="#c4b5fd"/>
+        <text x="660" y="346" text-anchor="middle" font-size="10" fill="#1e1b4b">安全 (SSRF/AES)</text>
+        <rect x="735" y="332" width="115" height="20" rx="4" fill="white" stroke="#c4b5fd"/>
+        <text x="792" y="346" text-anchor="middle" font-size="10" fill="#1e1b4b">限流 / 错误码</text>
+
+        <!-- shared → LLM 外部 -->
+        <line x1="800" y1="330" x2="845" y2="395" stroke="#475569" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="853" y="370" font-size="10" fill="#0e7490" font-style="italic">HTTPS</text>
+
+        <!-- 第 5 行:LLM + 存储 -->
+        <rect x="40" y="400" width="280" height="60" rx="10" fill="url(#grad-llm)" stroke="#67e8f9" stroke-width="1.5"/>
+        <text x="180" y="422" text-anchor="middle" font-size="12" font-weight="700" fill="#155e75">☁ LLM 供应商</text>
+        <text x="180" y="442" text-anchor="middle" font-size="10" fill="#155e75">OpenAI / Anthropic / Responses</text>
+
+        <rect x="350" y="400" width="280" height="60" rx="10" fill="url(#grad-storage)" stroke="#fdba74" stroke-width="1.5"/>
+        <text x="490" y="422" text-anchor="middle" font-size="12" font-weight="700" fill="#7c2d12">💾 SQLite + Chroma</text>
+        <text x="490" y="442" text-anchor="middle" font-size="10" fill="#7c2d12">/data/app.db + /data/chroma/</text>
+
+        <rect x="660" y="400" width="200" height="60" rx="10" fill="url(#grad-storage)" stroke="#fdba74" stroke-width="1.5"/>
+        <text x="760" y="422" text-anchor="middle" font-size="12" font-weight="700" fill="#7c2d12">📁 上传 + secrets</text>
+        <text x="760" y="442" text-anchor="middle" font-size="10" fill="#7c2d12">/uploads + .secret.key</text>
+
+        <!-- shared → SQLite -->
+        <line x1="490" y1="360" x2="490" y2="400" stroke="#475569" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+      </svg>
+      <p class="muted small">▸ 数据流:浏览器 → 网关(CORS/trace/限流) → 3 个服务 → shared 平台层 → LLM/DB/文件。颜色区分:蓝=前端、绿=网关、黄=服务、紫=共享平台、青=外部 LLM、橙=存储。</p>
+      <div class="tabs">
+        <div class="tabs-head" role="tablist">
+          <button class="active" data-tab="t1">聚合形态（默认）</button>
+          <button data-tab="t2">独立形态（可拆分）</button>
+          <button data-tab="t3">请求生命周期</button>
+        </div>
+        <div class="tabs-body">
+          <div data-pane="t1" class="show">
+<pre><code>                     浏览器（Next.js 14 SPA）
+  ┌────────────────────────────────────────────────────────┐
+  │  /api/v1/*            → 同源 fetch (HttpOnly Cookie)   │
+  │  /api/v1/ws/interview → WebSocket（与 REST 同 host）   │
+  └────────────────────────────────────────────────────────┘
+                              │   单一进程
+  ┌─────────────────────────▼──────────────────────────────┐
+  │  services/main.py                                       │
+  │  ┌──────────┐ ┌────────────┐ ┌───────────────────────┐  │
+  │  │ api_     │ │ agent_     │ │ interview_            │  │
+  │  │ service  │ │ service    │ │ service               │  │
+  │  │ profile  │ │ prep       │ │ interview / reports   │  │
+  │  │ resume   │ │ (SSE)      │ │ ws / realtime         │  │
+  │  │ settings │ │            │ │ realtime  mixins      │  │
+  │  └────┬─────┘ └─────┬──────┘ └──────┬────────────────┘  │
+  │       └──────────────┴──────────────┘                  │
+  │                       │                                │
+  │                       ▼ shared/（平台能力）             │
+  │  ┌─────────────────────────────────────────────────┐  │
+  │  │  database / config / core                       │  │
+  │  │  ├ errors · logging · session_auth · secrets   │  │
+  │  │  ├ security(SSRF/dns pin/redact) · ratelimit   │  │
+  │  │  ├ migrate / prompts / constants               │  │
+  │  │  └ services/pipeline_config · seed              │  │
+  │  │  capabilities/                                │  │
+  │  │  ├ ai/llm (llm_client / unified_client)        │  │
+  │  │  ├ voice (stt/* tts/* config/credentials)      │  │
+  │  │  ├ knowledge (company / web search)            │  │
+  │  │  └ integrations/github (client + tools)        │  │
+  │  └─────────────────────────────────────────────────┘  │
+  │                       │                                │
+  │                       ▼ SQLite + Chroma + 上传目录       │
+  │                  services/shared/data/                 │
+  └────────────────────────────────────────────────────────┘
+</code></pre>
+          </div>
+          <div data-pane="t2">
+<pre><code>每个服务都有自己的 ``main.py``，独立监听一个端口：
+
+  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐
+  │ api_service    │    │ agent_service  │    │ interview_     │
+  │   :8081        │    │   :8082        │    │ service :8083  │
+  │ create_service │    │ create_service │    │ create_service │
+  │ _app()         │    │ _app()         │    │ _app()         │
+  └────────┬───────┘    └────────┬───────┘    └────────┬───────┘
+           └──────────────┬──────┴──────────────┬──────┘
+                          ▼                     ▼
+                  shared/database.py        shared/...
+                  （共享 SQLite 与 Base.metadata）
+
+→ 这条路径通过 ``shared/app_factory.create_service_app()`` 消除重复装配：
+  CORS / health / /api/v1 / 异常 handler / trace_id 中间件都是同一份。
+</code></pre>
+          </div>
+          <div data-pane="t3">
+<pre><code>HTTP 一次普通请求
+  浏览器 → uvicorn → trace_middleware (注入/校验 X-Request-Id)
+        → CORSMiddleware → 路由 (api_service/agent_service/interview_service)
+        → Depends(require_local_peer) / Depends(rate_limit_dep(...))
+        → Depends(get_db) → handler 业务
+        → 异常 / 响应 envelope → headers["X-Trace-Id"] 透出
+
+WebSocket 一次连接
+  浏览器 → /api/v1/ws/interview/{sid}?token=...
+        → extract_ws_token (cookie > subprotocol > query, prod 拒绝 query)
+        → claim_session_connection (顶替旧连接)
+        → InterviewWSHandler.handle()
+        → 等待 user_turn_end / user_text / vision_update ...
+</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <h3>仓库根目录</h3>
+      <pre class="tree"><span class="tree-dir">D:/daftpunkwav/04-MyProjects/real-mock/</span>
+├── <span class="tree-dir">.git/</span>                    <span class="tree-comment"># git 历史</span>
+├── <span class="tree-dir">.pytest_cache/</span>          <span class="tree-comment"># pytest 缓存</span>
+├── <span class="tree-dir">.ruff_cache/</span>            <span class="tree-comment"># ruff 缓存</span>
+├── <span class="tree-dir">.zcode/</span>                 <span class="tree-comment"># 项目自定义工具（忽略）</span>
+├── <span class="tree-dir">apps/</span>                   <span class="tree-comment"># 前端：apps/web/</span>
+│   └── <span class="tree-dir">web/</span>                  <span class="tree-comment"># Next.js 14 App Router 应用</span>
+├── <span class="tree-dir">chroma_*/</span>              <span class="tree-comment"># Chroma 旧数据（7 个）</span>
+├── <span class="tree-dir">docs/</span>                   <span class="tree-comment"># 项目文档</span>
+│   └── <span class="tree-file">architecture-review-2026-08-28.md</span>  <span class="tree-comment"># 以代码为依据的架构审查</span>
+├── <span class="tree-dir">services/</span>               <span class="tree-comment"># 后端三服务 + shared + alembic</span>
+│   ├── <span class="tree-dir">api_service/</span>          <span class="tree-comment"># 档案 / 简历 / 设置</span>
+│   ├── <span class="tree-dir">agent_service/</span>        <span class="tree-comment"># 面试准备教练</span>
+│   ├── <span class="tree-dir">interview_service/</span>    <span class="tree-comment"># 模拟面试 / 报告 / 成长 / WS</span>
+│   ├── <span class="tree-dir">shared/</span>               <span class="tree-comment"># 平台能力（DB / 安全 / LLM / 语音 / RAG / GitHub / 搜索）</span>
+│   ├── <span class="tree-dir">tests/</span>                <span class="tree-comment"># 跨服务集成测试</span>
+│   ├── <span class="tree-dir">alembic/</span>              <span class="tree-comment"># Alembic 迁移（与 shared.core.migrate 协同）</span>
+│   └── <span class="tree-file">main.py</span>              <span class="tree-comment"># 聚合 FastAPI 入口</span>
+├── <span class="tree-file">AGENTS.md</span>              <span class="tree-comment"># Commit 规范</span>
+├── <span class="tree-file">CLAUDE.md</span>              <span class="tree-comment"># 同上（镜像）</span>
+├── <span class="tree-file">PROJECT_INTRO.html</span>     <span class="tree-comment"># 旧版项目介绍（被本文档替代）</span>
+├── <span class="tree-file">pyproject.toml</span>         <span class="tree-comment"># pytest / mypy / ruff 配置；pythonpath = ["services"]</span>
+├── <span class="tree-file">requirements.txt</span>       <span class="tree-comment"># 全栈依赖（>= 下限约束）</span>
+└── <span class="tree-file">.gitignore</span>
+</pre>
+    </section>
+
+    <!-- ============ 5. 聚合入口 ============ -->
+    <section id="sec-aggregate">
+      <h2><span class="num">5</span>聚合入口 <code>services/main.py</code></h2>
+      <p>这是生产默认的入口。它把三服务的纯路由 <code>service_router</code> 装到一个 <code>FastAPI</code> 实例中：</p>
+      <div class="code-cap"><span class="file">services/main.py</span> · <span class="lineno">L119-187</span><span class="tag">snippet</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">create_app</span>() -&gt; FastAPI:
+    app = FastAPI(
+        title=<span class="tk-str">"RealMock API"</span>,
+        description=<span class="tk-str">"RealMock 模拟面试平台聚合入口（api + agent + interview 三服务）"</span>,
+        version=<span class="tk-str">"1.0.0"</span>,
+        lifespan=lifespan,
+    )
+
+    <span class="tk-com"># X-Request-Id 注入 + 校验（只允许 [A-Za-z0-9_-]{8,64}）</span>
+    @app.middleware(<span class="tk-str">"http"</span>)
+    <span class="tk-key">async def</span> <span class="tk-fn">trace_middleware</span>(request, call_next): ...
+
+    <span class="tk-com"># CORS 严格策略：prod 禁用 * 通配</span>
+    _check_cors_policy(settings)
+    app.add_middleware(CORSMiddleware, ...)
+
+    <span class="tk-com"># prod 强制要求 SECRET_KEY（不允许依赖自动生成的 data/.secret.key）</span>
+    _check_secret_key_policy(settings)
+
+    <span class="tk-com"># 路由聚合（注入 /api/v1 前缀）</span>
+    app.include_router(api_router,     prefix=<span class="tk-str">"/api/v1"</span>)
+    app.include_router(agent_router,   prefix=<span class="tk-str">"/api/v1"</span>)
+    app.include_router(interview_router, prefix=<span class="tk-str">"/api/v1"</span>)
+
+    <span class="tk-com"># 3 个月滚动兼容：同时挂 /api 别名</span>
+    _legacy = APIRouter()
+    <span class="tk-key">for</span> r <span class="tk-key">in</span> (api_router, agent_router, interview_router):
+        _legacy.include_router(r, prefix=<span class="tk-str">"/api"</span>)
+    app.include_router(_legacy)
+
+    <span class="tk-com"># 统一 envelope：5 个异常 handler</span>
+    app.add_exception_handler(RequestValidationError, on_request_validation)
+    app.add_exception_handler(HTTPException, on_http_exception)
+    app.add_exception_handler(StarletteHTTPException, on_starlette_http_exception)
+    app.add_exception_handler(UnsafeURLError, on_unsafe_url)
+    app.add_exception_handler(Exception, on_unhandled_exception)
+
+    @app.get(<span class="tk-str">"/health"</span>)
+    <span class="tk-key">def</span> <span class="tk-fn">health</span>():
+        <span class="tk-key">return</span> {<span class="tk-str">"status"</span>: <span class="tk-str">"ok"</span>, <span class="tk-str">"service"</span>: <span class="tk-str">"realmock"</span>, <span class="tk-str">"version"</span>: <span class="tk-str">"1.0.0"</span>}
+
+    <span class="tk-key">return</span> app
+</code></pre>
+      <h3>lifespan：同步 IO 不阻塞事件循环</h3>
+      <div class="code-cap"><span class="file">services/main.py</span> · <span class="lineno">L76-108</span><span class="tag">snippet</span></div>
+<pre><code>@asynccontextmanager
+<span class="tk-key">async def</span> <span class="tk-fn">lifespan</span>(app):
+    <span class="tk-com"># 建表 + 列迁移 + 处理器配置 seed（同步 IO 走 to_thread）</span>
+    <span class="tk-key">await</span> asyncio.to_thread(_bootstrap_db_and_seed)
+    <span class="tk-com"># 首次启动构建企业知识库 RAG 索引（失败不阻断）</span>
+    <span class="tk-key">await</span> ensure_rag_index()
+    logger.info(<span class="tk-str">"RealMock 后端已启动 env=%s"</span>, settings.env)
+    <span class="tk-key">try</span>:
+        <span class="tk-key">yield</span>
+    <span class="tk-key">finally</span>:
+        <span class="tk-key">if not</span> settings.is_prod <span class="tk-key">and</span> os.environ.get(<span class="tk-str">"TEST_MODE"</span>) == <span class="tk-str">"1"</span>:
+            logger.debug(<span class="tk-str">"测试模式：跳过 engine dispose"</span>)
+        <span class="tk-key">else</span>:
+            <span class="tk-key">try</span>:
+                <span class="tk-key">await</span> asyncio.to_thread(_shutdown_engine)
+            <span class="tk-key">except</span> Exception:
+                logger.exception(<span class="tk-str">"关闭阶段释放引擎失败"</span>)
+        logger.info(<span class="tk-str">"RealMock 后端已关闭"</span>)
+</code></pre>
+      <p>这是一个非常优雅的写法：所有磁盘 IO（SQLite 建表、列迁移、写 seed、Chroma 索引构建）都被丢到线程池，事件循环永远不会因为磁盘慢而抖动；同时也只在 prod 关闭引擎，测试模式（<code>TEST_MODE=1</code>）下保留引擎给后续 fixture 用。</p>
+    </section>
+
+    <!-- ============ 6. 三服务边界 ============ -->
+    <section id="sec-services">
+      <h2><span class="num">6</span>三个服务域的边界</h2>
+      <p>三个服务在 <code>services/&lt;name&gt;_service/</code> 下都是相同的目录骨架：</p>
+      <pre class="tree"><span class="tree-dir">services/&lt;name&gt;_service/</span>
+├── <span class="tree-file">__init__.py</span>                 <span class="tree-comment"># 空（namespace package）</span>
+├── <span class="tree-file">router.py</span>                  <span class="tree-comment"># 暴露 service_router（无前缀纯路由）</span>
+├── <span class="tree-file">main.py</span>                    <span class="tree-comment"># 独立入口（create_service_app + lifespan）</span>
+├── <span class="tree-file">startup.py</span>                 <span class="tree-comment"># 同步启动钩子（建表/迁移/seed）</span>
+├── <span class="tree-file">models/__init__.py</span>         <span class="tree-comment"># ORM 模型（业务表）</span>
+├── <span class="tree-file">schemas/__init__.py</span>        <span class="tree-comment"># Pydantic 契约</span>
+├── <span class="tree-file">routes/</span>                   <span class="tree-comment"># HTTP 路由模块</span>
+└── <span class="tree-file">services/</span>                 <span class="tree-comment"># 业务逻辑（领域服务）</span>
+</pre>
+
+      <h3>api_service —— 基础 API（profile / resume / settings）</h3>
+      <p><strong>职责：</strong>用户档案、简历上传与解析、三阶段处理器配置。最适合"无状态、纯 HTTP"。</p>
+      <div class="grid grid-2">
+        <div class="card">
+          <h4>routes/profile.py</h4>
+          <p>单条 <code>GET / PUT /api/v1/profile</code>：基于 <code>UserProfile</code> 单例行（<code>id=1</code>）。所有可编辑字段白名单在 <code>_PROFILE_FIELDS</code>。挂 <code>Depends(require_local_peer)</code> 限制 loopback。</p>
+        </div>
+        <div class="card">
+          <h4>routes/resume.py</h4>
+          <p>上传（流式读，10 MB 上限 + 魔数嗅探）、解析（pypdf/python-docx/text）、列表、激活（<code>SELECT FOR UPDATE</code> 行锁）、删除、深度分析（多维度评分 + 联网检索 + 改写建议 + 市场参考）。</p>
+        </div>
+        <div class="card">
+          <h4>routes/settings.py</h4>
+          <p>BYOK 三阶段设置：旧版 <code>/v1/settings/llm</code> 拆到 <code>/v1/settings/stages/{recognize|reason|speak}</code>；含供应商目录 <code>/v1/settings/catalog</code> 与三阶段连通性测试 <code>/v1/settings/test/{stage}</code>。</p>
+        </div>
+        <div class="card">
+          <h4>services/resume/parser.py + sites.py</h4>
+          <p>PDF / DOCX / MD / TXT 解析（带 zip-bomb 防护、PDF 页数上限 50、字符上限 100k、段落上限 5000）。站点白名单 <code>RESUME_MARKET_SEARCH_SITES</code> 供市场检索范围收敛。</p>
+        </div>
+        <div class="card">
+          <h4>services/stage_tests.py</h4>
+          <p>三阶段连通性测试实现：ASR 用 fixture 音频 <code>audio_zh_growth.wav</code>（"同比前年增长五成"）+ 期望文本比对；Reason 走 <code>UnifiedLLMClient.test_connection</code>；Speak 优先 Edge 失败后回退。</p>
+        </div>
+      </div>
+
+      <h3>agent_service —— 智能体（面试准备教练 prep）</h3>
+      <p><strong>职责：</strong>基于简历与目标岗位，提供面试前的辅导式对话。OpenAI function calling 三类工具（web_search / company_info / quiz）+ GitHub 工具的白名单子集（<code>github_list_repos</code> / <code>github_get_readme</code> / <code>github_get_repo</code> / <code>github_list_commits</code> / <code>github_get_user</code>）。</p>
+      <p>入口只有 4 个接口：<code>POST /v1/prep/sessions</code>、<code>POST /v1/prep/sessions/{id}/message</code>、<code>POST .../message/stream</code>、<code>GET .../messages</code>。所有可变操作必验 <code>access_token</code>，无 token 时拒绝。</p>
+
+      <h3>interview_service —— 模拟面试域</h3>
+      <p><strong>职责：</strong>实时面试 WebSocket、面试引擎、报告生成、成长聚合。体积最大、复杂度最高、也是项目核心。</p>
+      <div class="grid grid-3">
+        <div class="card">
+          <h4>routes/interview.py</h4>
+          <p>REST: <code>/sessions</code> 创建、<code>/sessions</code> 列表、<code>/start</code>、<code>/message</code>、<code>/finish</code>、<code>/messages</code>。所有写操作校验 <code>access_token</code>。</p>
+        </div>
+        <div class="card">
+          <h4>routes/ws_interview.py</h4>
+          <p>唯一 WS 路由：<code>/api/v1/ws/interview/{session_id}</code>，把握手交给 <code>InterviewWSHandler</code>。</p>
+        </div>
+        <div class="card">
+          <h4>routes/reports.py</h4>
+          <p>报告：<code>GET /reports/{id}</code>、<code>GET /reports/{id}/stream</code>（伪流式分片推送）、<code>GET /reports/growth/history</code>、<code>GET /reports/growth/system-insights</code>。</p>
+        </div>
+        <div class="card">
+          <h4>routes/options.py</h4>
+          <p>返回岗位 / 职级 / 经验 / 公司 / 人格 / 风格 / 工作流 / 阶段 / 形象 / 场景 / 音色 / 静默追问秒数。</p>
+        </div>
+        <div class="card">
+          <h4>agents/orchestrator.py</h4>
+          <p>静默追问生成器：按阶段 + 人设 + 严厉度 3 档措辞库随机抽。</p>
+        </div>
+        <div class="card">
+          <h4>agents/snapshot.py + vision/agent.py</h4>
+          <p>会话快照 + 面部分析视觉 Agent 摘要。</p>
+        </div>
+        <div class="card">
+          <h4>realtime/ws_handler.py</h4>
+          <p>WS façade：5 个 mixin 组合（生命周期 / 回合协调 / 语音管线 / 提示服务 / 报告调度）。</p>
+        </div>
+        <div class="card">
+          <h4>realtime/{connection_lifecycle,turn_coordinator,turn_control,turn_streaming,voice_pipeline,hint_service,report_scheduler}.py</h4>
+          <p>WS 内部职责拆分：握手/心跳、分发、回合协调、流式消费与 TTS、STT 选择与回采判定、参考提纲、报告后台生成。</p>
+        </div>
+        <div class="card">
+          <h4>realtime/{session_registry,events}.py</h4>
+          <p>单会话单连接租约（顶替旧连接）+ 事件类型（<code>TurnState</code>/<code>SessionEvent</code>）。</p>
+        </div>
+        <div class="card">
+          <h4>services/interview/{runner,agent,agent_prompts,agent_text,prompt_assembler,tools,tool_round_runner,workflows,followup,report,events}.py</h4>
+          <p>面试引擎：<code>InterviewRunner</code> 是唯一对外入口，<code>InterviewAgent</code> 管状态/历史/阶段推进，<code>ToolRoundRunner</code> 跑工具循环，<code>PromptAssembler</code> 拼 messages，<code>workflows</code> 定义 3 套工作流的阶段元数据。</p>
+        </div>
+        <div class="card">
+          <h4>capabilities/rag/*</h4>
+          <p>RAG 子层：<code>base.py</code> 协议 + <code>factory.py</code> 工厂 + <code>local_backend.py</code>（Chroma + OpenAI 兼容 /embeddings） + <code>stepfun_backend.py</code>（托管 vector_stores） + <code>company_rag.py</code>（向后兼容包装器） + <code>_kb_data.py</code>（企业知识库数据 + 切片）。</p>
+        </div>
+        <div class="card">
+          <h4>services/growth/learning.py</h4>
+          <p>系统级自我学习：把追问类别命中 / 工具调用统计 / 公司均分 / 弱项线索写入 <code>services/shared/data/system_learning.json</code>（带进程内互斥 + 跨进程文件锁），下次面试开场注入提示词。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 7. shared 层 ============ -->
+    <section id="sec-shared">
+      <h2><span class="num">7</span><code>shared/</code> 共享层：平台能力</h2>
+      <p>三个服务都依赖的"基础设施工具箱"。通过 <code>pyproject.toml</code> 中 <code>pythonpath = ["services"]</code> 配置，使得 <code>shared.*</code> 可被 pytest 直接 import 为顶层包（无需 <code>sys.path</code> 注入）。</p>
+
+      <h3>核心模块（<code>shared/core/</code>）</h3>
+      <div class="grid grid-2">
+        <div class="card">
+          <h4>config.py</h4>
+          <p><code>Settings</code> 来自 pydantic-settings，<code>get_settings()</code> 缓存单例。涵盖 LLM BYOK、嵌入、语音、RAG 后端、信任代理、Cookie Secure、限流信任链等。</p>
+        </div>
+        <div class="card">
+          <h4>database.py</h4>
+          <p>SQLAlchemy 2.0 <code>DeclarativeBase</code>。<code>get_engine()</code> 线程安全双检锁懒创建；<code>get_session_factory()</code> 同样。SQLite 自动启用 WAL + busy_timeout + synchronous=NORMAL + 外键。</p>
+        </div>
+        <div class="card">
+          <h4>errors.py / error_handlers.py</h4>
+          <p>错误码目录 <code>CATALOG</code>（A0/A1/A2/A3/A4/B/C 四段式）；<code>ApiBusinessError</code> 继承 <code>HTTPException</code> 携带 <code>error_code</code>/<code>hint</code>/<code>retryable</code>；5 个 handler 共用 envelope。</p>
+        </div>
+        <div class="card">
+          <h4>logging.py</h4>
+          <p>JSON <code>SafeFormatter</code> + <code>RedactFilter</code>（自动脱敏 API Key / Authorization / PEM 块）。<code>trace_id</code> 走 <code>ContextVar</code>。</p>
+        </div>
+        <div class="card">
+          <h4>secrets.py</h4>
+          <p>AES-256-GCM（<code>cryptography</code>）。<code>enc:v2:&lt;salt&gt;:&lt;nonce&gt;:&lt;tag&gt;:&lt;cipher&gt;</code> 格式；旧 <code>enc:v1</code> 显式抛 <code>LegacySecretFormatError</code> 拒绝静默迁移。Master key 来自 <code>SECRET_KEY</code> env 或 <code>data/.secret.key</code>。</p>
+        </div>
+        <div class="card">
+          <h4>session_auth.py</h4>
+          <p>能力令牌（capability token）：HttpOnly Cookie <code>iv_{id}</code> / <code>prep_{id}</code>；也支持 <code>X-Interview-Token</code> Header；生产拒绝 query <code>?token=</code>。CSRF 缓解（仅 cookie 鉴权时校验 Origin/Referer）。</p>
+        </div>
+        <div class="card">
+          <h4>ratelimit.py</h4>
+          <p>进程内滑动窗口：<code>rate_limit_dep(key, limit)</code> 用于 FastAPI Depends；<code>try_rate_limit_by_id</code> 用于 WS；后台清理线程 120s sweep。</p>
+        </div>
+        <div class="card">
+          <h4>local_only.py</h4>
+          <p><code>require_local_peer</code>：非 prod 下只允许 loopback 访问管理接口（<code>HOST=0.0.0.0</code> 时被局域网任意改 BYOK 的关键防线）。</p>
+        </div>
+        <div class="card">
+          <h4>prompts.py</h4>
+          <p><code>with_agent_output_rules</code> 统一追加"禁止 emoji / 全角标点"；<code>strip_emojis</code> 出站前硬删除；<code>normalize_cn_punctuation</code> 递归规范化中英标点。</p>
+        </div>
+        <div class="card">
+          <h4>migrate.py</h4>
+          <p>列级幂等迁移 + Alembic 版本戳。详见 <a href="#sec-db">§19 数据库与迁移</a>。</p>
+        </div>
+        <div class="card">
+          <h4>file_lock.py</h4>
+          <p>跨进程文件锁：Windows msvcrt、POSIX fcntl；用于 <code>system_learning.json</code> 写并发保护。</p>
+        </div>
+        <div class="card">
+          <h4>constants.py</h4>
+          <p>三服务共用的协议常量：<code>LLMProtocol</code>、<code>PipelineStage</code>、<code>RAGBackendKind</code>、<code>SessionStatus</code>、<code>SSEMessageType</code>、限流默认值、<code>TRACE_ID_HEADER</code>、简历上传上限等。</p>
+        </div>
+      </div>
+
+      <h3>能力层（<code>shared/capabilities/</code>）</h3>
+      <div class="grid grid-3">
+        <div class="card">
+          <h4>ai/llm/client/*</h4>
+          <p>BYOK 客户端：<code>LLMClient</code>（OpenAI 兼容 chat completions），<code>UnifiedLLMClient</code>（多协议：openai_chat / anthropic_messages / openai_responses），<code>base.py</code>（重试/文本提取/环境判断），<code>tool_args.py</code>（工具参数解析）。</p>
+        </div>
+        <div class="card">
+          <h4>voice/stt/* + voice/tts/* + voice/config/*</h4>
+          <p>STT：10 个适配器（whisper / openai_compat / mimo_audio / 讯飞/火山/阿里/腾讯/百度）。TTS：edge / minimax_speech / mimo_audio / 通用 OpenAI 兼容。Config：<code>catalog.py</code>（三阶段供应商能力目录） + <code>credentials.py</code>（从 stage_configs 构建凭证，禁止把思考 Key 当 ASR 用）。</p>
+        </div>
+        <div class="card">
+          <h4>knowledge/company/* + knowledge/search/*</h4>
+          <p>企业知识库数据（7 家公司 × 4 切片 = 28 条文档）；联网搜索（<code>ddgs</code> 优先、<code>duckduckgo_search</code> 兜底）。</p>
+        </div>
+        <div class="card">
+          <h4>integrations/github/*</h4>
+          <p>GitHub REST 客户端 + 9 个 MCP 风格工具定义。无需 token 即可调用，有 token 提额。</p>
+        </div>
+        <div class="card">
+          <h4>ai/context_manager.py</h4>
+          <p>粗粒度 token 估算（中文 1.5 字符/token）+ <code>compress_messages</code>：超阈值（30%）时保留 system + 最近 20 条对话 + 压缩说明。</p>
+        </div>
+      </div>
+
+      <h3>服务层（<code>shared/services/</code>）</h3>
+      <div class="grid grid-2">
+        <div class="card">
+          <h4>pipeline_config.py</h4>
+          <p><code>stage_configs</code> 表的 CRUD + 从旧 <code>llm_settings</code> 一次性迁移。处理 <code>"keep"</code> 哨兵（不更新密钥）。</p>
+        </div>
+        <div class="card">
+          <h4>seed.py</h4>
+          <p>环境变量 <code>LLM_API_KEY</code> 存在时自动 seed 到 <code>reason</code> 阶段（已加密入库）。</p>
+        </div>
+      </div>
+
+      <h3>数据层（<code>shared/models/</code>）</h3>
+      <p>跨服务共享的实体：<code>Resume</code>、<code>UserProfile</code>（归属 <code>shared</code>，因为三服务都读写）。<code>StageConfig</code> / <code>LLMSettings</code> 处理器配置也已 re-export。</p>
+    </section>
+
+    <!-- ============ 8. 数据流 ============ -->
+    <section id="sec-dataflow">
+      <h2><span class="num">8</span>数据流：典型一次模拟面试</h2>
+      <p>这是整个系统最复杂的端到端流程。建议把它分成 <strong>6 个阶段</strong> 来读：</p>
+      <div class="seq">
+        <span class="who">浏览器</span><span class="msg">→ <b>POST /api/v1/profile</b> 写入候选人档案 + <b>POST /api/v1/resume/upload</b> 上传 PDF → 后端 pypdf 解析 → LLM 抽取 JSON → <b>POST /api/v1/resume/{id}/analyze</b> 多维度评分</span>
+        <span class="who">api_service</span><span class="msg">→ 写 <code>resumes</code> 表 + <code>parsed_profile</code> JSON + 评分 <code>analysis</code> JSON</span>
+        <span class="who">浏览器</span><span class="msg">→ <b>GET /api/v1/options</b> 拉岗位/公司/工作流 → 选好后 <b>POST /api/v1/interview/sessions</b> 创建会话 → 响应头写入 <code>Set-Cookie: iv_{id}=&lt;access_token&gt;</code> HttpOnly</span>
+        <span class="who">interview_service</span><span class="msg">→ 创建 <code>interview_sessions</code> 行（status=pending, current_phase=identity_check, access_token=新生成）</span>
+        <span class="who">浏览器</span><span class="msg">→ <b>WS /api/v1/ws/interview/{id}</b> 握手（Cookie 自动携带）</span>
+        <span class="who">WS handler</span><span class="msg">→ 验证 access_token → 顶替旧连接 → 初始化 LLM/STT/TTS 凭证 → 预热 Whisper → 启动 TTS 队列 worker → 进入开场白流（temperature=0.8）</span>
+        <span class="who">Runner</span><span class="msg">→ <code>stream_opening</code> → 工具轮次 → LLM 流式 token → ThinkStreamFilter 过滤 → 按句入队 TTS（<code>edge_tts.synthesize_to_base64</code>） → 客户端 <code>audio_chunk</code> 播放</span>
+        <span class="who">浏览器</span><span class="msg">→ 麦克风 <code>getUserMedia</code> → ScriptProcessor 16kHz Int16 PCM → <code>audio_chunk</code> base64 上行（缓冲上限 5MB）</span>
+        <span class="who">WS handler</span><span class="msg">→ 累积到 user_turn_end → <code>transcribe_utterance</code>（优先云端，失败回退本地 Whisper） → 回采判定（与上一条 assistant 比对） → 用户文本写入 messages</span>
+        <span class="who">Runner</span><span class="msg">→ <code>stream_turn</code> → followup.analyze 判定追问信号（vague/missing_data/tech_hole/off_topic） → RAG 检索 → 工具循环 → LLM 流式 → 阶段推进或 [INTERVIEW_COMPLETE]</span>
+        <span class="who">浏览器</span><span class="msg">→ 收到 <code>silence_nudge</code> 时 TTS 短句 → 候选人可 <code>barge_in</code> 打断 → <code>turn_state</code> 切回 USER_SPEAKING</span>
+        <span class="who">WS handler</span><span class="msg">→ 主动 finish → 报告后台任务（<code>asyncio.create_task</code>，独立 DB session） → <code>generate_and_persist_report</code>：进程内锁 + DB CAS 哨兵 <code>{"_generating":true}</code> 防 WS / HTTP / 多 worker 双打</span>
+        <span class="who">interview_service</span><span class="msg">→ 报告 JSON 落库 + <code>GrowthRecord</code> 写入 + <code>record_interview_learning</code> 写 <code>system_learning.json</code> → status=completed</span>
+        <span class="who">浏览器</span><span class="msg">→ <b>GET /api/v1/reports/{id}</b> 查看评分（多维度 + 培训计划 + 阶段总结） → <b>GET /api/v1/reports/growth/history</b> 跨场次成长</span>
+      </div>
+      <p class="muted small">上图的 <code>access_token</code> 仅在创建会话的响应写入 HttpOnly Cookie；后续所有可变操作都靠 Cookie 鉴权；生产环境拒绝 query <code>?token=</code>。</p>
+    </section>
+
+    <!-- ============ 9. LLM 客户端 ============ -->
+    <section id="sec-llm">
+      <h2><span class="num">9</span>LLM 客户端与多协议</h2>
+      <p>项目不绑定单一 LLM 供应商。<strong>两个客户端</strong>覆盖 OpenAI Chat Completions / Anthropic Messages / OpenAI Responses 三种协议：</p>
+
+      <h3><code>LLMClient</code>（OpenAI 兼容主路径）</h3>
+      <p>位置：<code>shared/capabilities/ai/llm/client/llm_client.py</code>。核心能力：</p>
+      <ul>
+        <li><b>BYOK 读取</b>：<code>from_db()</code> 优先 stage_configs 中的 <code>reason</code> 阶段；回退 <code>llm_settings</code> 表 → 环境变量。</li>
+        <li><b>协议分发</b>：当 <code>protocol != openai_chat</code>，自动委托 <code>UnifiedLLMClient</code>。</li>
+        <li><b>SSRF 防御</b>：每次请求都校验 <code>api_base</code>（<code>is_safe_http_url</code>），并通过 <code>make_pinned_async_client</code> DNS pin 建连。</li>
+        <li><b>重试</b>：429 / 5xx 指数退避（最多 3 次）；4xx 不重试直接抛。</li>
+        <li><b>流式</b>：<code>chat_stream</code> 解析 SSE、按 token 产出；遇到 <code>reasoning_content</code> 字段时自动包裹 <code>&lt;think&gt;...&lt;/think&gt;</code>，方便下游 <code>ThinkStreamFilter</code> 剥离。</li>
+        <li><b>JSON 模式</b>：<code>chat_json</code> 走 <code>response_format=json_object</code>，空内容回退无 response_format 重试，最后暴力 JSON 抽取。</li>
+        <li><b>Embeddings</b>：<code>embed</code> 调 <code>/embeddings</code>；独立 <code>LLM_EMBEDDINGS_*</code> 配置优先。</li>
+      </ul>
+
+      <h3><code>UnifiedLLMClient</code>（多协议）</h3>
+      <p>位置：<code>shared/capabilities/ai/llm/client/unified_client.py</code>。它把 <code>messages</code> 转成对应协议的 payload：</p>
+      <div class="code-cap"><span class="file">shared/capabilities/ai/llm/client/unified_client.py</span> · <span class="lineno">L214-280</span><span class="tag">snippet</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">_build_url_and_payload</span>(self, messages, *, system=None, stream=False, temperature=0.7, ...):
+    <span class="tk-key">if</span> self.protocol == LLMProtocol.ANTHROPIC_MESSAGES:
+        message_items = _anthropic_messages(messages)
+        system_text = system <span class="tk-key">or</span> <span class="tk-str">"\n"</span>.join(...)
+        url = <span class="tk-str">f"{self.api_base}/v1/messages"</span>
+        payload = {
+            <span class="tk-str">"model"</span>: self.model, <span class="tk-str">"max_tokens"</span>: self.max_tokens,
+            <span class="tk-str">"messages"</span>: message_items, <span class="tk-str">"stream"</span>: stream,
+        }
+        <span class="tk-key">if</span> system_text: payload[<span class="tk-str">"system"</span>] = system_text
+        <span class="tk-com"># tools / tool_choice 转 anthropic 格式</span>
+        ...
+    <span class="tk-key">elif</span> self.protocol == LLMProtocol.OPENAI_RESPONSES:
+        message_items = _responses_input(messages)
+        url = <span class="tk-str">f"{self.api_base}/responses"</span>
+        payload = {<span class="tk-str">"model"</span>: self.model, <span class="tk-str">"input"</span>: message_items, ...}
+        <span class="tk-key">if</span> response_format: payload[<span class="tk-str">"text"</span>] = {<span class="tk-str">"format"</span>: response_format}
+        ...
+    <span class="tk-key">else</span>:
+        <span class="tk-com"># openai_chat（默认）</span>
+        url = <span class="tk-str">f"{self.api_base}/chat/completions"</span>
+        ...
+</code></pre>
+      <p>流式响应解析也对应三种协议：OpenAI delta.content、Anthropic content_block_delta.text、OpenAI Responses response.output_text.delta。</p>
+
+      <h3>凭据与配置解耦</h3>
+      <p><code>from_db()</code> 的妙处：<strong>思考 LLM Key 与 ASR Key 物理隔离</strong>，避免误把思考的 LLM 当识别用去扣别人的 API 配额。这是 <code>build_stt_credentials</code> 注释里写明的强约束。</p>
+    </section>
+
+    <!-- ============ 10. 语音管线 ============ -->
+    <section id="sec-voice">
+      <h2><span class="num">10</span>语音管线（STT / TTS）</h2>
+      <p>语音管线被拆成 <strong>三阶段</strong>，每阶段独立配置、独立凭证：</p>
+
+      <h3>三阶段处理者能力目录（<code>catalog.py</code>）</h3>
+      <p>这是前后端共用的"供应商能力矩阵"。每个供应商的 metadata 包括：</p>
+      <pre><code>{
+  <span class="tk-str">"id"</span>: <span class="tk-str">"mimo_audio"</span>,
+  <span class="tk-str">"label"</span>: <span class="tk-str">"小米 MiMo（mimo-v2.5-asr）"</span>,
+  <span class="tk-str">"can_speech_recognize"</span>: <span class="tk-key">true</span>,
+  <span class="tk-str">"recognize_via"</span>: <span class="tk-str">"transcribe_only"</span>,  <span class="tk-com">// 或 "native_audio"</span>
+  <span class="tk-str">"default_model"</span>: <span class="tk-str">"mimo-v2.5-asr"</span>,
+  <span class="tk-str">"default_api_base"</span>: <span class="tk-str">"https://token-plan-cn.xiaomimimo.com/v1"</span>,
+  <span class="tk-str">"status"</span>: <span class="tk-str">"ready"</span>  <span class="tk-com">// 或 "coming_soon"</span>
+}</code></pre>
+
+      <h3>STT：10 个适配器</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>handler</th><th>协议</th><th>凭证</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr><td><code>local</code></td><td>faster-whisper</td><td>—</td><td>无云端 Key 时的兜底；预热 base</td></tr>
+          <tr><td><code>openai_compat</code></td><td>OpenAI 兼容 /audio/transcriptions</td><td>api_key+api_base</td><td>SiliconFlow / Groq / OpenAI</td></tr>
+          <tr><td><code>mimo_audio</code></td><td>OpenAI 兼容 chat.completions（input_audio）</td><td>api_key+api_base</td><td>MiMo ASR/TTS 协议</td></tr>
+          <tr><td><code>xfyun</code></td><td>讯飞一句话</td><td>AppId+APIKey+APISecret</td><td>WebSocket 连接</td></tr>
+          <tr><td><code>volcengine</code></td><td>火山录音文件极速识别</td><td>AppKey+AccessKey</td><td>资源 ID 默认 volc.bigasr.auc_turbo</td></tr>
+          <tr><td><code>aliyun</code></td><td>阿里一句话</td><td>AppKey+AccessKeyId/Secret</td><td>—</td></tr>
+          <tr><td><code>tencent</code></td><td>腾讯一句话</td><td>AppId+SecretId+SecretKey</td><td>—</td></tr>
+          <tr><td><code>baidu</code></td><td>百度短语音</td><td>API Key+Secret Key</td><td>需要换 token</td></tr>
+          <tr><td><code>zhipu_glm4_voice</code></td><td>原生听音频</td><td>—</td><td><code>coming_soon</code>：自动回退 local</td></tr>
+          <tr><td><code>doubao_s2s</code></td><td>豆包端到端</td><td>—</td><td><code>coming_soon</code>：自动回退 local</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>STT 路由：<code>transcribe_with_handler</code></h3>
+      <div class="code-cap"><span class="file">shared/capabilities/voice/stt/router.py</span> · <span class="lineno">L42-138</span><span class="tag">algorithm</span></div>
+<pre><code><span class="tk-key">async def</span> <span class="tk-fn">transcribe_with_handler</span>(pcm_b64, *, sample_rate, creds, fallback_local=True):
+    requested = (creds.provider <span class="tk-key">or</span> <span class="tk-str">"local"</span>).strip()
+    provider_id = requested
+    forced_fallback = <span class="tk-key">False</span>
+
+    <span class="tk-com"># 1. coming_soon 强制回退 local</span>
+    meta = find_provider(<span class="tk-str">"recognize"</span>, provider_id)
+    <span class="tk-key">if</span> meta <span class="tk-key">and</span> meta.get(<span class="tk-str">"status"</span>) == <span class="tk-str">"coming_soon"</span>:
+        logger.info(<span class="tk-str">"识别处理者 %s 尚未接通，回退本地 Whisper"</span>, provider_id)
+        provider_id = <span class="tk-str">"local"</span>; forced_fallback = <span class="tk-key">True</span>
+
+    <span class="tk-com"># 2. 查找实现</span>
+    impl = _PROVIDERS.get(provider_id)
+    <span class="tk-key">if</span> impl <span class="tk-key">is None and</span> creds.protocol == <span class="tk-str">"openai_chat"</span>:
+        impl = _PROVIDERS[<span class="tk-str">"mimo_audio"</span>]  <span class="tk-com"># 自定义供应商走 mimo 适配器</span>
+        provider_id = requested
+    <span class="tk-key">if</span> impl <span class="tk-key">is None</span>:
+        logger.warning(<span class="tk-str">"未知识别处理者 %s，回退 local"</span>, provider_id)
+        impl = _PROVIDERS[<span class="tk-str">"local"</span>]; provider_id = <span class="tk-str">"local"</span>; forced_fallback = <span class="tk-key">True</span>
+
+    <span class="tk-com"># 3. 尝试主 provider</span>
+    text = <span class="tk-str">""</span>
+    <span class="tk-key">try</span>: text = <span class="tk-key">await</span> impl.transcribe(pcm_b64, sample_rate=sample_rate, creds=creds)
+    <span class="tk-key">except</span> Exception <span class="tk-key">as</span> e: logger.error(...)
+
+    <span class="tk-key">if</span> text:
+        <span class="tk-key">return</span> SttResult(text=text, provider=provider_id, fallback=forced_fallback <span class="tk-key">or</span> provider_id != requested, ...)
+
+    <span class="tk-com"># 4. 主 provider 失败 → 配置的 fallback_handler</span>
+    fallback_handler = (creds.fallback_handler <span class="tk-key">or</span> <span class="tk-str">"local"</span>).strip()
+    <span class="tk-key">if</span> creds.fallback_mode <span class="tk-key">in</span> (<span class="tk-str">"none"</span>, <span class="tk-str">"text_only"</span>):
+        <span class="tk-key">return</span> SttResult(text=<span class="tk-str">""</span>, provider=provider_id, fallback=<span class="tk-key">True</span>, ...)
+    <span class="tk-key">if</span> fallback_local <span class="tk-key">and</span> fallback_handler <span class="tk-key">not in</span> (<span class="tk-str">""</span>, <span class="tk-str">"none"</span>, <span class="tk-str">"text_only"</span>) <span class="tk-key">and</span> fallback_handler != requested:
+        fallback_impl = _PROVIDERS.get(fallback_handler)
+        <span class="tk-key">if</span> fallback_impl <span class="tk-key">is not None</span>:
+            ...  <span class="tk-com"># 跑 fallback；返回 fallback=True</span>
+    ...
+</code></pre>
+
+      <h3>TTS：句子级流式合成</h3>
+      <p>TTS 关键在 <strong>节奏感</strong>。代码用 <code>should_flush_sentence_buffer</code> + <code>next_soft_min</code> 轮转 10/14/18/24/32 字做软切，模拟真人说话的长短句：</p>
+      <div class="code-cap"><span class="file">shared/capabilities/voice/tts/edge.py</span> · <span class="lineno">L42-66</span><span class="tag">snippet</span></div>
+<pre><code><span class="tk-com"># 句末硬切分点 + 长句软切（字数达标后）</span>
+_HARD_END  = frozenset(<span class="tk-str">"。！？!?；;…</span><span class="tk-str">\n"</span>)
+_SOFT_BREAK = frozenset(<span class="tk-str">"，、,"</span>)
+_SOFT_MIN_ROTATION = (<span class="tk-num">10</span>, <span class="tk-num">14</span>, <span class="tk-num">18</span>, <span class="tk-num">24</span>, <span class="tk-num">32</span>)
+_SOFT_MIN_CHARS = <span class="tk-num">18</span>
+
+<span class="tk-key">def</span> <span class="tk-fn">should_flush_sentence_buffer</span>(buf, soft_min=<span class="tk-key">None</span>):
+    <span class="tk-key">if not</span> buf: <span class="tk-key">return False</span>
+    last = buf[-<span class="tk-num">1</span>]
+    <span class="tk-key">if</span> last <span class="tk-key">in</span> _HARD_END: <span class="tk-key">return True</span>
+    min_chars = soft_min <span class="tk-key">if</span> soft_min <span class="tk-key">is not None else</span> _SOFT_MIN_CHARS
+    <span class="tk-key">if</span> len(buf) >= min_chars <span class="tk-key">and</span> last <span class="tk-key">in</span> _SOFT_BREAK: <span class="tk-key">return True</span>
+    <span class="tk-key">if</span> len(buf) >= <span class="tk-num">48</span>: <span class="tk-key">return True</span>   <span class="tk-com"># 超长硬切</span>
+    <span class="tk-key">return False</span>
+
+<span class="tk-key">def</span> <span class="tk-fn">next_soft_min</span>(index):
+    mins = _SOFT_MIN_ROTATION
+    i = index % len(mins)
+    <span class="tk-key">return</span> mins[i], index + <span class="tk-num">1</span>
+</code></pre>
+
+      <h3>音色与韵律：avatar / personality / emotion 三层映射</h3>
+      <p>位置：<code>shared/capabilities/voice/tts/voice_resolve.py</code>。</p>
+      <ul>
+        <li><b>avatar</b>：6 个形象各自绑定一个 Neural 音色（专业男→云扬、温和女→晓晓、严厉专家→云健+angry 情绪、...）。</li>
+        <li><b>personality</b>：5 档微调语速/音高（gentle -6%/0Hz、pressure +12%/+2Hz、...）。</li>
+        <li><b>strictness</b>：≥7 加 5% 语速，≤2 减 3%。</li>
+        <li><b>emotion</b>：句级微调（smile +3%/+3Hz、serious -3%/-2Hz、...）。</li>
+        <li>最终 <code>edge-tts</code> 只接受 rate / pitch（不支持 express-as），所以情绪全部量化成两个轴。</li>
+      </ul>
+
+      <h3>回采（扬声器误拾）检测</h3>
+      <div class="code-cap"><span class="file">shared/capabilities/voice/tts/voice_resolve.py</span> + <code>voice_pipeline._is_echo_of_assistant</code><span class="tag">snippet</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">_is_echo_of_assistant</span>(user_text, assistant_text):
+    u = _normalize_echo_text(user_text)  <span class="tk-com"># 去标点空白小写</span>
+    a = _normalize_echo_text(assistant_text)
+    <span class="tk-key">if</span> len(u) < <span class="tk-num">12 or</span> len(a) < <span class="tk-num">12</span>: <span class="tk-key">return False</span>
+    <span class="tk-com"># 1) 子串包含  2) SequenceMatcher 相似度 ≥ 0.55  3) 短前缀包含</span>
+    <span class="tk-key">if</span> u[:<span class="tk-num">40</span>] <span class="tk-key">in</span> a <span class="tk-key">or</span> a[:<span class="tk-num">40</span>] <span class="tk-key">in</span> u: <span class="tk-key">return True</span>
+    <span class="tk-key">if</span> SequenceMatcher(<span class="tk-key">None</span>, u[:<span class="tk-num">120</span>], a[:<span class="tk-num">120</span>]).ratio() >= <span class="tk-num">0.55</span>: <span class="tk-key">return True</span>
+    ...
+</code></pre>
+      <p>当候选人文本高度像面试官刚说过的内容时，丢弃并提示 <code>C2001</code>，让候选人重说或打字。</p>
+    </section>
+
+    <!-- ============ 11. RAG ============ -->
+    <section id="sec-rag">
+      <h2><span class="num">11</span>企业知识库 RAG</h2>
+      <p>位置：<code>interview_service/capabilities/rag/</code>。通过 <code>RAGBackend</code> 协议抽象出 <strong>3 种实现</strong>：</p>
+
+      <h3>后端实现矩阵</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>后端</th><th>索引位置</th><th>检索时机</th><th>适用</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>local</code>（<code>LocalEmbeddingRAG</code>）</td>
+            <td>本地 Chroma 持久化（<code>services/shared/data/chroma/</code>）</td>
+            <td>本地 cosine 相似度</td>
+            <td>所有暴露 OpenAI 兼容 <code>/embeddings</code> 的供应商</td>
+          </tr>
+          <tr>
+            <td><code>stepfun</code>（<code>StepFunRetrievalRAG</code>）</td>
+            <td>StepFun 托管 vector_stores</td>
+            <td>chat 时由 StepFun 服务端通过 <code>tools[].type=retrieval</code> 完成</td>
+            <td>StepFun 用户</td>
+          </tr>
+          <tr>
+            <td><code>none</code>（<code>_NullRAG</code>）</td>
+            <td>—</td>
+            <td>—</td>
+            <td>关闭 RAG</td>
+          </tr>
+        </tbody>
+      </table></div>
+
+      <h3>数据：7 家公司 × 4 切片</h3>
+      <p>位置：<code>shared/capabilities/knowledge/company/knowledge.py</code> 的 <code>BUILTIN_COMPANIES</code>。每家公司 4 类切片：</p>
+      <div class="code-cap"><span class="file">interview_service/capabilities/rag/_kb_data.py</span> · <span class="lineno">L39-94</span><span class="tag">_build_documents</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">_build_documents</span>():
+    texts, metadatas, ids = [], [], []
+    <span class="tk-key">for</span> company <span class="tk-key">in</span> BUILTIN_COMPANIES:  <span class="tk-com"># 字节 / 腾讯 / 阿里 / 美团 / 米哈游 / OpenAI / Google</span>
+        cid = company[<span class="tk-str">"id"</span>]
+        <span class="tk-com"># 切片 1：style  切片 2：focus_areas  切片 3：每题一片  切片 4：flow</span>
+        texts.append(<span class="tk-str">f"{company['name']}（{cid}）面试风格：{company['style']}。压力等级：{company['pressure_level']}。"</span>)
+        texts.append(<span class="tk-str">f"{company['name']}考察重点领域：{', '.join(company['focus_areas'])}。"</span>)
+        <span class="tk-key">for</span> idx, q <span class="tk-key">in</span> enumerate(company[<span class="tk-str">"sample_questions"</span>]):
+            texts.append(<span class="tk-str">f"{company['name']}典型面试问题示例：{q}"</span>)
+        texts.append(<span class="tk-str">f"{company['name']}典型面试流程：{company['interview_flow']}"</span>)
+    <span class="tk-key">return</span> texts, metadatas, ids
+</code></pre>
+      <p>一家公司 4 段描述，7 家公司共 <strong>28 条</strong> 文档（其中样题每题一片，所以实际条数因样题数量浮动）。</p>
+
+      <h3>检索与注入</h3>
+      <p>位置：<code>interview_service/services/interview/tool_round_runner.py</code> 的 <code>maybe_retrieve_rag</code>。每次候选人回答后：</p>
+      <ul>
+        <li>取 <code>{last_question} {user_text}</code> 作 query；</li>
+        <li>限定 <code>company_id</code> 元数据过滤（<code>where={"company_id": company_id}</code>）；</li>
+        <li><strong>距离阈值 &lt; 0.5</strong> 才注入（弱匹配丢弃）；</li>
+        <li>注入的 system 消息是 <code>## 企业知识库检索补充\n1. [style] ...\n2. [focus_areas] ...</code> 这种紧凑中文摘要。</li>
+      </ul>
+      <p>StepFun 后端不返回本地命中片段（<code>query()</code> 直接 <code>return []</code>），而是通过 <code>build_retrieval_tool()</code> 在 chat 时把 retrieval tool 注入到 messages；这部分真实检索由 StepFun 服务端执行。</p>
+    </section>
+
+    <!-- ============ 12. LLM 工具集 ============ -->
+    <section id="sec-llm-tools">
+      <h2><span class="num">12</span>LLM 工具集（GitHub / 搜索 / 简历）</h2>
+      <p>面试 Agent 与辅导 Agent 都通过 OpenAI function calling 调用工具。最多 3 轮循环。</p>
+
+      <h3>GitHub 工具（9 个，<code>shared/capabilities/integrations/github/tools.py</code>）</h3>
+      <div class="grid grid-3">
+        <div class="card"><h4><code>github_get_user</code></h4><p>公开资料（bio / repo 数 / followers）。</p></div>
+        <div class="card"><h4><code>github_list_repos</code></h4><p>按更新时间排序的仓库列表。</p></div>
+        <div class="card"><h4><code>github_get_repo</code></h4><p>单仓库元数据 + topics + license。</p></div>
+        <div class="card"><h4><code>github_get_readme</code></h4><p>README 全文（截断 12k 字符）。</p></div>
+        <div class="card"><h4><code>github_list_commits</code></h4><p>commit 列表（可按 author 过滤）。</p></div>
+        <div class="card"><h4><code>github_list_pulls</code></h4><p>PR 列表（state=open/closed/all）。</p></div>
+        <div class="card"><h4><code>github_list_issues</code></h4><p>Issue 列表（自动过滤 PR）。</p></div>
+        <div class="card"><h4><code>github_get_file</code></h4><p>文件或目录内容（base64 解码）。</p></div>
+        <div class="card"><h4><code>github_get_languages</code></h4><p>语言字节占比（与简历技术栈比对）。</p></div>
+      </div>
+      <p><b>关键交互</b>：<code>execute_github_tool</code> 接受 <code>arguments</code> 字典；<code>github_get_user</code> / <code>github_list_repos</code> 在没传 username 时自动从候选人 profile 的 <code>github_username</code> 字段补全。这是面试官的"暗核验"。</p>
+
+      <h3>联网搜索：<code>web_search_with_hits</code></h3>
+      <p>位置：<code>shared/capabilities/knowledge/search/web.py</code>。优先 <code>ddgs</code> 包（bing + duckduckgo 两个后端，按顺序尝试），旧包 <code>duckduckgo_search</code> 兜底。失败时返回 <code>"SEARCH_UNAVAILABLE\n..."</code> 文本 + 空 hits，<strong>引导 LLM 不要编造</strong>。</p>
+      <p>站点白名单：<code>build_site_scoped_query</code> 给查询附加 <code>(site:a.com OR site:b.com)</code>，由 <code>api_service/services/resume/sites.py</code> 提供配置项 <code>RESUME_MARKET_SEARCH_SITES</code>。</p>
+
+      <h3>面试域本地工具（<code>interview_service/services/interview/tools.py</code>）</h3>
+      <ul>
+        <li><code>lookup_company_profile</code>：从 <code>get_company_context(company_id)</code> 取整段企业知识（与 RAG 互补，结构化）。</li>
+        <li><code>lookup_resume_projects</code>：从候选人简历 JSON 中提取项目/技能，可 <code>focus</code> 关键词过滤。</li>
+        <li><code>web_search_interview_exp</code>：面经检索（与上面搜索共用实现）。</li>
+      </ul>
+
+      <h3>辅导域工具（<code>agent_service/agents/prep/agent.py</code>）</h3>
+      <ul>
+        <li><code>web_search</code>：同上</li>
+        <li><code>company_info</code>：同上</li>
+        <li><code>quiz</code>：出题（choice / open）</li>
+        <li>GitHub 5 个工具子集（<code>github_list_repos</code> / <code>github_get_readme</code> / <code>github_get_repo</code> / <code>github_list_commits</code> / <code>github_get_user</code>）</li>
+      </ul>
+
+      <h3>工具执行结果入长上下文结构化记忆</h3>
+      <p>每次 GitHub 工具结果会写一条 <code>{"tool": name, "args": args, "preview": result[:500]}</code> 到 <code>agent_state.github_findings</code>，限制最多 20 条；每条工具调用写 <code>{"round": i, "tool": name, "ok": bool}</code> 到 <code>tool_trace</code>，限制 40 条。这些都注入到 <code>## 会话结构化记忆（请勿重复已问问题）</code> 段落中，让长上下文下 LLM 仍记得已问过 / 已查过。</p>
+    </section>
+
+    <!-- ============ 13. 面试引擎 ============ -->
+    <section id="sec-interview-engine">
+      <h2><span class="num">13</span>面试引擎：Runner / Agent / Workflow</h2>
+      <p>这是项目最稠密的代码：<strong>三个类</strong>分工、加上 <strong>3 套工作流</strong> 共 16 个阶段。</p>
+
+      <h3>三个类的职责</h3>
+      <div class="grid grid-3">
+        <div class="card">
+          <h4><code>InterviewRunner</code>（流式入口）</h4>
+          <ul>
+            <li><code>stream_opening(db)</code>：开场白</li>
+            <li><code>stream_turn(user_text, db, face=..., image_b64=...)</code>：常规回合</li>
+            <li><code>stream_closing(db)</code>：候选人主动收尾</li>
+          </ul>
+          <p>所有路径 <code>yield StreamEvent</code>（TOKEN / TURN_COMPLETE / ERROR），由 WS 层消费。</p>
+        </div>
+        <div class="card">
+          <h4><code>InterviewAgent</code>（数据层）</h4>
+          <p>管 messages 列表、阶段索引、asked_questions / weak_points / github_findings / followup_clues / tool_trace 等结构化记忆。提供 <code>build_opening_prompt</code> / <code>refresh_system_memory</code> / <code>advance_phase_if_needed</code> / <code>mark_active/completed</code> / <code>record_user/assistant_text</code>。</p>
+        </div>
+        <div class="card">
+          <h4><code>ToolRoundRunner</code>（工具循环）</h4>
+          <p>非流式工具循环：最多 <code>interview_max_tool_rounds</code>（默认 3）轮；首轮无工具时返回 (messages, content) 让 Runner 直接播报。StepFun retrieval tool 也在此注入。</p>
+        </div>
+      </div>
+
+      <h3>3 套工作流（<code>workflows.py</code>）</h3>
+      <p>每个工作流是一个 <code>Workflow</code> dataclass，包含若干 <code>PhaseDef(id, name, description, min_questions, max_questions)</code>：</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>工作流</th><th>阶段顺序（id）</th><th>总题数</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>technical</code>（技术面）</td>
+            <td>identity_check → self_intro → basic_knowledge → project_deep_dive → technical_deep → system_design → scenario → reverse_qa → summary</td>
+            <td>1+1+2–4+3–6+2–4+1–2+1–2+1–3+1 = 13–23</td>
+          </tr>
+          <tr>
+            <td><code>hr</code>（HR 面）</td>
+            <td>identity_check → self_intro → career_plan → teamwork → pressure → salary → reverse_qa → summary</td>
+            <td>1+1+2–3+2–3+1–2+1+1–3+1 = 10–15</td>
+          </tr>
+          <tr>
+            <td><code>management</code>（管理岗）</td>
+            <td>identity_check → self_intro → leadership → decision_making → conflict → business → reverse_qa → summary</td>
+            <td>1+1+2–4+2–3+1–2+2–3+1–3+1 = 11–18</td>
+          </tr>
+        </tbody>
+      </table></div>
+
+      <h3>系统提示词组装（<code>agent_prompts.py</code>）</h3>
+      <p><code>build_system_prompt</code> 把 personality / style / strictness 描述、阶段名+目标+题量、候选人档案（profile + 简历 JSON）、公司知识库、可用工具列表、行为准则、追问引导拼成一段（<strong>约 2–4k 字</strong>）。</p>
+      <p>反问环节（<code>reverse_qa</code>）有特殊处理：候选人提问时切换角色为"公司代表"，注入完整公司知识库上下文（来自 <code>get_company_context</code>）。</p>
+
+      <h3>追问信号分析器（<code>followup.py</code>）</h3>
+      <p>不调 LLM，纯规则判定回答是否需要追问：</p>
+      <div class="code-cap"><span class="file">interview_service/services/interview/followup.py</span> · <span class="lineno">L46-122</span><span class="tag">analyze</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">analyze</span>(answer, question=<span class="tk-str">""</span>, tech_domains=None, *, phase_id=<span class="tk-str">""</span>):
+    text = (answer <span class="tk-key">or</span> <span class="tk-str">""</span>).strip()
+    <span class="tk-key">if not</span> text: <span class="tk-key">return</span> MISSING_DATA(<span class="tk-str">"候选人未给出实质性内容..."</span>)
+    skip_tech_rules = phase_id <span class="tk-key">in</span> _NON_TECHNICAL_PHASES  <span class="tk-com"># 反问/总结/寒暄</span>
+
+    <span class="tk-com"># 0. vague：模糊词 ≥2 或 1+短答</span>
+    vague_hits = sum(<span class="tk-num">1</span> <span class="tk-key">for</span> term <span class="tk-key">in</span> VAGUE_TERMS <span class="tk-key">if</span> term <span class="tk-key">in</span> text)
+    <span class="tk-key">if</span> vague_hits >= <span class="tk-num">2</span>: <span class="tk-key">return</span> VAGUE(<span class="tk-str">"..."</span>)
+    <span class="tk-key">if</span> vague_hits == <span class="tk-num">1 and</span> len(text) < <span class="tk-num">60</span>: <span class="tk-key">return</span> VAGUE(<span class="tk-str">"..."</span>)
+
+    <span class="tk-com"># 1. off_topic：极短 + 与问题关键词不重叠</span>
+    <span class="tk-key">if</span> question <span class="tk-key">and</span> len(text) < <span class="tk-num">30</span>:
+        q_keywords = _question_keywords(question)
+        <span class="tk-key">if</span> q_keywords <span class="tk-key">and not</span> _answer_contains_any(text, q_keywords):
+            <span class="tk-key">return</span> OFF_TOPIC(<span class="tk-str">"..."</span>)
+
+    <span class="tk-key">if</span> skip_tech_rules: <span class="tk-key">return</span> _NO_SIGNAL
+
+    <span class="tk-com"># 2. missing_data：长答无量化</span>
+    <span class="tk-key">if</span> len(text) >= <span class="tk-num">40 and not</span> HAS_QUANT_PATTERN.search(text):
+        <span class="tk-key">return</span> MISSING_DATA(<span class="tk-str">"候选人描述较为丰富但缺少具体数据..."</span>)
+
+    <span class="tk-com"># 3. tech_hole：技术领域词不匹配</span>
+    <span class="tk-key">if</span> tech_domains <span class="tk-key">and not</span> _matches_any_domain(text, tech_domains):
+        <span class="tk-key">return</span> TECH_HOLE(<span class="tk-str">f"候选人回答中未体现其简历声明的技术领域..."</span>)
+
+    <span class="tk-key">return</span> _NO_SIGNAL
+</code></pre>
+      <p>命中时把信号作为 <code>system</code> 消息追加到 messages，提示 LLM 本轮要深挖；同时把线索写到 <code>weak_points</code> + <code>followup_clues</code>，用于报告与系统学习。</p>
+
+      <h3>阶段推进</h3>
+      <div class="code-cap"><span class="file">interview_service/services/interview/agent.py</span> · <span class="lineno">L302-329</span><span class="tag">advance_phase_if_needed</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">advance_phase_if_needed</span>(self, reply: str) -&gt; bool:
+    phase_complete = has_marker(reply, PHASE_COMPLETE_MARKER)
+    max_reached = self.questions_in_phase >= self.current_phase().max_questions
+    <span class="tk-key">if</span> phase_complete <span class="tk-key">or</span> max_reached:
+        <span class="tk-key">if</span> self.current_phase_idx >= len(self.workflow.phases) - <span class="tk-num">1</span>:
+            self.questions_in_phase += <span class="tk-num">1</span>
+            <span class="tk-key">return False</span>
+        self._advance_phase()
+        <span class="tk-key">return True</span>
+    self.questions_in_phase += <span class="tk-num">1</span>
+    <span class="tk-key">return False</span>
+</code></pre>
+      <p>当 LLM 输出末尾出现 <code>[PHASE_COMPLETE]</code>，或当前阶段题数 ≥ max_questions，阶段推进。推进时往 messages 追加一个 system 消息（"进入新阶段：xxx"），让下一轮自然过渡。</p>
+
+      <h3>文本质控：<code>agent_text.py</code></h3>
+      <ul>
+        <li><code>strip_markers</code>：移除 <code>[PHASE_COMPLETE]</code> / <code>[INTERVIEW_COMPLETE]</code> / <code>[emotion:*]</code>。</li>
+        <li><code>strip_think_blocks</code>：去除 <code><think>...</think></code> 与 <code><thinking>...</thinking></code>，含未闭合兜底。</li>
+        <li><code>ThinkStreamFilter</code>：流式版本，跨 token 切分也能正确剥离（保留尾部的开标签前缀 12 字符做缓冲）。</li>
+        <li><code>detect_emotion</code>：从 <code>[emotion:smile]</code> 标签抽取。</li>
+      </ul>
+
+      <h3>Prompt 组装与多模态：<code>prompt_assembler.py</code></h3>
+      <p><code>build_user_content(text, face)</code> 把面部分析提示追加到 user 文本末尾；<code>build_api_messages</code> 拼最终 messages：</p>
+      <ul>
+        <li>有 <code>image_base64</code> 时把 user content 改成 <code>content: [{type:"text",...}, {type:"image_url", url: "data:image/jpeg;base64,..."}]</code> 多模态列表；</li>
+        <li>超过 <code>context_window</code> 时调 <code>compress_messages</code>（保留 system + 最近 20 条 + 压缩说明）。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 14. 实时层 ============ -->
+    <section id="sec-realtime">
+      <h2><span class="num">14</span>实时层：WebSocket / 话轮 / 打断</h2>
+      <p>实时层是项目最稠密的部分，但通过 <strong>5 个 mixin</strong> 优雅拆分：</p>
+
+      <h3>façade：<code>InterviewWSHandler</code></h3>
+      <div class="code-cap"><span class="file">interview_service/realtime/ws_handler.py</span> · <span class="lineno">L69-180</span><span class="tag">class</span></div>
+<pre><code><span class="tk-key">class</span> <span class="tk-cls">InterviewWSHandler</span>(
+    ConnectionLifecycleMixin,  <span class="tk-com"># 握手 / 心跳 / 分发</span>
+    TurnCoordinatorMixin,      <span class="tk-com"># 话轮与候选人回合</span>
+    VoicePipelineMixin,        <span class="tk-com"># STT 选择与 TTS 队列</span>
+    HintServiceMixin,          <span class="tk-com"># 参考提纲</span>
+    ReportSchedulerMixin,      <span class="tk-com"># 后台报告</span>
+):
+    <span class="tk-key">def</span> <span class="tk-fn">__init__</span>(self, websocket, session_id, *, access_token, ws_subprotocol):
+        ...
+        self.orchestrator = InterviewOrchestrator()
+        self.audio_buffer: list[str] = []
+        self._audio_buffer_bytes = <span class="tk-num">0</span>
+        self._tts_queue = _SentenceTTSQueue()
+        self._stream_epoch = <span class="tk-num">0</span>
+        self._tts_soft_idx = <span class="tk-num">0</span>
+        self._candidate_interrupts = <span class="tk-num">0</span>
+        self._ai_interrupts = <span class="tk-num">0</span>
+        self._bg_tasks: set[asyncio.Task] = set()
+        ...
+</code></pre>
+      <p>字段在 <code>__init__</code> 注入，mixin 通过 <code>TYPE_CHECKING</code> 块声明宿主契约（既给 mypy 看，又避免运行时冗余字段）。</p>
+
+      <h3>连接生命周期（<code>connection_lifecycle.py</code>，460 行）</h3>
+      <p><code>handle()</code> 主循环：</p>
+      <div class="code-cap"><span class="file">interview_service/realtime/connection_lifecycle.py</span> · <span class="lineno">L142-342</span><span class="tag">handle 主循环</span></div>
+<pre><code><span class="tk-key">async def</span> <span class="tk-fn">handle</span>(self):
+    <span class="tk-com"># 1. WS 握手：若客户端用 Sec-WebSocket-Protocol 传令牌，回显子协议</span>
+    <span class="tk-key">if</span> self._ws_subprotocol:
+        <span class="tk-key">await</span> self.ws.accept(subprotocol=self._ws_subprotocol)
+    <span class="tk-com"># 2. 注入 trace_id</span>
+    set_trace_id(<span class="tk-str">f"ws-{self.session_id}-{uuid.uuid4().hex[:8]}"</span>)
+    db = SessionLocal()
+    <span class="tk-key">try</span>:
+        <span class="tk-com"># 3. 查 session + 校验 access_token（先鉴权再 claim）</span>
+        session = ...
+        <span class="tk-key">if not</span> tokens_match(session.access_token, self._client_access_token):
+            <span class="tk-key">await</span> self._fail_and_close(<span class="tk-str">"无权访问该面试会话"</span>)
+            <span class="tk-key">return</span>
+        <span class="tk-com"># 4. 状态检查：非 PENDING/ACTIVE 不初始化（避免对已完成会话白跑 LLM）</span>
+        <span class="tk-key">if</span> session.status <span class="tk-key">not in</span> (PENDING, ACTIVE):
+            <span class="tk-key">await</span> self._fail_and_close(<span class="tk-str">"面试已结束"</span>)
+            <span class="tk-key">return</span>
+        <span class="tk-com"># 5. 占租约（顶替旧连接）+ 初始化 LLM/凭证 + 预热 Whisper + TTS 队列 worker</span>
+        <span class="tk-key">await</span> claim_session_connection(self)
+        self.llm = LLMClient.from_db(db)
+        <span class="tk-key">if not</span> self.llm.api_key: ...
+        self.agent = InterviewAgent(session, self.llm)
+        rag = CompanyKnowledgeRAG(self.llm)  <span class="tk-com"># 失败不阻断</span>
+        self.runner = InterviewRunner(session, self.llm, self.agent, rag=rag)
+        self._stt_creds = build_stt_credentials(...)
+        self._tts_creds = build_tts_credentials(...)
+        <span class="tk-com"># 形象 + 人设 + 严厉度 → 韵律</span>
+        self._session_prosody = resolve_prosody(avatar_id=..., personality=..., strictness=..., ...)
+        <span class="tk-com"># 预热 Whisper（云端 ASR 时仍预热 base 作回退）</span>
+        <span class="tk-key">if</span> provider == <span class="tk-str">"local"</span> <span class="tk-key">or</span> is_local_stt_model(self._whisper_model):
+            self._spawn(warmup_whisper(local_m))
+        <span class="tk-key">else</span>:
+            self._spawn(warmup_whisper(<span class="tk-str">"base"</span>))
+
+        <span class="tk-com"># 6. 开场 / 重连分支</span>
+        <span class="tk-key">if</span> session.status == PENDING:
+            <span class="tk-key">await</span> self._tts_queue.start(self._tts_send)
+            <span class="tk-key">await</span> self.set_turn(TurnState.AI_SPEAKING)
+            <span class="tk-key">await</span> self._stream_events_with_tts(self._consume_runner_opening(db), ...)
+            <span class="tk-key">await</span> self._open_mic_after_playback()
+        <span class="tk-key">elif</span> session.status == ACTIVE:
+            <span class="tk-com"># 重连：提升世代并直接开麦，避免等待已丢失的 playback_done</span>
+            self._begin_playback_wait()
+            self._tts_sent_this_turn = <span class="tk-key">False</span>
+            <span class="tk-key">await</span> self.set_turn(TurnState.USER_SPEAKING)
+
+        <span class="tk-com"># 7. 主循环带心跳：30s 无消息 ping；累计 3 次失败断开</span>
+        miss_count = <span class="tk-num">0</span>
+        <span class="tk-key">while not</span> self._superseded:
+            <span class="tk-key">try</span>:
+                data = <span class="tk-key">await</span> asyncio.wait_for(self.ws.receive_json(), timeout=<span class="tk-num">30.0</span>)
+            <span class="tk-key">except</span> asyncio.TimeoutError:
+                miss_count += <span class="tk-num">1</span>
+                <span class="tk-key">if</span> miss_count >= <span class="tk-num">3</span>:
+                    <span class="tk-key">await</span> self.send(<span class="tk-str">"error"</span>, message=<span class="tk-str">"心跳超时..."</span>, code=<span class="tk-str">"B2002"</span>)
+                    <span class="tk-key">break</span>
+                <span class="tk-key">try</span>: <span class="tk-key">await</span> self.send(<span class="tk-str">"server_ping"</span>, t=...)
+                <span class="tk-key">except</span>: <span class="tk-key">break</span>
+                <span class="tk-key">continue</span>
+            miss_count = <span class="tk-num">0</span>
+            <span class="tk-key">await</span> self._dispatch(data, db, session)
+    <span class="tk-key">except</span> WebSocketDisconnect: ...
+    <span class="tk-key">except</span> Exception <span class="tk-key">as</span> e:
+        <span class="tk-com"># 异常路径强制回到 USER_SPEAKING 防卡死</span>
+        <span class="tk-key">try</span>:
+            <span class="tk-key">await</span> self.set_turn(TurnState.USER_SPEAKING)
+            <span class="tk-key">await</span> self.send(<span class="tk-str">"error"</span>, ..., code=<span class="tk-str">"B2001"</span>)
+        <span class="tk-key">except</span>: <span class="tk-key">pass</span>
+    <span class="tk-key">finally</span>:
+        <span class="tk-key">await</span> release_session_connection(self)
+        <span class="tk-key">await</span> self._cancel_bg_tasks()
+        <span class="tk-key">try</span>: <span class="tk-key">await</span> asyncio.wait_for(self._tts_queue.stop(), timeout=<span class="tk-num">5.0</span>)
+        <span class="tk-key">finally</span>: db.close()
+</code></pre>
+
+      <h3>消息分发（<code>_dispatch</code>）</h3>
+      <div class="code-cap"><span class="file">connection_lifecycle.py</span> · <span class="lineno">L348-460</span><span class="tag">_dispatch</span></div>
+<pre><code><span class="tk-key">async def</span> <span class="tk-fn">_dispatch</span>(self, data, db, session):
+    msg_type = data.get(<span class="tk-str">"type"</span>, <span class="tk-str">""</span>)
+    <span class="tk-key">if</span> msg_type == <span class="tk-str">"audio_chunk"</span>:
+        <span class="tk-com"># 累积 base64 音频；超 5MB 拒绝</span>
+        ...
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"stt_text"</span>:
+        <span class="tk-com"># 浏览器 WS WebSpeech API 预览文本</span>
+        ...
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"pong"</span>:
+        <span class="tk-key">return</span>  <span class="tk-com"># 心跳应答（已在主循环重置 miss_count）</span>
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"vision_update"</span>:
+        <span class="tk-com"># 摄像头面部分析快照</span>
+        face = data.get(<span class="tk-str">"face_analysis"</span>)
+        <span class="tk-key">if</span> face:
+            self.orchestrator.snapshot.merge_face(face)
+            self.orchestrator.snapshot.vision_summary = VisionAgent.summarize(face)
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"user_turn_end"</span>:
+        <span class="tk-com"># 真正的回合提交</span>
+        <span class="tk-key">if not</span> self._can_start_user_turn(): <span class="tk-key">return</span>
+        <span class="tk-key">if not</span> try_rate_limit_by_id(key=<span class="tk-str">"llm"</span>, client_id=<span class="tk-str">f"ws-{self.session_id}"</span>, limit=_WS_LLM_RATE_LIMIT):
+            <span class="tk-key">await</span> self.send(<span class="tk-str">"error"</span>, ..., code=<span class="tk-str">"A0002"</span>)
+            <span class="tk-key">return</span>
+        self._spawn(self._run_user_turn_end(data))
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"silence_timeout"</span>:
+        <span class="tk-key">if</span> self._turn_busy <span class="tk-key">or</span> self._closing: <span class="tk-key">return</span>
+        self._spawn(self._on_silence_nudge())
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"barge_in"</span>:
+        <span class="tk-com"># 候选人打断面试官</span>
+        <span class="tk-key">if</span> self._closing: <span class="tk-key">return</span>
+        self._spawn(self._on_candidate_barge_in())
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"user_text"</span>:
+        <span class="tk-com"># 文字直接发言（不走 ASR）</span>
+        <span class="tk-key">if</span> len(text) > MAX_USER_TEXT_CHARS: ...
+        <span class="tk-key">if</span> text <span class="tk-key">and</span> self.turn_state == USER_SPEAKING <span class="tk-key">and</span> self._can_start_user_turn():
+            <span class="tk-key">if not</span> try_rate_limit_by_id(...): ...
+            self._spawn(self._run_user_text(text, data))
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"request_hint"</span>:
+        <span class="tk-com"># 参考提纲（与 llm 限流桶共享防止刷配额）</span>
+        ...
+        self._spawn(self._on_request_hint(data))
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"request_finish"</span>:
+        <span class="tk-key">if</span> self._closing: <span class="tk-key">return</span>
+        self._spawn(self._on_request_finish())
+    <span class="tk-key">elif</span> msg_type == <span class="tk-str">"tts_playback_done"</span>:
+        client_gen = data.get(<span class="tk-str">"generation"</span>)
+        <span class="tk-key">if</span> client_gen <span class="tk-key">is None or</span> client_gen == self._awaiting_playback_gen:
+            self._playback_done.set()
+</code></pre>
+
+      <h3>打断机制（<code>turn_control.py</code>）</h3>
+      <p>候选人发言打断面试官播报：</p>
+      <div class="code-cap"><span class="file">turn_control.py</span> · <span class="lineno">L48-86</span><span class="tag">_on_candidate_barge_in</span></div>
+<pre><code><span class="tk-key">async def</span> <span class="tk-fn">_on_candidate_barge_in</span>(self):
+    <span class="tk-key">if</span> self.ctx.turn_state <span class="tk-key">not in</span> (AI_SPEAKING, PROCESSING): <span class="tk-key">return</span>
+    self.ctx.candidate_interrupts += <span class="tk-num">1</span>
+    self.ctx.stream_epoch += <span class="tk-num">1</span>            <span class="tk-com"># 提升世代：旧 TTS/LLM 流全部作废</span>
+    self.ctx.playback_generation += <span class="tk-num">1</span>
+    <span class="tk-key">await</span> self.ctx.tts_queue.clear()      <span class="tk-com"># 清空 TTS 队列 + 提升 speak_gen</span>
+    self.ctx.tts_sent_this_turn = <span class="tk-key">False</span>
+    self.ctx.playback_done.set()         <span class="tk-com"># 放行（避免等已丢的 done）</span>
+    <span class="tk-key">await</span> self.send(<span class="tk-str">"tts_interrupted"</span>, reason=<span class="tk-str">"candidate_barge"</span>, ...)
+    <span class="tk-com"># 持久化打断计数到 agent_state，用于报告礼貌分</span>
+    ...
+    <span class="tk-key">await</span> self.set_turn(TurnState.USER_SPEAKING)
+</code></pre>
+
+      <h3>TTS 句子队列（<code>voice_pipeline.py</code>）</h3>
+      <p>关键数据结构 <code>_SentenceTTSQueue</code>：</p>
+      <ul>
+        <li>asyncio.Queue 装 <code>(text, emotion)</code> 任务；</li>
+        <li>worker 单线程逐个调 <code>synthesize_speech</code>（edge_tts）；</li>
+        <li>每个任务有自己的 <code>_speak_gen</code>，开始前与当前对比，被顶替则放弃；</li>
+        <li>队列超 <code>_MAX_QUEUE_SIZE=50</code> 时丢弃最早（防内存膨胀）；</li>
+        <li>每发出一条 <code>tts_audio</code> 调 <code>_mark_tts_sent</code> 标记，触发 <code>_open_mic_after_playback</code> 等待客户端播完。</li>
+      </ul>
+
+      <h3>单会话单连接租约（<code>session_registry.py</code>）</h3>
+      <p><code>claim_session_connection</code>：用 <code>asyncio.Lock</code> 串行化，新连接顶替旧连接时给旧连接发 <code>{"type":"error","code":"B2003",...}</code> + <code>ws.close(code=4000)</code>。这避免多标签页 / 多设备时双方都以为自己是主连接的问题。</p>
+
+      <h3>参考提纲服务（<code>hint_service.py</code>）</h3>
+      <p>候选人按"查看参考提纲"时触发，独立 DB session（不与主回合 ORM Session 竞态）；同 key 防重入；超时 20s 后降级为 STAR 框架提示。</p>
+
+      <h3>报告后台调度（<code>report_scheduler.py</code>）</h3>
+      <p>WS 关麦或 <code>request_finish</code> 时调 <code>_schedule_report_generation</code>，spawn 一个后台任务跑 <code>generate_and_persist_report</code>。任务挂到 <code>_bg_tasks</code> 集合，连接断开时统一 cancel。</p>
+    </section>
+
+    <!-- ============ 15. 报告生成 ============ -->
+    <section id="sec-report">
+      <h2><span class="num">15</span>报告生成与系统学习</h2>
+      <p>报告是面试结束的"产物"。它的难点不在评分本身，而在 <strong>多源并发写入防双打</strong>。</p>
+
+      <h3>报告生成流程</h3>
+      <p>位置：<code>interview_service/services/interview/report.py</code>。</p>
+      <ol>
+        <li><b>构造 LLM messages</b>：把面试对话（截取尾部 12000 字符） + system prompt 一起送进 LLM；</li>
+        <li><b>LLM 输出 JSON</b>：<code>overall_score</code> / 6 维评分 / <code>strengths</code> / <code>weaknesses</code> / <code>improvement_suggestions</code> / <code>training_plan</code> / <code>phase_summary</code> / <code>face_analysis_summary</code>；</li>
+        <li><b>礼貌分硬性下调</b>：候选人打断面试官 <code>c_int</code> 次 → 硬性 <code>politeness -= min(30, c_int*6)</code>、<code>communication -= penalty/2</code>、<code>presence -= penalty/3</code>、总分取平均；</li>
+        <li><b>同一事务</b>：写 <code>interview_sessions.report</code> + <code>overall_score</code> + <code>status=completed</code> + <code>ended_at</code> + 新建 <code>GrowthRecord</code> 行；</li>
+        <li><b>系统学习沉淀</b>：<code>record_interview_learning</code> 写 <code>system_learning.json</code>。</li>
+      </ol>
+
+      <h3>防双打：进程内锁 + DB 哨兵</h3>
+      <p>WS 路径自动 finish、HTTP 手动 <code>POST /finish</code>、报告页 GET 时再补生成，三个来源都可能同时触发 <code>generate_and_persist_report</code>。设计上的双层防护：</p>
+      <div class="code-cap"><span class="file">interview_service/services/interview/report.py</span> · <span class="lineno">L19, 173, 193-328</span><span class="tag">并发安全</span></div>
+<pre><code>_REPORT_LOCKS: dict[int, asyncio.Lock] = {}
+_REPORT_GENERATING_SENTINEL = '{"_generating":true}'
+
+<span class="tk-key">async def</span> <span class="tk-fn">generate_and_persist_report</span>(session, llm, db, face_records=None):
+    sid = int(session.id)
+    lock = _REPORT_LOCKS.setdefault(sid, asyncio.Lock())
+    <span class="tk-key">async with</span> lock:
+        <span class="tk-com"># 1. 已有正式报告 → 短路</span>
+        raw = (session.report <span class="tk-key">or</span> <span class="tk-str">""</span>).strip()
+        <span class="tk-key">if</span> raw <span class="tk-key">and</span> raw != <span class="tk-str">"{}"</span> <span class="tk-key">and</span> raw != _REPORT_GENERATING_SENTINEL:
+            <span class="tk-key">return</span> InterviewReport.model_validate_json(raw)
+        <span class="tk-com"># 2. 另一路径卡在哨兵 → 短暂轮询 30 * 0.2s 后清哨兵重试</span>
+        <span class="tk-key">if</span> raw == _REPORT_GENERATING_SENTINEL:
+            <span class="tk-key">for</span> _ <span class="tk-key">in</span> range(<span class="tk-num">30</span>):
+                <span class="tk-key">await</span> asyncio.sleep(<span class="tk-num">0.2</span>)
+                db.refresh(session)
+                cur = (session.report <span class="tk-key">or</span> <span class="tk-str">""</span>).strip()
+                <span class="tk-key">if</span> cur <span class="tk-key">and</span> cur != <span class="tk-str">"{}"</span> <span class="tk-key">and</span> cur != _REPORT_GENERATING_SENTINEL:
+                    <span class="tk-key">return</span> InterviewReport.model_validate_json(cur)
+        <span class="tk-com"># 3. DB CAS：UPDATE ... WHERE report IS NULL / '{}'，写哨兵</span>
+        result = db.execute(
+            update(InterviewSession).where(
+                InterviewSession.id == sid,
+                <span class="tk-fn">or_</span>(InterviewSession.report.is_(<span class="tk-key">None</span>), InterviewSession.report == <span class="tk-str">""</span>, InterviewSession.report == <span class="tk-str">"{}"</span>)
+            ).values(report=_REPORT_GENERATING_SENTINEL)
+        )
+        db.commit()
+        claimed = (getattr(result, <span class="tk-str">"rowcount"</span>, <span class="tk-num">0</span>) <span class="tk-key">or</span> <span class="tk-num">0</span>) > <span class="tk-num">0</span>
+        <span class="tk-com"># 4. 没抢到 → 等别人写完</span>
+        <span class="tk-key">if not</span> claimed: ...
+        <span class="tk-com"># 5. 抢到了：调 LLM → 写 report + GrowthRecord → 失败清哨兵</span>
+        ...
+</code></pre>
+      <p>进程内锁解决"同进程内 WS + HTTP"并发；DB 哨兵解决"多 worker / 进程重启后残留哨兵"。这是一个非常实用的工业级并发模式。</p>
+
+      <h3>流式报告（<code>routes/reports.py</code>）</h3>
+      <p><code>GET /reports/{id}/stream</code>：先调 <code>generate_and_persist_report</code>（写库 + 拿到结构），再 <strong>伪流式分片</strong> 推送（每片 48 字符），最后 <code>done</code> 事件带完整 <code>InterviewReport</code>。这样前端既能渐进显示，又避免流式 + chat_json 两次计费。</p>
+
+      <h3>系统学习（<code>growth/learning.py</code>）</h3>
+      <p>每次报告生成时同步写 <code>services/shared/data/system_learning.json</code>（带进程内 <code>_write_lock</code> + 跨进程 <code>file_lock</code>）：</p>
+      <ul>
+        <li><code>company_session_counts</code> / <code>role_session_counts</code>：公司/岗位面试次数；</li>
+        <li><code>avg_scores_by_company</code>：公司均分（<code>{"bytedance": {"sum": 320, "n": 4}}</code>）；</li>
+        <li><code>followup_category_hits</code>：追问类别命中数（vague / missing_data / tech_hole / off_topic）；</li>
+        <li><code>tool_call_counts</code>：工具调用次数；</li>
+        <li><code>effective_probes</code>：从 <code>weak_points</code> + 报告 weaknesses 抽取的前 5 条 + 最近 200 条循环；</li>
+      </ul>
+      <p>下次面试 <code>InterviewAgent._system_learning_section()</code> 读取后注入 system prompt：</p>
+      <div class="code-cap"><span class="file">interview_service/services/interview/agent.py</span> · <span class="lineno">L163-212</span><span class="tag">_system_learning_section</span></div>
+<pre><code><span class="tk-key">def</span> <span class="tk-fn">_system_learning_section</span>(self) -&gt; str:
+    insights = get_system_insights(limit=<span class="tk-num">5</span>)
+    parts = []
+    company = self.session.company <span class="tk-key">or</span> <span class="tk-str">""</span>
+    role = self.session.role <span class="tk-key">or</span> <span class="tk-str">""</span>
+
+    company_avg = (insights.get(<span class="tk-str">"avg_scores_by_company"</span>) <span class="tk-key">or</span> {}).get(company)
+    <span class="tk-key">if</span> company_avg <span class="tk-key">is not None and</span> company_avg < <span class="tk-num">80</span>:
+        parts.append(<span class="tk-str">f"目标公司「{company}」历史面试均分 {company_avg}，建议适度加大项目深挖与技术追问力度。"</span>)
+
+    probes = insights.get(<span class="tk-str">"recent_probes"</span>) <span class="tk-key">or</span> []
+    relevant = []
+    <span class="tk-key">for</span> p <span class="tk-key">in</span> probes:
+        p_company = p.get(<span class="tk-str">"company"</span>) <span class="tk-key">or</span> <span class="tk-str">""</span>
+        p_role = p.get(<span class="tk-str">"role"</span>) <span class="tk-key">or</span> <span class="tk-str">""</span>
+        <span class="tk-key">if</span> p_company == company <span class="tk-key">or</span> p_role == role <span class="tk-key">or not</span> relevant:
+            relevant.append(<span class="tk-str">str(p.get("point", ""))[:<span class="tk-num">120</span>]</span>)
+        <span class="tk-key">if</span> len(relevant) >= <span class="tk-num">3</span>: <span class="tk-key">break</span>
+    <span class="tk-key">if</span> relevant:
+        parts.append(<span class="tk-str">"近期面试中发现的常见薄弱点（可针对性考察）：\n- "</span> + <span class="tk-str">"\n- "</span>.join(relevant))
+
+    <span class="tk-key">if not</span> parts: <span class="tk-key">return</span> <span class="tk-str">""</span>
+    <span class="tk-key">return</span> <span class="tk-str">"\n\n## 系统学习摘要（跨面试积累，供参考）\n"</span> + <span class="tk-str">"\n"</span>.join(parts)
+</code></pre>
+      <p>这是一个非常优雅的"系统自学习"反哺闭环：同公司/同岗位历史均分低 → Agent 加大深挖；近期发现的有效追问线索 → Agent 主动参考。</p>
+    </section>
+
+    <!-- ============ 16. prep ============ -->
+    <section id="sec-prep">
+      <h2><span class="num">16</span>面试准备教练（prep）</h2>
+      <p>位置：<code>agent_service/</code>。逻辑与面试域类似但更轻量：</p>
+      <ul>
+        <li><b>会话</b>：<code>PrepSession</code>（id / resume_id / target_role / target_company / messages / status / access_token）；</li>
+        <li><b>工具</b>：web_search / company_info / quiz + 5 个 GitHub；</li>
+        <li><b>Agent</b>：<code>PrepAgent</code>（在 <code>agent.py</code>），3 轮工具循环 + 流式 token 输出；</li>
+        <li><b>路由</b>：<code>POST /v1/prep/sessions</code> → <code>POST /v1/prep/sessions/{id}/message</code> → <code>POST .../message/stream</code>（SSE）→ <code>GET .../messages</code>；</li>
+        <li><b>流式事件</b>：<code>{type:"token", content:...}</code> / <code>{type:"search_results", groups:...}</code> / <code>{type:"done", token_usage}</code> / <code>{type:"error"}</code>；</li>
+        <li><b>鉴权</b>：可变操作 <code>assert_session_token</code>，失败 <code>A0401</code>。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 17. 安全 ============ -->
+    <section id="sec-security">
+      <h2><span class="num">17</span>安全：SSRF / 加密 / 限流 / Token</h2>
+      <p>RealMock 把"安全"放在 <code>shared/core/security/</code> 集中处理，<strong>不分散到业务代码</strong>。</p>
+
+      <h3>SSRF 防御 + DNS Pin（<code>security/url.py</code>）</h3>
+      <p>两层防护：</p>
+      <ol>
+        <li><b>URL 解析 + 端口白名单 + 多 A 记录遍历</b>：默认只允许 80/443；解析所有 A 记录，<strong>任一不安全即拒</strong>；</li>
+        <li><b>DNS Pin</b>：单次解析后锁定首个安全 IP，<code>PinnedHostTransport</code> 把 <code>Host</code> 头和 SNI 保留为原主机名，但 socket 走到 pin 后的 IP。这缓解 DNS rebinding TOCTOU。</li>
+      </ol>
+      <div class="code-cap"><span class="file">shared/core/security/url.py</span> · <span class="lineno">L20-37, 41-50</span><span class="tag">黑名单网段</span></div>
+<pre><code>_DEFAULT_BLOCKED_NETS = [
+    ipaddress.ip_network(<span class="tk-str">"127.0.0.0/8"</span>),     <span class="tk-com"># loopback（dev 模式 allow_local 才放行）</span>
+    ipaddress.ip_network(<span class="tk-str">"10.0.0.0/8"</span>),       <span class="tk-com"># 私网</span>
+    ipaddress.ip_network(<span class="tk-str">"172.16.0.0/12"</span>),    <span class="tk-com"># 私网</span>
+    ipaddress.ip_network(<span class="tk-str">"192.168.0.0/16"</span>),   <span class="tk-com"># 私网</span>
+    ipaddress.ip_network(<span class="tk-str">"169.254.0.0/16"</span>),  <span class="tk-com"># link-local / metadata</span>
+    ipaddress.ip_network(<span class="tk-str">"0.0.0.0/8"</span>),
+    ipaddress.ip_network(<span class="tk-str">"100.64.0.0/10"</span>),   <span class="tk-com"># CGNAT</span>
+    ipaddress.ip_network(<span class="tk-str">"224.0.0.0/4"</span>),    <span class="tk-com"># multicast</span>
+    ipaddress.ip_network(<span class="tk-str">"240.0.0.0/4"</span>),    <span class="tk-com"># reserved</span>
+    ipaddress.ip_network(<span class="tk-str">"::1/128"</span>),
+    ipaddress.ip_network(<span class="tk-str">"fc00::/7"</span>),
+    ipaddress.ip_network(<span class="tk-str">"fe80::/10"</span>),
+    ipaddress.ip_network(<span class="tk-str">"ff00::/8"</span>),
+    ipaddress.ip_network(<span class="tk-str">"::ffff:0:0/96"</span>),  <span class="tk-com"># IPv4-mapped IPv6</span>
+]
+_DEFAULT_ALLOWED_PORTS = frozenset({<span class="tk-num">80</span>, <span class="tk-num">443</span>})
+</code></pre>
+      <p><strong>生产环境</strong>还额外强制 <code>require_https=True</code>。</p>
+
+      <h3>密钥 at-rest 加密（<code>secrets.py</code>）</h3>
+      <p>使用 <code>cryptography</code> 库的 <code>AESGCM</code>（AES-256-GCM，AEAD）：</p>
+      <ul>
+        <li>格式：<code>enc:v2:&lt;salt_b64&gt;:&lt;nonce_b64&gt;:&lt;tag_b64&gt;:&lt;cipher_b64&gt;</code>；</li>
+        <li>每次加密随机 16 字节 salt + 12 字节 nonce；</li>
+        <li>PBKDF2-HMAC-SHA256 200k 迭代从 master + salt 派生 32 字节 AES 密钥；</li>
+        <li>旧 <code>enc:v1</code> 显式抛 <code>LegacySecretFormatError</code>，拒绝静默迁移，引导用户在设置页重新保存 Key；</li>
+        <li>Master key 来源：<code>SECRET_KEY</code> env（base64 或明文，≥16 字节）→ fallback <code>data/.secret.key</code>；</li>
+        <li>Prod 必须显式设置（<code>services/main.py</code> 启动门禁 <code>_check_secret_key_policy</code>）。</li>
+      </ul>
+
+      <h3>能力令牌（<code>session_auth.py</code>）</h3>
+      <ul>
+        <li><b>本地优先</b>，不引入多用户登录。创建会话时下发 <code>secrets.token_urlsafe(32)</code> 写 HttpOnly Cookie；</li>
+        <li><b>优先级</b>：<code>X-Interview-Token</code> Header &gt; Cookie &gt; query（<code>?token=</code>，生产禁用）；</li>
+        <li><b>CSRF 缓解</b>：仅 cookie 鉴权 + 写操作要求 Origin/Referer 在 CORS 白名单；</li>
+        <li><b>常量时间比较</b>：<code>secrets.compare_digest</code>；</li>
+        <li><b>WebSocket 子协议</b>：<code>Sec-WebSocket-Protocol: mock.&lt;token&gt;</code>（兼容旧客户端）；</li>
+        <li><b>Cookie Secure</b>：<code>COOKIE_SECURE</code> 设置 &gt; 自动判断（https 或可信代理 + X-Forwarded-Proto=https）。</li>
+      </ul>
+
+      <h3>限流（<code>ratelimit.py</code>）</h3>
+      <ul>
+        <li>进程内滑动窗口：<code>rate_limit_dep(key, limit)</code> 用于 HTTP Depends；</li>
+        <li><code>try_rate_limit_by_id</code> 用于 WS（不抛异常）；</li>
+        <li><b>信任代理链</b>：仅当 <code>request.client.host</code> 落入 <code>TRUSTED_PROXY_CIDRS</code>（默认 loopback）才采纳 <code>X-Forwarded-For</code> 首段；</li>
+        <li>超限抛 <code>A0002</code> + 响应头 <code>Retry-After</code>。</li>
+      </ul>
+      <p>三个默认桶：<code>DEFAULT_RATE_LIMIT_PER_MINUTE=60</code>（通用）、<code>DEFAULT_LLM_RATE_LIMIT_PER_MINUTE=10</code>（LLM）、<code>DEFAULT_SESSION_CREATE_RATE_LIMIT_PER_MINUTE=20</code>（建会话）。</p>
+
+      <h3>本机访问（<code>local_only.py</code>）</h3>
+      <p>管理接口（profile / resume / settings / growth / reports）默认 <code>require_local_peer</code>，仅 loopback 可访问；<code>HOST=0.0.0.0</code> 部署时局域网也无法改 BYOK。Starlette TestClient 始终放行（<code>peer == "testclient"</code>）。</p>
+
+      <h3>日志脱敏（<code>logging.py</code>）</h3>
+      <ul>
+        <li><code>RedactFilter</code> 自动覆盖 record.msg / record.args / exc_text；</li>
+        <li>覆盖：sk-/sk_/sk-ant-/aiza/step- 前缀 + Authorization/Bearer + PEM 块 + 启发式"长度≥20 + 字母数字混合 + 无空格"；</li>
+        <li>JSON <code>SafeFormatter</code> 含 trace_id，方便日志检索。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 18. 错误码体系 ============ -->
+    <section id="sec-errors">
+      <h2><span class="num">18</span>错误码体系</h2>
+      <p>位置：<code>shared/core/errors.py</code> 的 <code>CATALOG</code>。四段式编号：<code>A</code>=通用 / 简历 / 面试 / 辅导 / 设置，<code>B</code>=系统，<code>C</code>=第三方。配套 <code>hint</code> 与 <code>retryable</code>。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>码</th><th>http</th><th>说明</th><th>hint</th><th>retry</th></tr></thead>
+        <tbody>
+          <tr><td><code>A0001</code></td><td>422</td><td>请求参数校验失败</td><td>检查输入完整、格式</td><td>—</td></tr>
+          <tr><td><code>A0002</code></td><td>429</td><td>请求过于频繁</td><td>放慢频率，等 1 分钟</td><td>✓</td></tr>
+          <tr><td><code>A0003</code></td><td>400</td><td>文本过长</td><td>分段输入</td><td>—</td></tr>
+          <tr><td><code>A0004</code></td><td>400</td><td>音频过大</td><td>单次 ≤ 2 分钟</td><td>—</td></tr>
+          <tr><td><code>A0006</code></td><td>400</td><td>未配 API Key</td><td>设置页填 Base+Key</td><td>—</td></tr>
+          <tr><td><code>A0007</code></td><td>400</td><td>URL 不安全</td><td>https + <code>ALLOW_LOCAL_LLM=true</code> (dev)</td><td>—</td></tr>
+          <tr><td><code>A0401</code></td><td>403</td><td>无权访问会话</td><td>重新进入</td><td>—</td></tr>
+          <tr><td><code>A0403</code></td><td>403</td><td>跨站请求被拒</td><td>从本站发起</td><td>—</td></tr>
+          <tr><td><code>A0405</code></td><td>403</td><td>仅本机访问</td><td>部署本机浏览器</td><td>—</td></tr>
+          <tr><td><code>A0413</code></td><td>413</td><td>文件超 {max}MB</td><td>压缩或换格式</td><td>—</td></tr>
+          <tr><td><code>A1005</code></td><td>404</td><td>简历不存在</td><td>刷新列表</td><td>—</td></tr>
+          <tr><td><code>A2001</code></td><td>404</td><td>面试会话不存在</td><td>新建面试</td><td>—</td></tr>
+          <tr><td><code>A2002</code></td><td>400</td><td>面试已结束</td><td>查看报告</td><td>—</td></tr>
+          <tr><td><code>A2003</code></td><td>400</td><td>面试未结束</td><td>完成后再看报告</td><td>—</td></tr>
+          <tr><td><code>A2004</code></td><td>404</td><td>报告未生成</td><td>稍后刷新 / 重试</td><td>✓</td></tr>
+          <tr><td><code>A3001</code></td><td>404</td><td>辅导会话不存在</td><td>新建</td><td>—</td></tr>
+          <tr><td><code>A3002</code></td><td>400</td><td>辅导已结束</td><td>新建</td><td>—</td></tr>
+          <tr><td><code>A4001</code></td><td>400</td><td>思考供应商不支持</td><td>换 Chat Completions 兼容</td><td>—</td></tr>
+          <tr><td><code>A4004</code></td><td>400</td><td>stage 不合法</td><td>从设置页按钮发起</td><td>—</td></tr>
+          <tr><td><code>B0001</code></td><td>500</td><td>服务器内部错误</td><td>携带 trace_id 反馈</td><td>✓</td></tr>
+          <tr><td><code>B1001</code></td><td>500</td><td>写库失败</td><td>检查磁盘/权限</td><td>✓</td></tr>
+          <tr><td><code>B2001</code></td><td>4401</td><td>WS 会话级错误</td><td>—</td><td>—</td></tr>
+          <tr><td><code>B2002</code></td><td>—</td><td>WS 心跳超时</td><td>重连</td><td>✓</td></tr>
+          <tr><td><code>B2003</code></td><td>4000</td><td>WS 被顶替</td><td>另一窗口已打开</td><td>—</td></tr>
+          <tr><td><code>C0001</code></td><td>502</td><td>AI 服务不可用</td><td>检查 Key 额度/网络</td><td>✓</td></tr>
+          <tr><td><code>C0002</code></td><td>502</td><td>模型返回空</td><td>当前模型可能仅推理/空输出</td><td>✓</td></tr>
+          <tr><td><code>C1001</code></td><td>502</td><td>报告生成失败</td><td>报告页点击重新生成</td><td>✓</td></tr>
+          <tr><td><code>C2001</code></td><td>200</td><td>STT 失败</td><td>靠近麦克风/打字</td><td>✓</td></tr>
+          <tr><td><code>C2002</code></td><td>200</td><td>TTS 失败</td><td>切 Edge TTS</td><td>✓</td></tr>
+          <tr><td><code>C3001</code></td><td>200</td><td>联网搜索不可用</td><td>降级到通用知识</td><td>✓</td></tr>
+          <tr><td><code>C4001</code></td><td>200</td><td>知识库检索失败</td><td>检查 RAG/embeddings</td><td>✓</td></tr>
+        </tbody>
+      </table></div>
+      <p>每次抛 <code>ApiBusinessError</code> 都会经过 envelope handler，最终响应：</p>
+<pre><code>{
+  <span class="tk-str">"detail"</span>: <span class="tk-str">"文件超过 10MB 上限"</span>,
+  <span class="tk-str">"error"</span>: {
+    <span class="tk-str">"code"</span>: <span class="tk-str">"A0413"</span>,
+    <span class="tk-str">"message"</span>: <span class="tk-str">"文件超过 10MB 上限"</span>,
+    <span class="tk-str">"hint"</span>: <span class="tk-str">"请压缩文件或改用 DOCX/TXT 格式后重试"</span>,
+    <span class="tk-str">"retryable"</span>: <span class="tk-key">false</span>,
+    <span class="tk-str">"trace_id"</span>: <span class="tk-str">"7c2e8d1b3a4f4e1a"</span>
+  }
+}</code></pre>
+    </section>
+
+    <!-- ============ 19. 数据库与迁移 ============ -->
+    <section id="sec-db">
+      <h2><span class="num">19</span>数据库与迁移</h2>
+      <p>默认 <strong>SQLite</strong>（<code>services/shared/data/app.db</code>）。SQLAlchemy 2.0 + Alembic + 自研列迁移。</p>
+
+      <h3>引擎 & 会话</h3>
+      <p>位置：<code>shared/database.py</code>。</p>
+      <ul>
+        <li>线程安全双检锁懒创建 <code>get_engine()</code>；</li>
+        <li>SQLite 启用 <code>journal_mode=WAL</code> + <code>busy_timeout=5000</code> + <code>synchronous=NORMAL</code> + <code>foreign_keys=ON</code>（企业级三件套 + 外键）；</li>
+        <li>内存库回退 <code>StaticPool</code>（测试场景）；</li>
+        <li><code>get_db()</code> FastAPI 依赖；<code>reset_engine()</code> 仅测试用。</li>
+      </ul>
+
+      <h3>迁移：列级幂等 + Alembic 版本戳</h3>
+      <p>位置：<code>shared/core/migrate.py</code> + <code>services/alembic/</code>。</p>
+      <ul>
+        <li><code>MIGRATIONS</code> 字典列 <code>ALTER TABLE ... ADD COLUMN ...</code> 语句；</li>
+        <li><code>apply_column_migrations</code> 用 <code>inspect()</code> 检查表/列存在性，缺则补；</li>
+        <li><code>stamp_alembic_head</code> 把 <code>alembic_version</code> 指向 <code>"20260803_0001"</code>；</li>
+        <li>Alembic revision <code>20260803_0001_baseline_columns.py</code> 调 <code>apply_column_migrations</code>，与启动钩子共用代码。</li>
+      </ul>
+      <p>未来要加列时，<strong>只需往 <code>MIGRATIONS</code> 字典加一条 <code>ALTER</code> 即可</strong>，不需要 Alembic revision（baseline 之后是免费的列迁移）。</p>
+
+      <h3>表清单</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>表</th><th>归属</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>user_profiles</code></td><td>shared</td><td>单行候选人档案（28 字段）</td></tr>
+          <tr><td><code>resumes</code></td><td>shared</td><td>上传的简历 + 解析 JSON + 评分 + 分析</td></tr>
+          <tr><td><code>llm_settings</code></td><td>shared</td><td>旧版三阶段统一表（兼容读）</td></tr>
+          <tr><td><code>stage_configs</code></td><td>shared</td><td>新版三阶段独立配置（每阶段一行）</td></tr>
+          <tr><td><code>prep_sessions</code></td><td>agent_service</td><td>辅导会话 + messages JSON + status + access_token</td></tr>
+          <tr><td><code>interview_sessions</code></td><td>interview_service</td><td>面试会话：personality/strictness/avatar/scene + report + agent_state + 打断统计</td></tr>
+          <tr><td><code>growth_records</code></td><td>interview_service</td><td>跨场次弱项沉淀（profile_id + session_id）</td></tr>
+          <tr><td><code>alembic_version</code></td><td>alembic</td><td>迁移版本戳</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ============ 20. 配置与启动 ============ -->
+    <section id="sec-config">
+      <h2><span class="num">20</span>配置与启动流程</h2>
+
+      <h3>环境变量（<code>shared/config.py</code>）</h3>
+      <dl class="kv">
+        <dt>LLM_API_BASE / LLM_API_KEY / LLM_MODEL</dt><dd>BYOK 思考 LLM 端点 + 凭证 + 模型名</dd>
+        <dt>LLM_EMBEDDINGS_BASE / KEY / MODEL</dt><dd>独立嵌入端点（None 时回退到上面 LLM BYOK）</dd>
+        <dt>LLM_MAX_TOKENS / LLM_CONTEXT_WINDOW</dt><dd>默认 4096 / 128000</dd>
+        <dt>DATABASE_URL</dt><dd>默认 <code>sqlite:///services/shared/data/app.db</code></dd>
+        <dt>CORS_ORIGINS</dt><dd>逗号分隔 origins；prod 禁用 *</dd>
+        <dt>HOST / PORT</dt><dd>默认 127.0.0.1:8081</dd>
+        <dt>ENV</dt><dd>dev / prod；prod 启用 https 强制、SECRET_KEY 强制、关停 engine.dispose</dd>
+        <dt>ALLOW_LOCAL_LLM</dt><dd>dev 才允许非 https / loopback / 私网 base_url；prod 强制拒绝</dd>
+        <dt>WHISPER_MODEL</dt><td>本地 Whisper 模型大小（tiny/base/small/medium/large-v3）；云端用 whisper-1</dd>
+        <dt>TTS_VOICE</dt><dd>默认 <code>zh-CN-XiaoxiaoNeural</code></dd>
+        <dt>SILENCE_NUDGE_SECONDS</dt><td>静默追问阈值（1–600，默认 25）</dd>
+        <dt>GITHUB_TOKEN</dt><dd>提高 GitHub API 配额（5000/h vs 60/h）</dd>
+        <dt>INTERVIEW_TOOLS_ENABLED</dt><td>关闭 function calling 循环（默认 true）</dd>
+        <dt>INTERVIEW_MAX_TOOL_ROUNDS</dt><td>0–6，默认 3</dd>
+        <dt>SECRET_KEY</dt><dd>Master key（≥16 字节）；prod 必填</dd>
+        <dt>TRUSTED_PROXY_CIDRS</dt><dd>X-Forwarded-For 信任链</dd>
+        <dt>COOKIE_SECURE</dt><td>None/True/False 强制覆盖</dd>
+        <dt>RAG_BACKEND</dt><td>local / stepfun / none</dd>
+        <dt>STEPFUN_VECTOR_STORE_ID</dt><td>复用已有 vector_store</dd>
+      </dl>
+
+      <h3>启动顺序（从代码归纳）</h3>
+      <ol>
+        <li><b>导入期</b>：<code>shared.core.logging.configure_logging()</code> 替换 root logger、装脱敏 filter；</li>
+        <li><b>FastAPI app 构造</b>：<code>create_app()</code> 注册 trace_middleware / CORSMiddleware / 路由 / 5 个异常 handler / /health；</li>
+        <li><b>lifespan.startup</b>：<code>asyncio.to_thread(_bootstrap_db_and_seed)</code> → <code>init_db()</code> → <code>run_migrations(engine)</code> → <code>seed_llm_settings(db)</code>；</li>
+        <li><b>RAG 索引</b>：<code>ensure_rag_index()</code>，未配 Key 跳过 / 失败仅 warn；</li>
+        <li><b>首请求</b>：依赖 <code>get_db()</code> 创建 Session；handler 业务；envelope 包装；trace_id 透出；</li>
+        <li><b>lifespan.shutdown</b>：非测试模式下 <code>engine.dispose()</code>。</li>
+      </ol>
+
+      <h3>如何启动（按环境）</h3>
+      <div class="tabs">
+        <div class="tabs-head" role="tablist">
+          <button class="active" data-tab="r1">聚合形态</button>
+          <button data-tab="r2">独立形态</button>
+          <button data-tab="r3">测试</button>
+        </div>
+        <div class="tabs-body">
+          <div data-pane="r1" class="show">
+<pre><code><span class="tk-com"># 后端</span>
+cd D:/daftpunkwav/04-MyProjects/real-mock
+pip install -r requirements.txt
+uvicorn services.main:app --port 8081 --reload
+
+<span class="tk-com"># 前端</span>
+cd apps/web
+pnpm install
+pnpm dev   <span class="tk-com"># 默认 3000，NEXT_PUBLIC_API_BASE/WS_URL/STREAM_API_BASE 指向 8081</span>
+</code></pre>
+          </div>
+          <div data-pane="r2">
+<pre><code><span class="tk-com"># 三个独立进程</span>
+uvicorn api_service.main:app     --port 8081
+uvicorn agent_service.main:app   --port 8082
+uvicorn interview_service.main:app --port 8083
+
+<span class="tk-com"># 共享同一个 SQLite（services/shared/data/app.db）</span>
+<span class="tk-com"># 共享同一个 Chroma 目录（services/shared/data/chroma/）</span>
+</code></pre>
+          </div>
+          <div data-pane="r3">
+<pre><code><span class="tk-com"># 跑全部测试（PYTHONPATH=services 由 pyproject 注入）</span>
+pytest
+
+<span class="tk-com"># 单文件</span>
+pytest services/tests/test_main.py
+
+<span class="tk-com"># 集成测试（http+ws）</span>
+pytest services/tests/sessions/ -v
+</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 21. 提示词与中文化 ============ -->
+    <section id="sec-prompts">
+      <h2><span class="num">21</span>提示词与中文化约束</h2>
+      <p><code>shared/core/prompts.py</code> 提供三件事：</p>
+      <ul>
+        <li><code>with_agent_output_rules(system_prompt)</code>：在 system 末尾追加统一"禁用 emoji / 全角标点"约束（幂等）；</li>
+        <li><code>strip_emojis(text)</code>：出站前硬删除 emoji（覆盖国旗 / 杂项符号 / 表情 / 交通地图 / 装饰 / ZWJ 等 30+ Unicode 区块）和颜文字；</li>
+        <li><code>normalize_cn_punctuation(text)</code> / <code>normalize_cn_punctuation_tree(value)</code>：递归把中文字境下的半角标点 (`,.;:!?()`) 转换为全角，纯 ASCII 片段不动。</li>
+      </ul>
+      <p>所有面向用户 / 解析用的 system prompt 都会通过 <code>with_agent_output_rules</code> 包装；流式 token 实时调用 <code>strip_emojis</code>（在 <code>llm_client.chat_stream</code>）。</p>
+      <p>几个典型的 prompt 实践：</p>
+      <ul>
+        <li>强约束：<code>禁止使用任何 emoji 表情符号、颜文字、绘文字或表情包式符号</code>；</li>
+        <li>中文标点：<code>中文正文必须使用全角标点：，。；：！？、（）「」；英文专有名词、代码标识符、URL 保持半角</code>；</li>
+        <li>控制标记：<code>[PHASE_COMPLETE]</code> / <code>[INTERVIEW_COMPLETE]</code> / <code>[emotion:smile]</code>，由客户端解析后渲染，不念出；</li>
+        <li>思考块：<code><think>...</think></code> 与 <code><thinking>...</thinking></code>，被 <code>ThinkStreamFilter</code> 过滤；</li>
+        <li>能力声明：<code>可用工具（function calling）你可以使用以下工具获取真实信息</code>，引导 LLM 优先用工具核实项目细节。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 22. 前端 ============ -->
+    <section id="sec-frontend">
+      <h2><span class="num">22</span>前端：Next.js 14 应用</h2>
+      <p>位置：<code>apps/web/</code>。Next.js 14 App Router + React + TypeScript + Framer Motion + lucide-react。</p>
+
+      <h3>顶层结构</h3>
+      <pre class="tree"><span class="tree-dir">apps/web/src/</span>
+├── <span class="tree-dir">app/</span>              <span class="tree-comment"># App Router 页面</span>
+│   ├── <span class="tree-file">page.tsx</span>            <span class="tree-comment"># 首页（landing）</span>
+│   ├── <span class="tree-file">layout.tsx</span>          <span class="tree-comment"># 根 layout（sidebar + theme）</span>
+│   ├── <span class="tree-dir">profile/</span>          <span class="tree-comment"># 个人档案</span>
+│   ├── <span class="tree-dir">resume/</span>           <span class="tree-comment"># 简历上传 + 解析 + 分析</span>
+│   ├── <span class="tree-dir">prep/</span>             <span class="tree-comment"># 面试准备教练</span>
+│   ├── <span class="tree-dir">interview/</span>        <span class="tree-comment"># 面试房间创建/列表</span>
+│   │   └── <span class="tree-dir">[id]/</span>           <span class="tree-comment"># 实时面试页（WS + Audio + 3D）</span>
+│   ├── <span class="tree-dir">history/</span>          <span class="tree-comment"># 历史列表</span>
+│   ├── <span class="tree-dir">report/[id]/</span>     <span class="tree-comment"># 报告详情 + 流式</span>
+│   ├── <span class="tree-dir">growth/</span>           <span class="tree-comment"># 跨场次成长</span>
+│   ├── <span class="tree-dir">settings/</span>        <span class="tree-comment"># BYOK 三阶段设置</span>
+│   └── <span class="tree-dir">avatar-debug/</span>    <span class="tree-comment"># 形象调试</span>
+├── <span class="tree-dir">components/</span>        <span class="tree-comment"># 通用组件（layout/interview/prep/effects/theme）</span>
+├── <span class="tree-dir">features/</span>          <span class="tree-comment"># 技术能力封装</span>
+│   ├── <span class="tree-dir">avatar/</span>          <span class="tree-comment"># 2D / 3D 形象</span>
+│   └── <span class="tree-dir">media/</span>           <span class="tree-comment"># 音频 / WS / TTS hooks</span>
+├── <span class="tree-dir">lib/</span>               <span class="tree-comment"># API 客户端、env 校验、工具</span>
+│   ├── <span class="tree-dir">api/</span>             <span class="tree-comment"># apiService / agentService / interviewService / base</span>
+│   └── <span class="tree-file">env.ts, cnText.ts, thinkStream.ts, ...</span>
+├── <span class="tree-dir">config/</span>            <span class="tree-comment"># 导航 / 静态配置</span>
+└── <span class="tree-dir">types/</span>             <span class="tree-comment"># 全部 TS 类型（506 行）</span>
+</pre>
+
+      <h3>页面职责</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>路由</th><th>职责</th><th>关键交互</th></tr></thead>
+        <tbody>
+          <tr><td><code>/</code></td><td>Landing：3 步引导 + 功能卡片 + 演示</td><td>无 API</td></tr>
+          <tr><td><code>/profile</code></td><td>28 字段候选人档案</td><td><code>GET/PUT /api/v1/profile</code></td></tr>
+          <tr><td><code>/resume</code></td><td>上传 + 列表 + 解析 + 多维度评分</td><td><code>POST /resume/upload</code> + <code>/resume/{id}/analyze</code>（长超时 180s）</td></tr>
+          <tr><td><code>/prep</code></td><td>辅导聊天（SSE 流式）</td><td><code>/prep/sessions/{id}/message/stream</code></td></tr>
+          <tr><td><code>/interview</code></td><td>配置 + 创建会话</td><td><code>POST /interview/sessions</code></td></tr>
+          <tr><td><code>/interview/[id]</code></td><td>实时房间（WS + 音视频 + 3D 形象）</td><td><code>/ws/interview/{id}</code></td></tr>
+          <tr><td><code>/history</code></td><td>历史列表 + 状态 + 评分</td><td><code>GET /interview/sessions</code></td></tr>
+          <tr><td><code>/report/[id]</code></td><td>报告详情 + 流式生成</td><td><code>GET /reports/{id}/stream</code></td></tr>
+          <tr><td><code>/growth</code></td><td>跨场次弱项 + 系统洞察</td><td><code>GET /reports/growth/history</code> + <code>/growth/system-insights</code></td></tr>
+          <tr><td><code>/settings</code></td><td>三阶段处理器 + 目录 + 连通性测试</td><td><code>GET/PUT /settings/stages</code></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ============ 23. 前端栈与 hooks ============ -->
+    <section id="sec-frontend-stack">
+      <h2><span class="num">23</span>前端栈与关键 hook</h2>
+
+      <h3><code>lib/api/</code> 三件套</h3>
+      <p>统一 fetch 封装（<code>base.ts</code>）+ 三个 service client（<code>apiService.ts</code> / <code>agentService.ts</code> / <code>interviewService.ts</code>）。</p>
+      <ul>
+        <li><code>request&lt;T&gt;(path, options)</code>：自动超时（30s / 180s for heavy LLM）、与外部 <code>AbortSignal</code> 合并、错误解析 envelope；</li>
+        <li><code>consumeSSE&lt;T&gt;(res, onEvent)</code>：流式 SSE 解析器（容错畸形行）；</li>
+        <li><code>ApiError</code> 类携带 <code>code/hint/traceId/retryable</code>，与后端 envelope 一一对应；</li>
+        <li><code>resolveBackendUrl(path)</code>：把 STREAM_API_BASE 与 page hostname 在 loopback 场景下对齐（防止 localhost ↔ 127.0.0.1 跨 host）；</li>
+        <li>所有请求 <code>credentials: "include"</code>，HttpOnly Cookie 自动携带。</li>
+      </ul>
+
+      <h3>三个关键 hook</h3>
+      <div class="grid grid-3">
+        <div class="card">
+          <h4><code>useInterviewWS</code>（237 行）</h4>
+          <p>WebSocket 强类型客户端。Handler 走 <code>ref</code> 同步避免 effect 重连；<strong>effect 世代号 + 实例比对</strong>防止 React Strict Mode cleanup 误重连。最大重试 5 次（指数退避 1→8s），耗尽后切到 failed 但 20s 长间隔保活。</p>
+        </div>
+        <div class="card">
+          <h4><code>useAudioRecorder</code>（614 行）</h4>
+          <p>麦克风 16kHz Int16 PCM 录制。基于 RMS 能量做 VAD；分段触发（句末 / 静音 1.8s / 句末快提交 1.0s）；AI 播报中以更高阈值检测 <code>barge_in</code>。环形缓冲 + 武装延时（450ms / 打断后 200ms）避免回采。</p>
+        </div>
+        <div class="card">
+          <h4><code>useTTSPlayer</code>（245 行）</h4>
+          <p>顺序播放 base64 MP3。必须先用户手势 unlock，否则只缓冲不播、不假报 done。epoch 用于"打断后旧播放失效"；RMS analyser 同步驱动形象口型。</p>
+        </div>
+      </div>
+
+      <h3>前后端类型契约（<code>types/index.ts</code>，506 行）</h3>
+      <p>手写 TS 类型镜像后端 Pydantic 模型：</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>类型</th><th>后端出处</th></tr></thead>
+        <tbody>
+          <tr><td><code>LLMSettings</code> / <code>LLMSettingsWrite</code> / <code>StageConfig</code> / <code>StageConfigs</code></td><td><code>shared/schemas</code> + <code>api_service/schemas</code></td></tr>
+          <tr><td><code>UserProfile</code> / <code>Resume</code> / <code>CandidateProfile</code> / <code>ResumeAnalysis</code></td><td><code>shared/schemas</code> + <code>api_service/schemas</code></td></tr>
+          <tr><td><code>Options</code> / <code>CompanyInfo</code></td><td><code>interview_service/schemas</code> + <code>knowledge.company</code></td></tr>
+          <tr><td><code>InterviewConfig</code> / <code>InterviewSession</code> / <code>ChatMessage</code> / <code>InterviewReport</code></td><td><code>interview_service/schemas</code></td></tr>
+          <tr><td><code>FaceAnalysis</code> / <code>ServerEvent</code> / <code>ClientEvent</code></td><td><code>interview_service/constants.WSClientEvent</code> / <code>WSServerEvent</code></td></tr>
+          <tr><td><code>PrepSSEEvent</code> / <code>ReportSSEEvent</code></td><td>前后端联合约定</td></tr>
+          <tr><td><code>ApiErrorBody</code> / <code>ApiErrorEnvelope</code></td><td>后端 <code>APIError</code> + <code>ErrorBody</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>前后端目前靠手工同步。建议未来引入 <code>openapi-typescript</code> 或 Pydantic-to-TS 脚本。</p>
+    </section>
+
+    <!-- ============ 24. 前端形象 / 场景 / 视觉 ============ -->
+    <section id="sec-frontend-avatar">
+      <h2><span class="num">24</span>3D 形象 / 场景 / 视觉</h2>
+      <p>前端 <code>features/avatar/</code> 提供了两套面试官形象：</p>
+      <ul>
+        <li><b>2D CSS 矢量</b>：<code>InterviewerAvatar.tsx</code>，用纯 CSS/SVG 画出 6 套形象（专业男 / 资深男 / 严厉专家 / 温和女 / HR 女 / 青年女），无外部资源依赖。表情随 emotion 变化；嘴唇随 <code>audioLevel</code> 同步。</li>
+        <li><b>3D TalkingHead</b>：<code>TalkingHeadAvatar.tsx</code>（480 行），使用 <code>@met4citizen/talkinghead</code> + 同源 GLB（<code>public/avatars/*.glb</code>），口型 / 头部 / 眨眼由音频 RMS 驱动。Mood 必须是 TalkingHead 内置名（无 serious）。</li>
+      </ul>
+      <p>场景：<code>public/scenes/</code> 下 6 张 SVG（meeting_room / glass_office / online_interview / boardroom / startup_loft / library_corner），CSS 渐变 fallback。</p>
+      <p>视觉状态：<code>SessionSnapshot.merge_face(face)</code> 把面部分析（nervousness / looking_away / face_detected）合并为中文一句话摘要（"候选人状态：未看镜头、略显紧张"），注入到 LLM 上下文让 Agent 主动关心临场状态。</p>
+    </section>
+
+    <!-- ============ 25. 关键文件功能索引 ============ -->
+    <section id="sec-files">
+      <h2><span class="num">25</span>关键文件功能索引</h2>
+      <p>按目录列出每个文件的真实职责。所有结论直接来自代码（行号标注）。</p>
+
+      <h3><code>services/</code>（根）</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>文件</th><th>行数</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td><code>main.py</code></td><td>~220</td><td>聚合 FastAPI 入口（lifespan + 中间件 + 路由 + 异常 handler）</td></tr>
+          <tr><td><code>alembic/env.py</code></td><td>~60</td><td>Alembic 环境；注册三服务全部 model 到 metadata</td></tr>
+          <tr><td><code>alembic/versions/20260803_0001_baseline_columns.py</code></td><td>~35</td><td>baseline revision：调 <code>apply_column_migrations</code></td></tr>
+        </tbody>
+      </table></div>
+
+      <h3><code>services/shared/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>文件</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td><code>__init__.py</code></td><td>空包</td></tr>
+          <tr><td><code>config.py</code></td><td><code>Settings</code> + <code>get_settings()</code>（pydantic-settings；CORS/LLM/RAG/语音/cookie 字段）</td></tr>
+          <tr><td><code>database.py</code></td><td>SQLAlchemy 引擎 + SessionLocal + WAL 启用</td></tr>
+          <tr><td><code>app_factory.py</code></td><td>三服务独立入口的 FastAPI 工厂（统一 CORS/health/路由/异常）</td></tr>
+          <tr><td><code>core/config_models.py</code></td><td><code>StageConfig</code> + <code>LLMSettings</code> ORM</td></tr>
+          <tr><td><code>core/constants.py</code></td><td>三服务协议常量（<code>LLMProtocol</code> / <code>PipelineStage</code> / <code>RAGBackendKind</code> / <code>SessionStatus</code>）</td></tr>
+          <tr><td><code>core/errors.py</code></td><td>错误码目录 + <code>ApiBusinessError</code> + <code>raise_error</code></td></tr>
+          <tr><td><code>core/error_handlers.py</code></td><td>5 个异常 handler + envelope 构造</td></tr>
+          <tr><td><code>core/file_lock.py</code></td><td>跨进程文件锁（msvcrt / fcntl）</td></tr>
+          <tr><td><code>core/local_only.py</code></td><td><code>require_local_peer</code> 限制 loopback</td></tr>
+          <tr><td><code>core/logging.py</code></td><td>JSON 日志 + 脱敏 filter + trace_id contextvar</td></tr>
+          <tr><td><code>core/migrate.py</code></td><td>列级幂等迁移 + Alembic 版本戳</td></tr>
+          <tr><td><code>core/prompts.py</code></td><td>统一 agent 输出规则 + emoji 剥离 + 中文标点规范化</td></tr>
+          <tr><td><code>core/ratelimit.py</code></td><td>进程内滑动窗口 + 信任代理链</td></tr>
+          <tr><td><code>core/secrets.py</code></td><td>AES-256-GCM at-rest 加密 + 旧格式检测</td></tr>
+          <tr><td><code>core/session_auth.py</code></td><td>能力令牌（HttpOnly Cookie / Header / WS 子协议 / CSRF）</td></tr>
+          <tr><td><code>core/security/__init__.py</code></td><td>re-export 入口</td></tr>
+          <tr><td><code>core/security/url.py</code></td><td>SSRF 防御 + DNS pin + pinned transport（450+ 行）</td></tr>
+          <tr><td><code>core/security/file.py</code></td><td>文件名清洗 + 路径穿越防御</td></tr>
+          <tr><td><code>core/security/redact.py</code></td><td>API Key / Bearer / PEM 脱敏</td></tr>
+          <tr><td><code>models/__init__.py</code></td><td><code>Resume</code> / <code>UserProfile</code> ORM</td></tr>
+          <tr><td><code>schemas/__init__.py</code></td><td>跨服务 Pydantic 契约（<code>APIError</code> / <code>CandidateProfile</code> / <code>CompanyInfo</code> / LLM 设置）</td></tr>
+          <tr><td><code>services/pipeline_config.py</code></td><td><code>stage_configs</code> CRUD + 旧 <code>llm_settings</code> 迁移</td></tr>
+          <tr><td><code>services/seed.py</code></td><td>env → stage_configs 自动 seed</td></tr>
+          <tr><td><code>capabilities/ai/llm/client/__init__.py</code></td><td>re-export <code>LLMClient</code> / <code>UnifiedLLMClient</code> / <code>parse_tool_arguments</code></td></tr>
+          <tr><td><code>capabilities/ai/llm/client/base.py</code></td><td>重试 / 文本提取 / 环境判断</td></tr>
+          <tr><td><code>capabilities/ai/llm/client/llm_client.py</code></td><td>OpenAI Chat Completions 客户端（650+ 行）</td></tr>
+          <tr><td><code>capabilities/ai/llm/client/unified_client.py</code></td><td>多协议客户端（Anthropic / OpenAI Responses）</td></tr>
+          <tr><td><code>capabilities/ai/llm/client/tool_args.py</code></td><td>function-calling 参数解析</td></tr>
+          <tr><td><code>capabilities/ai/context_manager.py</code></td><td>token 估算 + 压缩</td></tr>
+          <tr><td><code>capabilities/integrations/github/__init__.py</code></td><td>GitHub 集成 re-export</td></tr>
+          <tr><td><code>capabilities/integrations/github/client.py</code></td><td>GitHub REST 客户端（12k 字符上限）</td></tr>
+          <tr><td><code>capabilities/integrations/github/tools.py</code></td><td>9 个 MCP 风格工具</td></tr>
+          <tr><td><code>capabilities/knowledge/company/knowledge.py</code></td><td>7 家公司内置数据 + <code>get_company_context</code></td></tr>
+          <tr><td><code>capabilities/knowledge/search/web.py</code></td><td>ddgs + duckduckgo_search 联网搜索</td></tr>
+          <tr><td><code>capabilities/voice/config/catalog.py</code></td><td>三阶段供应商能力目录（前后端共用）</td></tr>
+          <tr><td><code>capabilities/voice/config/credentials.py</code></td><td>从 <code>LLMSettings</code> / stage_configs 构建 STT/TTS 凭证</td></tr>
+          <tr><td><code>capabilities/voice/stt/__init__.py</code></td><td>STT 统一入口 + <code>transcribe_utterance</code></td></tr>
+          <tr><td><code>capabilities/voice/stt/base.py</code></td><td><code>SttCredentials</code> + <code>SttProvider</code> 协议</td></tr>
+          <tr><td><code>capabilities/voice/stt/cloud.py</code></td><td>云端 STT 抽象 + 模型解析</td></tr>
+          <tr><td><code>capabilities/voice/stt/local.py</code></td><td>本地 faster-whisper 封装</td></tr>
+          <tr><td><code>capabilities/voice/stt/whisper.py</code></td><td>Whisper 转写 + 预热（线程池）</td></tr>
+          <tr><td><code>capabilities/voice/stt/router.py</code></td><td>10 个 provider 路由 + 降级</td></tr>
+          <tr><td><code>capabilities/voice/stt/{openai_compat,aliyun,baidu,tencent,volcengine,xfyun,mimo_audio}.py</code></td><td>各自云厂商适配器</td></tr>
+          <tr><td><code>capabilities/voice/tts/__init__.py</code></td><td>TTS 统一入口 + 降级链</td></tr>
+          <tr><td><code>capabilities/voice/tts/options.py</code></td><td>6 个 avatar + 5 个音色</td></tr>
+          <tr><td><code>capabilities/voice/tts/edge.py</code></td><td>edge-tts 合成 + 句子切分 + 韵律</td></tr>
+          <tr><td><code>capabilities/voice/tts/minimax.py</code></td><td>MiniMax T2A_v2 适配</td></tr>
+          <tr><td><code>capabilities/voice/tts/voice_resolve.py</code></td><td>avatar / personality / emotion 韵律解析</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3><code>services/api_service/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>文件</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td><code>router.py</code></td><td><code>service_router</code> 聚合（profile/resume/settings）</td></tr>
+          <tr><td><code>main.py</code></td><td>独立入口（<code>create_service_app</code>）</td></tr>
+          <tr><td><code>startup.py</code></td><td>同步 startup 钩子</td></tr>
+          <tr><td><code>models/__init__.py</code></td><td>re-export <code>Resume</code> / <code>UserProfile</code></td></tr>
+          <tr><td><code>schemas/__init__.py</code></td><td><code>UserProfileResponse/Update</code> / <code>ResumeResponse</code> / <code>ResumeAnalysis</code> / <code>RewriteExample</code></td></tr>
+          <tr><td><code>routes/profile.py</code></td><td><code>GET/PUT /api/v1/profile</code></td></tr>
+          <tr><td><code>routes/resume.py</code></td><td>上传/列表/激活/分析/删除 + 多维度 prompt</td></tr>
+          <tr><td><code>routes/settings.py</code></td><td>三阶段设置 + 目录 + 连通性测试</td></tr>
+          <tr><td><code>services/stage_tests.py</code></td><td>三阶段连通性测试实现</td></tr>
+          <tr><td><code>services/resume/parser.py</code></td><td>PDF/DOCX/MD/TXT 解析（zip-bomb 防护）</td></tr>
+          <tr><td><code>services/resume/sites.py</code></td><td>简历市场检索的站点白名单</td></tr>
+          <tr><td><code>tests/test_smoke.py</code></td><td>api_service 冒烟测试</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3><code>services/agent_service/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>文件</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td><code>router.py</code></td><td><code>service_router</code> 聚合 <code>prep</code></td></tr>
+          <tr><td><code>main.py</code></td><td>独立入口</td></tr>
+          <tr><td><code>startup.py</code></td><td>建表/迁移/seed</td></tr>
+          <tr><td><code>models/__init__.py</code></td><td><code>PrepSession</code> ORM</td></tr>
+          <tr><td><code>schemas/__init__.py</code></td><td>（仅 217 字节，无 Pydantic 契约，全部 inline）</td></tr>
+          <tr><td><code>routes/prep.py</code></td><td>辅导会话 CRUD + SSE 流式</td></tr>
+          <tr><td><code>agents/prep/agent.py</code></td><td>辅导 Agent（300+ 行，工具循环）</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3><code>services/interview_service/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>文件</th><th>行数</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td><code>router.py</code></td><td>~ 30</td><td><code>service_router</code> 聚合 interview/reports/options/ws</td></tr>
+          <tr><td><code>main.py</code></td><td>~ 35</td><td>独立入口 + <code>ensure_rag_index</code></td></tr>
+          <tr><td><code>startup.py</code></td><td>~ 50</td><td>建表/迁移 + RAG 索引</td></tr>
+          <tr><td><code>models/__init__.py</code></td><td>~ 80</td><td><code>InterviewSession</code> + <code>GrowthRecord</code></td></tr>
+          <tr><td><code>schemas/__init__.py</code></td><td>~ 200</td><td>面试/报告/成长/选项契约</td></tr>
+          <tr><td><code>constants.py</code></td><td>~ 130</td><td>面试专属枚举（<code>WorkflowType</code> / <code>Personality</code> / <code>WSServerEvent</code> 等）</td></tr>
+          <tr><td><code>options_data.py</code></td><td>~ 75</td><td>岗位/职级/人格/场景静态数据</td></tr>
+          <tr><td><code>routes/interview.py</code></td><td>~ 335</td><td>REST: sessions/start/message/finish/messages</td></tr>
+          <tr><td><code>routes/reports.py</code></td><td>~ 175</td><td>报告 + 成长 + system-insights</td></tr>
+          <tr><td><code>routes/options.py</code></td><td>~ 20</td><td><code>GET /v1/options</code></td></tr>
+          <tr><td><code>routes/ws_interview.py</code></td><td>~ 30</td><td><code>WS /v1/ws/interview/{id}</code></td></tr>
+          <tr><td><code>agents/orchestrator.py</code></td><td>~ 100</td><td>静默追问生成器</td></tr>
+          <tr><td><code>agents/snapshot.py</code></td><td>~ 50</td><td>会话快照数据类</td></tr>
+          <tr><td><code>agents/vision/agent.py</code></td><td>~ 30</td><td>视觉摘要（face → text）</td></tr>
+          <tr><td><code>realtime/ws_handler.py</code></td><td>~ 180</td><td>WS façade（5 mixin）</td></tr>
+          <tr><td><code>realtime/connection_lifecycle.py</code></td><td>~ 460</td><td>握手/心跳/分发/初始化</td></tr>
+          <tr><td><code>realtime/turn_coordinator.py</code></td><td>~ 315</td><td>话轮协调 + 候选人回合</td></tr>
+          <tr><td><code>realtime/turn_control.py</code></td><td>~ 235</td><td>打断/收尾/静默追问/事件分发</td></tr>
+          <tr><td><code>realtime/turn_streaming.py</code></td><td>~ 150</td><td>流式事件消费 + TTS 入队</td></tr>
+          <tr><td><code>realtime/voice_pipeline.py</code></td><td>~ 305</td><td>STT 文本选择 + 回采 + 句子 TTS 队列</td></tr>
+          <tr><td><code>realtime/session_registry.py</code></td><td>~ 75</td><td>单会话单连接租约</td></tr>
+          <tr><td><code>realtime/events.py</code></td><td>~ 40</td><td><code>TurnState</code> / <code>SessionEvent</code> + SessionSnapshot re-export</td></tr>
+          <tr><td><code>realtime/hint_service.py</code></td><td>~ 130</td><td>参考提纲服务</td></tr>
+          <tr><td><code>realtime/report_scheduler.py</code></td><td>~ 80</td><td>报告后台生成调度</td></tr>
+          <tr><td><code>services/interview/runner.py</code></td><td>~ 320</td><td>面试回合执行器（开场/常规/收尾）</td></tr>
+          <tr><td><code>services/interview/agent.py</code></td><td>~ 375</td><td>面试会话状态机（消息/阶段/已问/弱项）</td></tr>
+          <tr><td><code>services/interview/agent_prompts.py</code></td><td>~ 150</td><td>系统提示词组装（候选人档案/公司知识/阶段）</td></tr>
+          <tr><td><code>services/interview/agent_text.py</code></td><td>~ 135</td><td>标记剥离 + 思考过滤 + 情绪检测</td></tr>
+          <tr><td><code>services/interview/events.py</code></td><td>~ 70</td><td><code>StreamEvent</code> + <code>EventKind</code></td></tr>
+          <tr><td><code>services/interview/prompt_assembler.py</code></td><td>~ 125</td><td>messages 组装 + 上下文压缩 + 多模态</td></tr>
+          <tr><td><code>services/interview/tools.py</code></td><td>~ 170</td><td>面试域工具注册表 + 执行器</td></tr>
+          <tr><td><code>services/interview/tool_round_runner.py</code></td><td>~ 195</td><td>非流式工具循环</td></tr>
+          <tr><td><code>services/interview/workflows.py</code></td><td>~ 150</td><td>3 套工作流 + 人格/风格/严厉度文案</td></tr>
+          <tr><td><code>services/interview/followup.py</code></td><td>~ 210</td><td>追问信号分析器（vague/missing_data/tech_hole/off_topic）</td></tr>
+          <tr><td><code>services/interview/report.py</code></td><td>~ 345</td><td>报告生成 + 进程内锁 + DB 哨兵</td></tr>
+          <tr><td><code>services/growth/learning.py</code></td><td>~ 175</td><td>系统级学习（公司均分/弱项线索）</td></tr>
+          <tr><td><code>capabilities/rag/base.py</code></td><td>~ 70</td><td><code>RAGBackend</code> 协议</td></tr>
+          <tr><td><code>capabilities/rag/factory.py</code></td><td>~ 85</td><td>后端工厂（none/local/stepfun）</td></tr>
+          <tr><td><code>capabilities/rag/local_backend.py</code></td><td>~ 135</td><td>Chroma + OpenAI 兼容 /embeddings</td></tr>
+          <tr><td><code>capabilities/rag/stepfun_backend.py</code></td><td>~ 290</td><td>StepFun vector_stores 托管</td></tr>
+          <tr><td><code>capabilities/rag/company_rag.py</code></td><td>~ 75</td><td>向后兼容包装器（显式委托）</td></tr>
+          <tr><td><code>capabilities/rag/_kb_data.py</code></td><td>~ 110</td><td>企业知识库数据 + 切片 + 格式化</td></tr>
+          <tr><td><code>capabilities/rag/__init__.py</code></td><td>~ 30</td><td>子模块聚合 re-export</td></tr>
+          <tr><td><code>tests/test_smoke.py</code></td><td>interview_service 冒烟测试</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3><code>services/tests/</code>（45 文件 / 328 用例）</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>类别</th><th>样例</th></tr></thead>
+        <tbody>
+          <tr><td>跨服务集成</td><td><code>test_main.py</code>、<code>test_review_hardening.py</code></td></tr>
+          <tr><td>WS / HTTP session</td><td><code>sessions/test_session_*</code>（auth/audio/rate/report/ssrf/tts/ws 8 个）</td></tr>
+          <tr><td>LLM 客户端</td><td><code>test_llm_client_retry.py</code></td></tr>
+          <tr><td>RAG</td><td><code>test_rag.py</code>、<code>test_rag_backends.py</code></td></tr>
+          <tr><td>面试引擎</td><td><code>test_runner.py</code>、<code>test_agent_prompts.py</code>、<code>test_followup.py</code>、<code>test_report_stream.py</code>、<code>test_orchestrator.py</code></td></tr>
+          <tr><td>STT</td><td><code>test_cloud_stt.py</code></td></tr>
+          <tr><td>安全</td><td><code>test_security.py</code>、<code>test_security_extra.py</code>、<code>test_session_ssrf_pin.py</code></td></tr>
+          <tr><td>会话鉴权</td><td><code>test_session_auth_regression.py</code>、<code>test_phase_ssot.py</code></td></tr>
+          <tr><td>工具</td><td><code>test_github_tools.py</code>、<code>test_web_search.py</code>、<code>test_voice_resolve.py</code>、<code>test_voice_pipeline.py</code>、<code>test_tts_queue.py</code></td></tr>
+          <tr><td>成长 / 上下文</td><td><code>test_growth_learning.py</code>、<code>test_context_compress.py</code></td></tr>
+          <tr><td>错误</td><td><code>test_error_codes.py</code>、<code>test_error_handlers.py</code></td></tr>
+          <tr><td>简历</td><td><code>test_resume_analysis_normalize.py</code></td></tr>
+          <tr><td>Stage 设置</td><td><code>test_stage_settings.py</code></td></tr>
+          <tr><td>WS 强化</td><td><code>test_ws_handler.py</code>、<code>test_ws_hardening.py</code></td></tr>
+          <tr><td>fixtures</td><td><code>conftest.py</code>、<code>fakes.py</code></td></tr>
+        </tbody>
+      </table></div>
+
+      <h3><code>apps/web/src/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>路径</th><th>行数</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td><code>app/page.tsx</code></td><td>~ 420</td><td>Landing：3 步 + 6 功能 + 演示对话</td></tr>
+          <tr><td><code>app/profile/page.tsx</code></td><td>~ 720</td><td>28 字段档案表单</td></tr>
+          <tr><td><code>app/resume/page.tsx</code></td><td>~ 850</td><td>上传 + 解析 + 多维度评分（10 维度） + 市场参考</td></tr>
+          <tr><td><code>app/prep/page.tsx</code></td><td>~ 415</td><td>辅导聊天（SSE）</td></tr>
+          <tr><td><code>app/interview/page.tsx</code></td><td>~ 420</td><td>配置表单 + 创建会话</td></tr>
+          <tr><td><code>app/interview/[id]/page.tsx</code></td><td>~ 940</td><td>实时房间：WS + 录音 + TTS + 3D 形象 + 视频</td></tr>
+          <tr><td><code>app/history/page.tsx</code></td><td>~ 370</td><td>历史列表</td></tr>
+          <tr><td><code>app/report/[id]/page.tsx</code></td><td>~ 415</td><td>报告详情 + 流式生成</td></tr>
+          <tr><td><code>app/growth/page.tsx</code></td><td>~ 415</td><td>跨场次成长 + 系统洞察</td></tr>
+          <tr><td><code>app/settings/page.tsx</code></td><td>~ 665</td><td>三阶段处理器设置 + 目录 + 连通性测试</td></tr>
+          <tr><td><code>app/avatar-debug/page.tsx</code></td><td>—</td><td>形象调试</td></tr>
+          <tr><td><code>components/layout/Sidebar.tsx</code></td><td>~ 290</td><td>侧边导航 + 折叠动画 + 主题切换</td></tr>
+          <tr><td><code>components/interview/VideoPanel.tsx</code></td><td>~ 320</td><td>摄像头采集 + 面部分析 + 波形</td></tr>
+          <tr><td><code>components/MarkdownContent.tsx</code></td><td>~ 305</td><td>Markdown 渲染 + 代码高亮 + 引用块</td></tr>
+          <tr><td><code>components/Toast.tsx</code></td><td>~ 195</td><td>错误/成功提示</td></tr>
+          <tr><td><code>components/CollapsibleSection.tsx</code></td><td>~ 145</td><td>折叠段</td></tr>
+          <tr><td><code>components/effects/ParticleField.tsx</code></td><td>~ 130</td><td>背景粒子</td></tr>
+          <tr><td><code>components/theme/ThemeProvider.tsx</code></td><td>~ 120</td><td>浅/深/系统主题切换</td></tr>
+          <tr><td><code>components/prep/SearchResultCards.tsx</code></td><td>~ 110</td><td>搜索结果卡片</td></tr>
+          <tr><td><code>components/interview/ThinkAnswerMessage.tsx</code></td><td>~ 130</td><td>思考 + 答案气泡</td></tr>
+          <tr><td><code>features/avatar/InterviewerAvatar.tsx</code></td><td>~ 345</td><td>2D CSS 矢量形象</td></tr>
+          <tr><td><code>features/avatar/TalkingHeadAvatar.tsx</code></td><td>~ 480</td><td>3D TalkingHead 形象</td></tr>
+          <tr><td><code>features/media/useInterviewWS.ts</code></td><td>~ 240</td><td>强类型 WS hook</td></tr>
+          <tr><td><code>features/media/useAudioRecorder.ts</code></td><td>~ 615</td><td>麦克风 PCM 录制 + VAD</td></tr>
+          <tr><td><code>features/media/useTTSPlayer.ts</code></td><td>~ 245</td><td>TTS 顺序播放 + 口型驱动</td></tr>
+          <tr><td><code>lib/api/base.ts</code></td><td>~ 240</td><td>fetch 封装 + SSE 解析 + 错误解析</td></tr>
+          <tr><td><code>lib/api/apiService.ts</code></td><td>~ 75</td><td>api_service 客户端</td></tr>
+          <tr><td><code>lib/api/agentService.ts</code></td><td>~ 70</td><td>agent_service 客户端</td></tr>
+          <tr><td><code>lib/api/interviewService.ts</code></td><td>~ 120</td><td>interview_service 客户端</td></tr>
+          <tr><td><code>lib/env.ts</code></td><td>~ 65</td><td>环境变量校验（生产强制 + 协议一致性）</td></tr>
+          <tr><td><code>lib/cnText.ts</code></td><td>~ 180</td><td>中文字符串处理</td></tr>
+          <tr><td><code>lib/thinkStream.ts</code></td><td>~ 145</td><td>流式思考块剥离</td></tr>
+          <tr><td><code>types/index.ts</code></td><td>~ 510</td><td>全部 TS 类型（前后端契约镜像）</td></tr>
+          <tr><td><code>config/nav.ts</code></td><td>~ 50</td><td>导航配置</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ============ 26. 依赖关系 ============ -->
+    <section id="sec-deps">
+      <h2><span class="num">26</span>依赖关系</h2>
+
+      <h3>Python 依赖（<code>requirements.txt</code>）</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>类别</th><th>包</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>Web 框架</td><td><code>fastapi</code> + <code>uvicorn[standard]</code></td><td>HTTP + WebSocket + ASGI</td></tr>
+          <tr><td>ORM / DB</td><td><code>sqlalchemy</code></td><td>SQLAlchemy 2.0 + Alembic</td></tr>
+          <tr><td>数据 / 配置</td><td><code>pydantic</code> + <code>pydantic-settings</code></td><td>校验 + 配置</td></tr>
+          <tr><td>HTTP / WS 客户端</td><td><code>httpx</code> + <code>websockets</code> + <code>python-multipart</code></td><td>调用 LLM + 解析 SSE + 上传</td></tr>
+          <tr><td>文档解析</td><td><code>pypdf</code> + <code>python-docx</code></td><td>PDF / DOCX 解析（zip-bomb 防护）</td></tr>
+          <tr><td>异步文件</td><td><code>aiofiles</code></td><td>异步文件 IO</td></tr>
+          <tr><td>环境变量</td><td><code>python-dotenv</code></td><td>.env 加载</td></tr>
+          <tr><td>迁移</td><td><code>alembic</code></td><td>列迁移版本管理</td></tr>
+          <tr><td>TTS</td><td><code>edge-tts</code></td><td>Edge Neural 语音合成</td></tr>
+          <tr><td>本地 STT</td><td><code>faster-whisper</code> + <code>opencv-python-headless</code></td><td>本地语音转写</td></tr>
+          <tr><td>联网搜索</td><td><code>duckduckgo-search</code> + <code>ddgs</code></td><td>DuckDuckGo 搜索</td></tr>
+          <tr><td>数值</td><td><code>numpy</code></td><td>音频数值处理</td></tr>
+          <tr><td>RAG</td><td><code>chromadb</code></td><td>本地向量库（注意 PYSEC-2026-311 漏洞）</td></tr>
+          <tr><td>加密</td><td><code>cryptography</code></td><td>AES-256-GCM</td></tr>
+          <tr><td>缓存</td><td><code>cachetools</code></td><td>LRU 缓存（lru_cache 替代品）</td></tr>
+          <tr><td>测试</td><td><code>pytest</code> + <code>pytest-asyncio</code></td><td>测试 + 异步</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>后端 import 关系（按代码静态统计）</h3>
+      <div class="grid grid-2">
+        <div class="card">
+          <h4>被 import 的顶层包</h4>
+          <ul>
+            <li><code>shared</code>：<strong>~ 70%</strong>（278 次）</li>
+            <li><code>interview_service</code>：~ 25%</li>
+            <li><code>api_service</code>：~ 3%</li>
+            <li><code>agent_service</code>：~ 2%</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>关键结论</h4>
+          <ul>
+            <li>三服务 <strong>业务零循环</strong>，仅通过 <code>shared</code> 通信；</li>
+            <li><code>shared</code> 内的 <code>capabilities/ai/llm/client</code> + <code>core/security</code> + <code>services/pipeline_config</code> 形成三角依赖，是相对独立的"基础设施核心"；</li>
+            <li><code>interview_service</code> 内部自引用 100+ 次，是项目唯一真正的"巨石服务"。</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>服务间依赖箭头（最简视图）</h3>
+      <pre class="tree">        <span class="tree-dir">interview_service</span>
+              │
+   ┌──────────┼──────────────────┐
+   ▼          ▼                  ▼
+<span class="tree-dir">api_service</span>   <span class="tree-dir">agent_service</span>   <span class="tree-dir">shared</span>
+   │          │                  │
+   └──────────┴──────────────────┘
+              │
+              ▼
+        <span class="tree-dir">shared</span>  <span class="tk-com"># 平台能力（DB / 安全 / LLM / 语音 / 知识 / GitHub）</span>
+              │
+              ▼
+       SQLite + Chroma + 上传目录 + <code>data/.secret.key</code>
+</pre>
+    </section>
+
+    <!-- ============ 27. 测试覆盖 ============ -->
+    <section id="sec-tests">
+      <h2><span class="num">27</span>测试覆盖</h2>
+      <p>后端测试：<strong>45 个文件 / 328 个用例</strong>，覆盖大部分关键模块。前端：仅 247 行测试，覆盖 <code>api</code> / <code>cnText</code> / <code>thinkStream</code>。</p>
+
+      <h3>后端测试分布</h3>
+      <div class="grid grid-3">
+        <div class="card">
+          <h4>集成 / 端到端</h4>
+          <p><code>test_main.py</code>（聚合入口）+ <code>test_review_hardening.py</code>（生产门禁 / 错误码）</p>
+        </div>
+        <div class="card">
+          <h4>session 端到端</h4>
+          <p><code>sessions/test_session_*.py</code> 8 个：auth、audio_buffer、frontend_source、http_interview、rate_limit、report_stream、settings_and_growth、ssrf_pin、tts_flush、ws_mutex</p>
+        </div>
+        <div class="card">
+          <h4>单元</h4>
+          <p>LLM 客户端 / RAG / STT / 安全 / 错误 / 简历 / 追问 / 报告流 / 上下文压缩 / 阶段设置 / 增长 / 语音管线 / 工具 / WebSocket / orchestrator / agent_prompts</p>
+        </div>
+      </div>
+
+      <h3>前端测试现状（薄）</h3>
+      <ul class="cross">
+        <li>复杂 hook（<code>useInterviewWS</code> / <code>useAudioRecorder</code> / <code>useTTSPlayer</code>）<strong>无单测</strong>；</li>
+        <li>页面组件（<code>interview/[id]</code>、<code>resume</code>、<code>settings</code>、<code>growth</code>、<code>prep</code>、<code>report/[id]</code>、<code>history</code>）<strong>无单测</strong>；</li>
+        <li><code>features/avatar</code> 无测试；</li>
+        <li>无 E2E（Playwright / Cypress）；</li>
+      </ul>
+      <p>建议：把 3 个核心 hook + 4 个关键页面加测试（覆盖 reconnect 世代、barge_in 能量阈值、TTS unlock 失败缓冲、错误 envelope 渲染等）。</p>
+    </section>
+
+    <!-- ============ 28. 已知问题与改进建议 ============ -->
+    <section id="sec-issues">
+      <h2><span class="num">28</span>已知问题与改进建议</h2>
+      <p>这一节的内容部分来自 <code>docs/architecture-review-2026-08-28.md</code>，并结合代码做了交叉验证。</p>
+
+      <h3>已发现的问题（按优先级）</h3>
+
+      <h4>🔴 高优先级</h4>
+      <div class="grid grid-2">
+        <div class="card card-tinted-danger">
+          <h4>实时层文件臃肿</h4>
+          <p><code>connection_lifecycle.py</code> 460 行、<code>ws_handler.py</code> 180+ 兼容导出。Mixins 隐式字段契约通过 <code>TYPE_CHECKING</code> 声明，编辑器无法导航。建议引入显式 <code>ConnectionContext</code> dataclass。</p>
+        </div>
+        <div class="card card-tinted-danger">
+          <h4>前端"上帝页面"</h4>
+          <p><code>app/interview/[id]/page.tsx</code> ~ 940 行，84 个函数、65 个 hook；同时处理 WS / 录音 / TTS / 视频 / 消息 / 阶段 / 静默追问 / 打断 / 报告跳转。强烈建议按 <code>features/interview/</code> 拆 hooks 与 components。</p>
+        </div>
+        <div class="card card-tinted-danger">
+          <h4><code>shared</code> 包过重</h4>
+          <p><code>capabilities/ai/llm/client/llm_client.py</code> 650+ 行统一管 BYOK + 协议 + 重试 + embedding + 测试连接 + chat_json；<code>core/security/url.py</code> 450+ 行。需进一步拆分。</p>
+        </div>
+      </div>
+
+      <h4>🟡 中优先级</h4>
+      <div class="grid grid-2">
+        <div class="card card-tinted-warning">
+          <h4>30+ 空 <code>__init__.py</code></h4>
+          <p>30 个空包、20+ 处"兼容旧"分支，污染主线。建议填有意义的 re-export 或删空包（namespace package 不再需要）。</p>
+        </div>
+        <div class="card card-tinted-warning">
+          <h4>类型契约手工同步</h4>
+          <p><code>types/index.ts</code> 510 行镜像后端 Pydantic，字段注释偶有"与后端对齐"字样但无强制校验。建议 <code>openapi-typescript</code> / Pydantic-to-TS + CI 校验。</p>
+        </div>
+        <div class="card card-tinted-warning">
+          <h4>前端服务边界破坏</h4>
+          <p><code>interviewService.ts</code> 注释承认跨域调用 <code>apiService.listResumes</code>。微服务化时需调整。</p>
+        </div>
+        <div class="card card-tinted-warning">
+          <h4>前端测试严重不足</h4>
+          <p>仅 247 行；hook 与页面无测试。</p>
+        </div>
+      </div>
+
+      <h4>🟢 低优先级</h4>
+      <div class="grid grid-2">
+        <div class="card card-tinted-success">
+          <h4><code>use client</code> 泛滥</h4>
+          <p><code>app/</code> 12 个、<code>components/</code> 18 个 client component。RSC / SSR 优势没用到。纯展示组件（<code>CollapsibleSection</code> / <code>MarkdownContent</code>）可改 server component。</p>
+        </div>
+        <div class="card card-tinted-success">
+          <h4>文件上传未走 <code>request()</code></h4>
+          <p><code>apiService.uploadResume</code> 直接 <code>fetch()</code>，错误处理与 base 不一致。</p>
+        </div>
+        <div class="card card-tinted-success">
+          <h4>命名空间混淆</h4>
+          <p><code>interview_service.agents.orchestrator</code>（"统筹 Agent"实际只是 nudge）、<code>interview_service.services.interview.agent</code>（实际是状态机）、<code>interview_service.agents.vision.agent</code>（实际是 analyzer）。建议改名 <code>nudge.py</code> / <code>session_state.py</code> / <code>vision_analyzer.py</code>。</p>
+        </div>
+        <div class="card card-tinted-success">
+          <h4>Chroma PYSEC-2026-311 漏洞</h4>
+          <p><code>chromadb 1.5.9</code> 已知漏洞，攻击面有限（嵌入式模式无 server 端口），但需关注上游修复。</p>
+        </div>
+      </div>
+
+      <h3>代码健壮性的亮点（值得保留的）</h3>
+      <ul class="check">
+        <li><b>三层 X-Request-Id 注入</b>：HTTP 中间件 + WS 握手 + 日志 contextvar 串联</li>
+        <li><b>DNS Pin + SSRF 黑名单</b>：缓解 DNS rebinding + 私网/loopback 拒绝</li>
+        <li><b>AES-256-GCM at-rest</b> + 旧 <code>enc:v1</code> 显式抛错</li>
+        <li><b>WS 心跳 + 顶替机制</b>：30s ping、3 次失败断开、单会话单连接</li>
+        <li><b>报告防双打</b>：进程内锁 + DB 哨兵 + 失败清哨兵</li>
+        <li><b>流式思考块剥离</b>：<code>ThinkStreamFilter</code> 跨 token 切分也安全</li>
+        <li><b>回采检测</b>：SequenceMatcher + 子串包含，避免扬声器误拾</li>
+        <li><b>SQLite WAL + busy_timeout</b>：WS 回合写状态与后台报告并发</li>
+        <li><b>HTTP-only Cookie + WS 子协议兼容</b>：防止令牌落 URL 日志</li>
+        <li><b>反 prompt 注入</b>：搜索不可用时返回 <code>SEARCH_UNAVAILABLE</code> 引导 LLM 不要编造</li>
+      </ul>
+    </section>
+
+    <!-- ============ 29. 部署 ============ -->
+    <section id="sec-deploy">
+      <h2><span class="num">29</span>部署 / 运维</h2>
+
+      <h3>环境要求</h3>
+      <ul>
+        <li><b>Python</b> ≥ 3.11（pyproject mypy 锁 3.12，requirements 不强制）；</li>
+        <li><b>Node</b> ≥ 18（Next.js 14）；</li>
+        <li><b>SQLite</b> ≥ 3.35（WAL + busy_timeout 支持）；</li>
+        <li><b>反向代理</b>（Nginx / Caddy / Cloudflare）处理 TLS + X-Forwarded-Proto / X-Forwarded-For；</li>
+        <li>首次启动：建表 + 列迁移 + seed（自动）；</li>
+        <li>数据目录：<code>services/shared/data/</code>（含 app.db / .secret.key / chroma/ / system_learning.json / uploads/）。</li>
+      </ul>
+
+      <h3>反向代理要点</h3>
+      <ul>
+        <li><b>Cookie Secure</b>：HTTPS 部署 → <code>COOKIE_SECURE=true</code>（或自动）；</li>
+        <li><b>WebSocket 升级</b>：Nginx <code>proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";</code> + 60s+ <code>proxy_read_timeout</code>；</li>
+        <li><b>缓冲关闭</b>：SSE 端点要 <code>proxy_buffering off</code>（已在响应头 <code>X-Accel-Buffering: no</code>）；</li>
+        <li><b>信任链</b>：<code>TRUSTED_PROXY_CIDRS=10.0.0.0/8</code>，让限流信任 <code>X-Forwarded-For</code>；</li>
+        <li><b>跨域</b>：<code>CORS_ORIGINS=https://your.app</code>（<strong>禁止通配</strong>）。</li>
+      </ul>
+
+      <h3>生产门禁（启动时检查）</h3>
+      <ul>
+        <li><code>ENV=prod</code> → 拒绝 <code>ALLOW_LOCAL_LLM=true</code>；</li>
+        <li><code>SECRET_KEY</code> 缺失 → 报错（不能用自动生成的 <code>.secret.key</code>，否则跨机器后 API Key 密文不可解密）；</li>
+        <li>CORS 包含 <code>*</code> → 报错；</li>
+        <li>URL 校验要求 <code>https</code>。</li>
+      </ul>
+
+      <h3>运维建议</h3>
+      <ul>
+        <li><b>备份</b>：<code>services/shared/data/</code> 整目录（含 <code>.secret.key</code>、chroma）；</li>
+        <li><b>日志</b>：JSON <code>X-Trace-Id</code> 串接；</li>
+        <li><b>限流</b>：默认桶足够；多 worker 时每个 worker 独立计数（注释里写明）；</li>
+        <li><b>升级</b>：列迁移自动；前端 next start 即可。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 30. 新人上手 ============ -->
+    <section id="sec-onboard">
+      <h2><span class="num">30</span>新人上手指南</h2>
+
+      <h3>第 1 天：跑通最小闭环</h3>
+      <ol>
+        <li>读 <code>services/main.py</code> + <code>shared/app_factory.py</code> 理解入口与装配；</li>
+        <li>读 <code>shared/config.py</code> + <code>shared/database.py</code> 理解配置与引擎；</li>
+        <li><code>uvicorn services.main:app --port 8081</code>；<code>curl /health</code> 拿 <code>{"status":"ok"}</code>；</li>
+        <li>看 <code>apps/web</code>，<code>pnpm dev</code> 跑通首页；</li>
+        <li>在设置页填 BYOK → 上传简历 → 开一场面试，看 SSE / WS 流。</li>
+      </ol>
+
+      <h3>第 2-3 天：理解一条 WS 连接的生命周期</h3>
+      <ol>
+        <li>读 <code>interview_service/realtime/ws_handler.py</code>（5 mixin 入口）；</li>
+        <li>读 <code>connection_lifecycle.handle</code>（握手/初始化/主循环/关闭）；</li>
+        <li>读 <code>voice_pipeline._SentenceTTSQueue</code> 与 <code>turn_streaming._stream_events_with_tts</code>；</li>
+        <li>读 <code>turn_coordinator._run_user_turn_end</code> 跟一次"用户说话 → ASR → 回合"的完整路径；</li>
+        <li>读 <code>turn_control._on_candidate_barge_in</code> + <code>_on_silence_nudge</code>；</li>
+        <li>读 <code>hint_service._on_request_hint</code> + <code>report_scheduler._schedule_report_generation</code>。</li>
+      </ol>
+
+      <h3>第 4-5 天：面试引擎 + 报告 + 系统学习</h3>
+      <ol>
+        <li>读 <code>services/interview/agent_prompts.py</code> 看提示词组装；</li>
+        <li>读 <code>runner.stream_opening</code> / <code>stream_turn</code> / <code>stream_closing</code>；</li>
+        <li>读 <code>tools.py</code> + <code>tool_round_runner.py</code> 看工具循环；</li>
+        <li>读 <code>followup.py</code> 看纯规则追问信号；</li>
+        <li>读 <code>report.generate_and_persist_report</code> 看进程内锁 + DB 哨兵；</li>
+        <li>读 <code>growth/learning.py</code> 看 <code>system_learning.json</code> 写入与读取反哺；</li>
+        <li>跑 <code>services/tests/sessions/test_session_ws_mutex.py</code> + <code>test_session_report_stream.py</code>，体会并发安全。</li>
+      </ol>
+
+      <h3>第 2 周：横向扩展</h3>
+      <ol>
+        <li>读 <code>shared/capabilities/ai/llm/client/{llm_client,unified_client}.py</code> 理解多协议；</li>
+        <li>读 <code>shared/core/security/{url,secrets,session_auth,ratelimit}.py</code> 四大安全模块；</li>
+        <li>读 <code>shared/capabilities/voice/{stt,tts}/</code> 全部适配器；</li>
+        <li>读 <code>interview_service/capabilities/rag/{base,factory,local_backend,stepfun_backend}.py</code>；</li>
+        <li>读 <code>shared/services/pipeline_config.py</code> + <code>api_service/routes/settings.py</code> 看三阶段设置；</li>
+        <li>读 <code>apps/web/src/features/media/{useInterviewWS,useAudioRecorder,useTTSPlayer}.ts</code>。</li>
+      </ol>
+
+      <h3>命名 / 路径速查</h3>
+      <ul>
+        <li>"实时层"：<code>interview_service/realtime/</code>（5 mixin + session registry + events）</li>
+        <li>"面试引擎"：<code>interview_service/services/interview/</code>（runner / agent / tools / workflows / followup / report）</li>
+        <li>"能力层"：<code>shared/capabilities/</code>（ai / voice / knowledge / integrations）</li>
+        <li>"平台核心"：<code>shared/core/</code>（config / database / errors / secrets / session_auth / security / ratelimit / migrate / prompts / logging）</li>
+        <li>"服务"：<code>&lt;name&gt;_service/{routes,services,models,schemas}/</code></li>
+      </ul>
+
+      <h3>常见坑</h3>
+      <ul>
+        <li>前端 <code>NEXT_PUBLIC_*</code> 必须用 https/wss 或 http/wss 一致（<code>env.ts</code> 会校验）；</li>
+        <li>后端 <code>HOST=0.0.0.0</code> 时管理接口仍需 loopback 访问（<code>require_local_peer</code>）；</li>
+        <li>STT/TTS 的 ASR Key 绝不与思考 LLM Key 混用；</li>
+        <li>Whisper 模型在 <code>SETTINGS_WHISPER_MODEL</code> 修改后要重启进程（<code>set_whisper_model</code> 会重置缓存）；</li>
+        <li>WS 路径上想加新事件：在 <code>interview_service/constants.py WSServerEvent</code> / <code>WSCClientEvent</code> 加 + 前端 <code>types/index.ts ServerEvent</code> / <code>ClientEvent</code> 镜像 + <code>ws_handler._dispatch</code> 加分支。</li>
+      </ul>
+    </section>
+
+    <!-- 附录 -->
+    <section id="appendix">
+      <h2><span class="num">A</span>附录：核心不变量</h2>
+      <p>这些不变量是"理解系统的关键"。违反任一项都会破坏系统行为：</p>
+      <ol>
+        <li><b>三服务业务零循环</b>，所有跨服务通信仅经 <code>shared</code>。</li>
+        <li><b>思考 LLM Key 与 ASR Key 物理隔离</b>，<code>build_stt_credentials</code> 注释里写明。</li>
+        <li><b>面试每阶段题量有 <code>min/max</code></b>，由 LLM 输出的 <code>[PHASE_COMPLETE]</code> 标记或题数达 max 推进。</li>
+        <li><b>WS 单会话单连接</b>：新连接顶替旧连接，发 <code>error(B2003)</code> + <code>close(4000)</code>。</li>
+        <li><b>报告防双打</b>：进程内锁 + DB 哨兵 <code>{"_generating":true}</code> + 失败清哨兵。</li>
+        <li><b>能力令牌</b>：<code>access_token</code> 仅在创建响应写 HttpOnly Cookie，<strong>不</strong>在 list / get 响应回传。</li>
+        <li><b>CORS</b>：prod 禁用 <code>*</code> 通配；URL 出站经 <code>make_pinned_async_client</code> DNS pin。</li>
+        <li><b>SECRET_KEY</b>：prod 必须显式提供（≥16 字节），否则 <code>data/.secret.key</code> 不可跨机器迁移。</li>
+        <li><b>流式思考块</b>：<code>&lt;think&gt;...&lt;/think&gt;</code> / <code>&lt;thinking&gt;...&lt;/thinking&gt;</code> 由 <code>ThinkStreamFilter</code> 剥离（跨 token 切分安全）。</li>
+        <li><b>回采检测</b>：<code>SequenceMatcher.ratio &gt;= 0.55</code> 或前缀 40 字符子串包含，丢弃并提示 <code>C2001</code>。</li>
+        <li><b>SQLite WAL + busy_timeout</b>：WS 写状态与后台报告并发安全。</li>
+        <li><b>追问信号</b>：在反问/总结/寒暄阶段 <strong>不</strong>触发技术性 missing_data / tech_hole。</li>
+        <li><b>子协议传令牌</b>：握手须回显；生产拒绝 query <code>?token=</code>。</li>
+        <li><b>FFI / Chroma</b>：导入较重，使用时 <code>import</code> 延迟到第一次实例化（<code>local_backend.py</code>）。</li>
+      </ol>
+    </section>
+
+    <footer class="colophon">
+      <p>本文档为 RealMock 项目深度解读，<strong>所有内容直接来自代码静态分析</strong>（截至 <code>git HEAD</code>）。<br/>
+      文档结构：5 万行级目标，覆盖架构、模块、数据流、安全、依赖、上手指南。<br/>
+      若发现与代码不一致，以 <code>services/</code> 与 <code>apps/web/src/</code> 为权威真相。</p>
+      <p class="muted small">最后更新：2026-08-28 · 与 docs/architecture-review-2026-08-28.md 同步</p>
+    </footer>
+  </main>
+</div>
+
+<button class="back-top" id="back-top" title="回到顶部" aria-label="回到顶部">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+</button>
+
+<script>
+  /* ==========================================================
+   * 交互：主题切换 / 回到顶部 / 搜索 / 目录高亮 / Tab 切换
+   * ========================================================== */
+
+  // 主题
+  const themeBtn = document.getElementById('theme');
+  const themeIcon = document.getElementById('theme-icon');
+  const root = document.documentElement;
+  const STORAGE_KEY = 'realmock-doc-theme';
+
+  function applyTheme(t) {
+    root.setAttribute('data-theme', t);
+    if (t === 'dark') {
+      themeIcon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>';
+    } else {
+      themeIcon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+    }
+  }
+
+  const saved = localStorage.getItem(STORAGE_KEY) ||
+                (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  applyTheme(saved);
+
+  themeBtn.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem(STORAGE_KEY, next);
+  });
+
+  // 回到顶部
+  const backTop = document.getElementById('back-top');
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 400) backTop.classList.add('show');
+    else backTop.classList.remove('show');
+  });
+  backTop.addEventListener('click', () => {
+    document.getElementById('top').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // 目录高亮
+  const tocLinks = Array.from(document.querySelectorAll('aside.sidebar a[href^="#sec-"]'));
+  const sectionMap = new Map();
+  tocLinks.forEach(link => {
+    const id = link.getAttribute('href').slice(1);
+    const sec = document.getElementById(id);
+    if (sec) sectionMap.set(id, link);
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = entry.target.id;
+      const link = sectionMap.get(id);
+      if (!link) return;
+      if (entry.isIntersecting) {
+        tocLinks.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -65% 0px', threshold: 0 });
+
+  sectionMap.forEach((_, id) => {
+    const sec = document.getElementById(id);
+    if (sec) observer.observe(sec);
+  });
+
+  // Tab 切换
+  document.querySelectorAll('.tabs').forEach(tabs => {
+    const head = tabs.querySelector('.tabs-head');
+    const body = tabs.querySelector('.tabs-body');
+    if (!head || !body) return;
+    head.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        head.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        body.querySelectorAll('[data-pane]').forEach(p => p.classList.remove('show'));
+        btn.classList.add('active');
+        const pane = body.querySelector(`[data-pane="${btn.dataset.tab}"]`);
+        if (pane) pane.classList.add('show');
+      });
+    });
+  });
+
+  // 搜索
+  const searchInput = document.getElementById('search');
+  const sections = Array.from(document.querySelectorAll('section[id]'));
+  const headingsMap = new Map();  // 关键词 -> [section]
+  sections.forEach(sec => {
+    const title = sec.querySelector('h2')?.textContent || '';
+    const sub = Array.from(sec.querySelectorAll('h3, h4')).map(h => h.textContent).join(' | ');
+    const codeSyms = Array.from(sec.querySelectorAll('code')).map(c => c.textContent).slice(0, 30).join(' ');
+    const blob = (title + ' ' + sub + ' ' + codeSyms).toLowerCase();
+    blob.split(/[^a-z0-9_]+/).forEach(tok => {
+      if (tok.length >= 2) {
+        if (!headingsMap.has(tok)) headingsMap.set(tok, new Set());
+        headingsMap.get(tok).add(sec.id);
+      }
+    });
+  });
+
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    if (q.length < 2) { clearHighlights(); return; }
+    // 简单匹配：取第一个词
+    const token = q.split(/\s+/)[0];
+    const hits = headingsMap.get(token) || new Set();
+    // 高亮所有 section，命中的更明显
+    sections.forEach(sec => {
+      if (hits.has(sec.id)) {
+        sec.style.opacity = '1';
+        sec.style.outline = '2px solid var(--primary)';
+        sec.style.borderRadius = '10px';
+      } else {
+        sec.style.opacity = '0.35';
+        sec.style.outline = '';
+      }
+    });
+    // 跳到第一个命中
+    if (hits.size) {
+      const first = document.getElementById([...hits][0]);
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  searchInput.addEventListener('blur', () => {
+    if (searchInput.value.trim().length < 2) clearHighlights();
+  });
+
+  function clearHighlights() {
+    sections.forEach(sec => { sec.style.opacity = ''; sec.style.outline = ''; sec.style.borderRadius = ''; });
+  }
+</script>
+
+</body>
+</html>
