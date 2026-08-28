@@ -93,7 +93,7 @@ def get_voice_catalog() -> dict[str, Any]:
 
 @router.get("/llm", response_model=LLMSettingsResponse)
 def get_llm_settings(db: Session = Depends(get_db)):
-    """兼容旧版设置读取（内部仍从 stage_configs 聚合）。"""
+    """DEPRECATED: 兼容旧版设置读取（内部仍从 stage_configs 聚合）。将在 v2.0 移除。"""
     cfg_map = get_stage_config_map(db)
     reason = cfg_map.get("reason", {})
     recognize = cfg_map.get("recognize", {})
@@ -136,7 +136,7 @@ def get_llm_settings(db: Session = Depends(get_db)):
 
 @router.put("/llm", response_model=LLMSettingsResponse)
 def update_llm_settings(body: LLMSettingsUpdate, db: Session = Depends(get_db)):
-    """兼容旧版统一保存：拆分到 stage_configs。
+    """DEPRECATED: 兼容旧版统一保存：拆分到 stage_configs。将在 v2.0 移除。
 
     URL 安全校验使用 ``allow_local_llm``，而不是开发环境字符串判断。
     """
@@ -244,7 +244,7 @@ def update_stage(
     dependencies=[Depends(rate_limit_dep(key="llm", limit=DEFAULT_LLM_RATE_LIMIT_PER_MINUTE))],
 )
 async def test_llm_connection(db: Session = Depends(get_db)):
-    """兼容旧入口：等同于测试「面试思考」阶段，客户端遵循 ``allow_local_llm``。"""
+    """DEPRECATED: 兼容旧入口：等同于测试「面试思考」阶段，客户端遵循 ``allow_local_llm``。将在 v2.0 移除。"""
     result = await test_reason(db)
     return LLMTestResponse(
         success=bool(result.get("success")),

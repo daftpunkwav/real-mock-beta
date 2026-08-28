@@ -31,7 +31,9 @@ from interview_service.schemas import (
     InterviewMessageRequest,
     InterviewMessageResponse,
     InterviewSessionResponse,
+    ResumePickerItem,
 )
+from shared.models import Resume
 from interview_service.services.interview.agent import InterviewAgent, generate_and_persist_report
 from interview_service.services.interview.events import EventKind
 from interview_service.services.interview.runner import InterviewRunner
@@ -42,6 +44,25 @@ logger = logging.getLogger(__name__)
 
 # 强类型 ChatMessage 列表校验（防御存储层历史脏数据）
 _CHAT_MSG_ADAPTER: TypeAdapter[list[ChatMessage]] = TypeAdapter(list[ChatMessage])
+
+
+@router.get(
+    "/resumes",
+    response_model=list[ResumePickerItem],
+    dependencies=[Depends(require_local_peer)],
+)
+def list_resume_picker(db: Session = Depends(get_db)):
+    """配置页下拉用的简历摘要；不返回解析正文与深度评价。"""
+    rows = db.query(Resume).order_by(Resume.created_at.desc()).all()
+    return [
+        ResumePickerItem(
+            id=r.id,
+            filename=r.filename,
+            is_active=bool(r.is_active),
+            score=r.score,
+        )
+        for r in rows
+    ]
 
 
 @router.post(

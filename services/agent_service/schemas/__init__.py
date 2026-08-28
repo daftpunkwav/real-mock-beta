@@ -1,5 +1,14 @@
-"""智能体服务契约：面试准备域。
+"""智能体服务契约：面试准备域。"""
 
-PrepCreateRequest / PrepMessageRequest 定义在路由模块内联（请求体小且唯一
-使用方是 prep 路由），本包保留为服务契约扩展位。
-"""
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+
+class ResumePickerItem(BaseModel):
+    """准备页简历下拉：只读摘要，不含解析正文与评价。"""
+
+    id: int
+    filename: str
+    is_active: bool = False
+    score: int | None = None

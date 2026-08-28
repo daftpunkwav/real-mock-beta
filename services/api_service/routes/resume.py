@@ -133,7 +133,7 @@ def _gather_resume_market_context(r: Resume) -> tuple[str, list[str]]:
 
     站点过滤读取 ``RESUME_MARKET_SEARCH_SITES``（当前默认为空=全网）。
     """
-    from shared.capabilities.knowledge.search.sites import RESUME_MARKET_SEARCH_SITES
+    from api_service.services.resume.sites import RESUME_MARKET_SEARCH_SITES
     from shared.capabilities.knowledge.search.web import web_search
 
     role = _infer_target_role_from_resume(r)
@@ -150,7 +150,7 @@ def _gather_resume_market_context(r: Resume) -> tuple[str, list[str]]:
         scope = (
             "限定站点：" + "、".join(sites)
             if sites
-            else "全网检索（站点限定尚未启用，可在 services/search/sites.py 配置）"
+            else "全网检索（站点限定尚未启用，可在 api_service/services/resume/sites.py 配置）"
         )
         blocks.append(f"【{scope}】\n查询：{q}\n{result}")
     return "\n\n".join(blocks), used

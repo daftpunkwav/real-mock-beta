@@ -1,8 +1,11 @@
-"""求职市场 / 简历评价联网搜索的站点配置。
+"""求职市场 / 简历评价联网搜索的站点配置（api_service 简历域）。
 
 当前默认不限定站点（全网检索）。后续可在 ``RESUME_MARKET_SEARCH_SITES``
 中填入域名，例如牛客、BOSS 直聘，``web_search(..., sites=...)`` 会自动加
 ``site:`` 过滤。
+
+从 ``shared.capabilities.knowledge.search.sites`` 下沉：仅 api_service 简历
+解析消费，与三服务共用的 ``web_search`` 解耦。
 """
 
 from __future__ import annotations

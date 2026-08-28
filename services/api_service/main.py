@@ -22,7 +22,7 @@ async def _bootstrap() -> None:
 
 
 app = create_service_app(
-    service_router=service_router,
+    service_routers=service_router,
     title="API Service",
     description="RealMock 基础后端 API（档案 / 简历 / 处理器配置）",
     service_name="api-service",

@@ -32,7 +32,9 @@ from shared.core.session_auth import (
 )
 from shared.database import get_db
 from agent_service.models import PrepSession
+from agent_service.schemas import ResumePickerItem
 from shared.capabilities.ai.llm.client import LLMClient
+from shared.models import Resume
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -40,6 +42,25 @@ router = APIRouter()
 # SSE 错误事件统一文案（防止上游异常文本泄露 API Key / 内部细节）
 _SSE_ERR_GENERIC = "辅导生成失败，请稍后重试"
 _PREP_FORBIDDEN = "无权访问该辅导会话"
+
+
+@router.get(
+    "/resumes",
+    response_model=list[ResumePickerItem],
+    dependencies=[Depends(require_local_peer)],
+)
+def list_resume_picker(db: Session = Depends(get_db)):
+    """准备页下拉用的简历摘要；不返回解析正文与深度评价。"""
+    rows = db.query(Resume).order_by(Resume.created_at.desc()).all()
+    return [
+        ResumePickerItem(
+            id=r.id,
+            filename=r.filename,
+            is_active=bool(r.is_active),
+            score=r.score,
+        )
+        for r in rows
+    ]
 
 
 class PrepCreateRequest(BaseModel):
