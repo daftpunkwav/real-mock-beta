@@ -2,11 +2,9 @@
 
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { agentService as api } from "@/lib/api/agentService";
-import { apiService as apiService } from "@/lib/api/apiService";
 import { PREP_QUICK_PROMPTS } from "@/config/prepPrompts";
-import type { PrepSearchGroup, Resume } from "@/types";
-import { ThinkAnswerMessage } from "@/components/ThinkAnswerMessage";
-import { SearchResultCards } from "@/components/prep/SearchResultCards";
+import type { PrepSearchGroup, ResumePickerItem } from "@/types";
+import { SearchResultCards, ThinkAnswerMessage } from "@/features/prep";
 import {
   Send,
   BookOpen,
@@ -30,7 +28,7 @@ interface ChatMessage {
 }
 
 export default function PrepPage() {
-  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [resumes, setResumes] = useState<ResumePickerItem[]>([]);
   const [resumeId, setResumeId] = useState<number | null>(null);
   const [prepSessionId, setPrepSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -38,6 +36,7 @@ export default function PrepPage() {
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [prepError, setPrepError] = useState("");
+  const [resumeLoadError, setResumeLoadError] = useState("");
   const [tokenUsage, setTokenUsage] = useState(0);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -49,11 +48,17 @@ export default function PrepPage() {
   }
 
   useEffect(() => {
-    apiService.listResumes().then((list) => {
-      setResumes(list);
-      const active = list.find((r) => r.is_active) || list[0];
-      if (active) setResumeId(active.id);
-    });
+    api
+      .listResumes()
+      .then((list) => {
+        setResumeLoadError("");
+        setResumes(list);
+        const active = list.find((r) => r.is_active) || list[0];
+        if (active) setResumeId(active.id);
+      })
+      .catch((e) => {
+        setResumeLoadError(e instanceof Error ? e.message : "简历列表加载失败");
+      });
   }, []);
 
   const selectedResume = useMemo(
@@ -200,7 +205,9 @@ export default function PrepPage() {
                   </p>
                 </div>
 
-                {resumes.length > 0 ? (
+                {resumeLoadError ? (
+                  <div className="alert alert-error !block text-center">{resumeLoadError}</div>
+                ) : resumes.length > 0 ? (
                   <div>
                     <label className="field-label">关联简历</label>
                     <select
@@ -335,23 +342,9 @@ export default function PrepPage() {
                   {selectedResume.filename}
                 </p>
                 <p className="mt-1 text-[11px] text-ink-subtle">
-                  {selectedResume.parsed_profile.name || "未解析姓名"}
+                  {selectedResume.is_active ? "当前投递" : "未设为投递"}
                   {selectedResume.score != null && ` · 评分 ${selectedResume.score}`}
                 </p>
-                {selectedResume.parsed_profile.summary && (
-                  <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-ink-muted">
-                    {selectedResume.parsed_profile.summary}
-                  </p>
-                )}
-                {selectedResume.parsed_profile.skills.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {selectedResume.parsed_profile.skills.slice(0, 8).map((s) => (
-                      <span key={s} className="chip chip-blue !text-[10px]">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </>
             ) : (
               <p className="text-[12px] text-ink-subtle">未关联简历,将进行通用辅导</p>

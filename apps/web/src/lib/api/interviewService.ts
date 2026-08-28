@@ -1,8 +1,4 @@
-/** 模拟面试域客户端（对应后端 ``interview_service``：面试 / 报告 / 成长 / 选项）
- *
- * 注意（微服务化预留）：本域在单进程聚合下跨域调用 api_service 的简历接口
- * （``listResumes`` 属 api 域）。将来服务拆分时，此依赖需改为显式聚合 base URL。
- */
+/** 模拟面试域客户端（对应后端 ``interview_service``：面试 / 报告 / 成长 / 选项 / 简历摘要）。 */
 
 import type {
   ChatMessage,
@@ -15,6 +11,7 @@ import type {
   InterviewSession,
   Options,
   ReportSSEEvent,
+  ResumePickerItem,
   SendMessageResponse,
   StartInterviewResponse,
 } from "@/types";
@@ -23,6 +20,7 @@ import { ApiError, consumeSSE, parseStructuredErrorResponse, request, resolveBac
 export const interviewService = {
   /* 选项 */
   getOptions: () => request<Options>("/v1/options"),
+  listResumes: () => request<ResumePickerItem[]>("/v1/interview/resumes"),
 
   /* 面试 */
   createSession: (config: InterviewConfig) =>

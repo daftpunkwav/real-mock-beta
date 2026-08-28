@@ -4,8 +4,32 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { interviewService as api } from "@/lib/api/interviewService";
+import { ApiError } from "@/lib/api/base";
 import type { InterviewReport, ScoreBreakdown } from "@/types";
 import { ArrowLeft, RefreshCw, FileBarChart } from "lucide-react";
+
+function isReportPending(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.code === "A2004" || error.retryable || error.status === 404;
+  }
+  const msg = error instanceof Error ? error.message : String(error);
+  return /尚未|A2004/.test(msg);
+}
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(resolve, ms);
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      reject(new DOMException("aborted", "AbortError"));
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 export default function ReportPage() {
   const params = useParams();
@@ -42,32 +66,46 @@ export default function ReportPage() {
       setLoading(false);
       return;
     }
-    let cancelled = false;
+    const ac = new AbortController();
+    setLoading(true);
+    setError("");
+    setReport(null);
 
-    api
-      .getReport(sessionId)
-      .then((data) => {
-        if (cancelled) return;
-        applyPayload(data);
-        setError("");
-        setLoading(false);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        const missing =
-          /尚未|不存在|404|生成/.test(msg) ||
-          (e && typeof e === "object" && "status" in e && Number(e.status) === 404);
-        if (missing) {
-          setError("报告尚未生成。可点击下方按钮生成或重新加载。");
-        } else {
-          setError(msg);
+    const poll = async () => {
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (ac.signal.aborted) return;
+        try {
+          const data = await api.getReport(sessionId);
+          if (ac.signal.aborted) return;
+          applyPayload(data);
+          setError("");
+          setLoading(false);
+          return;
+        } catch (e) {
+          if (ac.signal.aborted) return;
+          if (isReportPending(e)) {
+            try {
+              await sleep(Math.min(1000 * (attempt + 1), 4000), ac.signal);
+            } catch {
+              return;
+            }
+            continue;
+          }
+          setError(e instanceof Error ? e.message : String(e));
+          setLoading(false);
+          return;
         }
+      }
+      if (!ac.signal.aborted) {
+        setError("报告尚未生成。可点击下方按钮生成或重新加载。");
         setLoading(false);
-      });
+      }
+    };
 
+    void poll();
     return () => {
-      cancelled = true;
+      ac.abort();
     };
   }, [sessionId]);
 

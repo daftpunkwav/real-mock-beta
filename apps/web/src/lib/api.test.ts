@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ApiError, formatApiError } from "./api/base";
+import { ApiError, consumeSSE, formatApiError } from "./api/base";
 
 describe("ApiError", () => {
   it("无 fields 时按 status 兜底 code", () => {
@@ -90,5 +90,47 @@ describe("formatApiError", () => {
   it("retryable 字段不改变 formatApiError 输出（用于上层按钮控制）", () => {
     const e = new ApiError("x", 503, { code: "B0001", retryable: true });
     expect(formatApiError(e)).toBe("[B0001] x");
+  });
+});
+
+function sseResponse(chunks: string[]): Response {
+  const encoder = new TextEncoder();
+  let i = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (i < chunks.length) {
+        controller.enqueue(encoder.encode(chunks[i]));
+        i += 1;
+      } else {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream);
+}
+
+describe("consumeSSE", () => {
+  it("刷新无换行结尾的最后一块 data 行", async () => {
+    const events: { type: string; content?: string }[] = [];
+    const res = sseResponse([
+      'data: {"type":"token","content":"hello"}\n',
+      'data: {"type":"done","content":"ok"}',
+    ]);
+    await consumeSSE(res, (event) => {
+      events.push(event);
+    });
+    expect(events).toEqual([
+      { type: "token", content: "hello" },
+      { type: "done", content: "ok" },
+    ]);
+  });
+
+  it("跳过畸形 JSON 行并继续", async () => {
+    const events: { type: string }[] = [];
+    const res = sseResponse(['data: not-json\ndata: {"type":"token"}\n']);
+    await consumeSSE(res, (event) => {
+      events.push(event);
+    });
+    expect(events).toEqual([{ type: "token" }]);
   });
 });

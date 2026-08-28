@@ -217,7 +217,10 @@ export default function SettingsPage() {
           const blob = new Blob([bytes], { type: isWav ? "audio/wav" : "audio/mpeg" });
           const url = URL.createObjectURL(blob);
           const audio = new Audio(url);
-          void audio.play().finally(() => URL.revokeObjectURL(url));
+          const release = () => URL.revokeObjectURL(url);
+          audio.addEventListener("ended", release, { once: true });
+          audio.addEventListener("error", release, { once: true });
+          void audio.play().catch(release);
         } catch {
           /* 试听失败不影响测试结果展示 */
         }

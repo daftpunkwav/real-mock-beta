@@ -5,10 +5,12 @@ import type {
   PrepSessionCreateResponse,
   PrepSSEEvent,
   PrepSearchGroup,
+  ResumePickerItem,
 } from "@/types";
 import { ApiError, consumeSSE, parseStructuredErrorResponse, request, resolveBackendUrl } from "@/lib/api/base";
 
 export const agentService = {
+  listResumes: () => request<ResumePickerItem[]>("/v1/prep/resumes"),
   createPrepSession: (data: {
     resume_id?: number;
     target_role?: string;

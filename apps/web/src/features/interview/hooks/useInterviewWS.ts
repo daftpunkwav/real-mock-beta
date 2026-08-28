@@ -99,9 +99,21 @@ export function useInterviewWS(
     // 本 effect 实例的世代；cleanup 后旧回调对比失败即退出
     const generation = ++generationRef.current;
     retryCountRef.current = 0;
+    setEverConnected(false);
+    setConnected(false);
+    setTurnState("IDLE");
+    setReconnectAttempt(0);
+    setConnectionState("connecting");
     clearRetryTimer();
 
     const isCurrent = () => generationRef.current === generation;
+
+    if (!Number.isFinite(sessionId) || sessionId <= 0) {
+      return () => {
+        generationRef.current += 1;
+        clearRetryTimer();
+      };
+    }
 
     const connect = () => {
       if (!isCurrent()) return;

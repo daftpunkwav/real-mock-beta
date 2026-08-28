@@ -3,9 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { interviewService as api } from "@/lib/api/interviewService";
-import { apiService as apiService } from "@/lib/api/apiService";
 import { toast } from "@/components/Toast";
-import type { Options, Resume, InterviewConfig } from "@/types";
+import type { Options, ResumePickerItem, InterviewConfig } from "@/types";
 import {
   Play,
   Sparkles,
@@ -21,7 +20,7 @@ import { LoadError } from "@/components/LoadError";
 export default function InterviewSetupPage() {
   const router = useRouter();
   const [options, setOptions] = useState<Options | null>(null);
-  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [resumes, setResumes] = useState<ResumePickerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -41,7 +40,7 @@ export default function InterviewSetupPage() {
   const loadData = () => {
     setLoading(true);
     setLoadError("");
-    Promise.all([api.getOptions(), apiService.listResumes()])
+    Promise.all([api.getOptions(), api.listResumes()])
       .then(([opts, res]) => {
         setOptions(opts);
         setResumes(res);
