@@ -80,3 +80,10 @@ docs/history/
 
 # 审计临时产物（文件清单）
 _audit_*.txt
+
+# 本地 Agent 会话计划（非仓库源码）
+.zcode/
+
+# 本机抽查脚本
+_test_*.mjs
+
