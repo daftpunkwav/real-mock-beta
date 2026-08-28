@@ -27,7 +27,7 @@ def test_pin_allows_loopback_with_allow_local() -> None:
 
 def test_pin_public_host(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "shared.core.security._resolve_all",
+        "shared.core.security.url._resolve_all",
         lambda host: [ipaddress.ip_address("93.184.216.34")],
     )
     t = pin_safe_http_url("https://example.com/v1", allow_local=False)
@@ -43,7 +43,7 @@ def test_pin_single_resolve_no_toctou(monkeypatch: pytest.MonkeyPatch) -> None:
         calls.append(host)
         return [ipaddress.ip_address("93.184.216.34")]
 
-    monkeypatch.setattr("shared.core.security._resolve_all", _once)
+    monkeypatch.setattr("shared.core.security.url._resolve_all", _once)
     t = pin_safe_http_url("https://example.com/v1", allow_local=False)
     assert len(calls) == 1
     assert t.pinned_ip == "93.184.216.34"
@@ -56,7 +56,7 @@ def test_allow_local_rejects_mixed_loopback_and_metadata(
     from shared.core.security import is_safe_http_url
 
     monkeypatch.setattr(
-        "shared.core.security._resolve_all",
+        "shared.core.security.url._resolve_all",
         lambda host: [
             ipaddress.ip_address("127.0.0.1"),
             ipaddress.ip_address("169.254.169.254"),
@@ -80,9 +80,9 @@ async def test_transport_rewrites_host_to_pinned_ip(
             captured["sni"] = (request.extensions or {}).get("sni_hostname")
             return httpx.Response(200, json={"ok": True}, request=request)
 
-    import shared.core.security as sec
+    import shared.core.security.url as sec_url
 
-    monkeypatch.setattr(sec.httpx, "AsyncHTTPTransport", lambda **kw: _Inner())
+    monkeypatch.setattr(sec_url.httpx, "AsyncHTTPTransport", lambda **kw: _Inner())
     transport = PinnedHostTransport(hostname="api.example.com", pinned_ip="1.2.3.4")
     async with httpx.AsyncClient(transport=transport) as client:
         resp = await client.get("https://api.example.com/v1/models")

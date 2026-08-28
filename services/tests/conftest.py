@@ -89,7 +89,7 @@ def public_dns(monkeypatch: pytest.MonkeyPatch):
     """
     import ipaddress
 
-    from shared.core import security
+    from shared.core.security import url as security_url
 
     def fake_resolve(hostname: str):
         try:
@@ -101,4 +101,4 @@ def public_dns(monkeypatch: pytest.MonkeyPatch):
             return [ipaddress.ip_address("127.0.0.1")]
         return [ipaddress.ip_address("93.184.216.34")]
 
-    monkeypatch.setattr(security, "_resolve_all", fake_resolve)
+    monkeypatch.setattr(security_url, "_resolve_all", fake_resolve)

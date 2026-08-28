@@ -83,7 +83,7 @@ class TestDnsRebindingMultiARecords:
 
     def test_multi_a_records_any_private_ip_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """域名解析返回多个 IP,只要任一在黑名单网段内即拒绝。"""
-        from shared.core import security
+        from shared.core.security import url as security_url
 
         def fake_resolve(hostname: str):
             return [
@@ -91,12 +91,12 @@ class TestDnsRebindingMultiARecords:
                 ipaddress.ip_address("127.0.0.1"),   # loopback 命中黑名单 → 整体拒绝
             ]
 
-        monkeypatch.setattr(security, "_resolve_all", fake_resolve)
+        monkeypatch.setattr(security_url, "_resolve_all", fake_resolve)
         assert is_safe_http_url("https://dns-rebind.attacker.example", allow_local=False) is False
 
     def test_multi_a_records_all_public_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """全部 A 记录是公网 IP 时通过。"""
-        from shared.core import security
+        from shared.core.security import url as security_url
 
         def fake_resolve(hostname: str):
             return [
@@ -104,16 +104,16 @@ class TestDnsRebindingMultiARecords:
                 ipaddress.ip_address("1.1.1.1"),
             ]
 
-        monkeypatch.setattr(security, "_resolve_all", fake_resolve)
+        monkeypatch.setattr(security_url, "_resolve_all", fake_resolve)
         assert is_safe_http_url("https://multi-a.example.com", allow_local=False) is True
 
     def test_unresolvable_hostname_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from shared.core import security
+        from shared.core.security import url as security_url
 
         def fake_resolve(hostname: str):
             raise ValueError(f"无法解析主机: {hostname!r}")
 
-        monkeypatch.setattr(security, "_resolve_all", fake_resolve)
+        monkeypatch.setattr(security_url, "_resolve_all", fake_resolve)
         assert is_safe_http_url("https://unresolvable.example.invalid", allow_local=False) is False
 
 

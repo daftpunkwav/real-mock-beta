@@ -219,7 +219,7 @@ class TestPinSafeHttpUrl:
         import ipaddress
 
         monkeypatch.setattr(
-            "shared.core.security._resolve_all",
+            "shared.core.security.url._resolve_all",
             lambda host: [ipaddress.ip_address("93.184.216.34")],
         )
         target = pin_safe_http_url("https://example.com/v1", allow_local=False)
@@ -241,10 +241,10 @@ async def test_pinned_host_transport_rewrites_to_ip(
             captured["sni"] = (request.extensions or {}).get("sni_hostname")
             return httpx.Response(200, json={"ok": True}, request=request)
 
-    import shared.core.security as sec
+    import shared.core.security.url as sec_url
 
     monkeypatch.setattr(
-        sec.httpx,
+        sec_url.httpx,
         "AsyncHTTPTransport",
         lambda **kw: _Inner(),
     )

@@ -27,7 +27,9 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch, *, allow_local: bool) -> No
     s.effective_embeddings_key = "sk-test"
     s.effective_embeddings_model = "text-embedding-3-small"
     s.is_prod = not allow_local
-    monkeypatch.setattr("shared.capabilities.ai.llm.client.get_settings", lambda: s)
+    # client 拆包后 get_settings 分布在 llm_client 和 base 两个子模块
+    monkeypatch.setattr("shared.capabilities.ai.llm.client.llm_client.get_settings", lambda: s)
+    monkeypatch.setattr("shared.capabilities.ai.llm.client.base.get_settings", lambda: s)
 
 
 def _make_client(monkeypatch: pytest.MonkeyPatch, *, allow_local: bool) -> Any:
@@ -45,7 +47,7 @@ def _make_client(monkeypatch: pytest.MonkeyPatch, *, allow_local: bool) -> Any:
 async def test_chat_4xx_no_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _make_client(monkeypatch, allow_local=False)
     # 本测试聚焦重试语义：URL 校验放行（域名真实 DNS 在不同环境解析结果不同）
-    monkeypatch.setattr("shared.capabilities.ai.llm.client.is_safe_http_url", lambda *a, **kw: True)
+    monkeypatch.setattr("shared.capabilities.ai.llm.client.llm_client.is_safe_http_url", lambda *a, **kw: True)
     http_client = AsyncMock()
     fake_resp = MagicMock(spec=httpx.Response)
     fake_resp.status_code = 400
@@ -53,7 +55,7 @@ async def test_chat_4xx_no_retry(monkeypatch: pytest.MonkeyPatch) -> None:
         "400", request=MagicMock(), response=fake_resp
     )
     http_client.post = AsyncMock(return_value=fake_resp)
-    with patch("shared.capabilities.ai.llm.client.make_pinned_async_client") as ac:
+    with patch("shared.capabilities.ai.llm.client.llm_client.make_pinned_async_client") as ac:
         ac.return_value.__aenter__.return_value = http_client
         ac.return_value.__aexit__.return_value = False
         with pytest.raises(httpx.HTTPStatusError):
@@ -66,7 +68,7 @@ async def test_chat_4xx_no_retry(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_chat_429_retries_then_returns(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _make_client(monkeypatch, allow_local=False)
     # 同 test_chat_4xx_no_retry：URL 校验放行，聚焦重试语义
-    monkeypatch.setattr("shared.capabilities.ai.llm.client.is_safe_http_url", lambda *a, **kw: True)
+    monkeypatch.setattr("shared.capabilities.ai.llm.client.llm_client.is_safe_http_url", lambda *a, **kw: True)
 
     succ = MagicMock(spec=httpx.Response)
     succ.status_code = 200
@@ -85,10 +87,10 @@ async def test_chat_429_retries_then_returns(monkeypatch: pytest.MonkeyPatch) ->
             succ,
         ]
     )
-    with patch("shared.capabilities.ai.llm.client.make_pinned_async_client") as ac:
+    with patch("shared.capabilities.ai.llm.client.llm_client.make_pinned_async_client") as ac:
         ac.return_value.__aenter__.return_value = http_client
         ac.return_value.__aexit__.return_value = False
-        with patch("shared.capabilities.ai.llm.client.asyncio.sleep", new=AsyncMock()):
+        with patch("shared.capabilities.ai.llm.client.base.asyncio.sleep", new=AsyncMock()):
             text = await client.chat([{"role": "user", "content": "hi"}])
     assert text == "ok"
     assert http_client.post.await_count == 3
@@ -113,7 +115,7 @@ async def test_chat_allows_loopback_in_dev(monkeypatch: pytest.MonkeyPatch) -> N
     succ.raise_for_status = MagicMock()
     http_client = AsyncMock()
     http_client.post = AsyncMock(return_value=succ)
-    with patch("shared.capabilities.ai.llm.client.make_pinned_async_client") as ac:
+    with patch("shared.capabilities.ai.llm.client.llm_client.make_pinned_async_client") as ac:
         ac.return_value.__aenter__.return_value = http_client
         ac.return_value.__aexit__.return_value = False
         text = await client.chat([{"role": "user", "content": "hi"}])

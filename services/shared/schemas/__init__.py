@@ -74,7 +74,7 @@ class StageConfigsResponse(BaseModel):
 
 
 class LLMSettingsUpdate(BaseModel):
-    """兼容旧版三阶段统一保存；内部会拆到 stage_configs。"""
+    """DEPRECATED: 兼容旧版三阶段统一保存；内部会拆到 stage_configs。将在 v2.0 移除。"""
 
     api_base: str
     api_key: str

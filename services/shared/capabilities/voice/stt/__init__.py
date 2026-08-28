@@ -39,7 +39,7 @@ async def transcribe_utterance(
     prefer_cloud: bool = True,
     creds: SttCredentials | None = None,
 ) -> str:
-    """转写一整段用户发言，返回纯文本（兼容旧调用）。"""
+    """DEPRECATED: 转写一整段用户发言，返回纯文本（兼容旧调用）。请使用 transcribe_utterance_result。"""
     result = await transcribe_utterance_result(
         pcm_b64,
         sample_rate=sample_rate,

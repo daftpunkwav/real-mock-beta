@@ -46,7 +46,9 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{SHARED_ROOT / 'data' / 'app.db'}"
     upload_dir: str = str(SHARED_ROOT / "uploads")
     cors_origins: str = Field(
-        # 端口规划：前端 8080 / 后端 8081；其他服务依次顺延 8082、8083…
+        # 端口规划（经 .env 配置，默认值仅本机兜底）：
+        #   默认聚合形态：前端 + 后端单进程聚合（8080 / 8081）；
+        #   独立运行形态：api 8081 / agent 8082 / interview 8083。
         default="http://localhost:8080,http://127.0.0.1:8080",
     )
     # 默认仅本机；局域网调试请显式设 HOST=0.0.0.0
