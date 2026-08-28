@@ -54,33 +54,33 @@ class TestBargeEpoch:
         h = _make_handler()
         epoch = h._begin_user_turn()
         assert epoch is not None
-        assert h._turn_busy is True
+        assert h.ctx.turn_busy is True
         assert not h._can_start_user_turn()
         # 模拟 barge：推进 stream epoch，不盲清 busy
-        h._stream_epoch += 1
+        h.ctx.stream_epoch += 1
         assert h._can_start_user_turn()
         new_epoch = h._begin_user_turn()
-        assert new_epoch == h._stream_epoch
+        assert new_epoch == h.ctx.stream_epoch
         # 旧回合结束不得清掉新回合的锁
         h._end_user_turn(epoch)
-        assert h._turn_busy is True
+        assert h.ctx.turn_busy is True
         h._end_user_turn(new_epoch)
-        assert h._turn_busy is False
+        assert h.ctx.turn_busy is False
 
     @pytest.mark.asyncio
     async def test_barge_bumps_playback_generation(self) -> None:
         h = _make_handler()
-        h.turn_state = TurnState.AI_SPEAKING
-        h._awaiting_playback_gen = 3
-        h._playback_generation = 3
-        h._stream_epoch = 1
-        h._tts_queue.clear = AsyncMock()
+        h.ctx.turn_state = TurnState.AI_SPEAKING
+        h.ctx.awaiting_playback_gen = 3
+        h.ctx.playback_generation = 3
+        h.ctx.stream_epoch = 1
+        h.ctx.tts_queue.clear = AsyncMock()
         await h._on_candidate_barge_in()
-        assert h._stream_epoch == 2
-        assert h._playback_generation == 4
-        assert h._awaiting_playback_gen == 4
-        assert h.turn_state == TurnState.USER_SPEAKING
-        h._tts_queue.clear.assert_awaited()
+        assert h.ctx.stream_epoch == 2
+        assert h.ctx.playback_generation == 4
+        assert h.ctx.awaiting_playback_gen == 4
+        assert h.ctx.turn_state == TurnState.USER_SPEAKING
+        h.ctx.tts_queue.clear.assert_awaited()
         sent = [c.args[0] for c in h.ws.send_json.call_args_list]
         assert any(e.get("type") == "tts_interrupted" for e in sent)
         interrupted = next(e for e in sent if e.get("type") == "tts_interrupted")
@@ -89,13 +89,13 @@ class TestBargeEpoch:
     @pytest.mark.asyncio
     async def test_stream_returns_none_after_barge_epoch(self) -> None:
         h = _make_handler()
-        h._stream_epoch = 5
-        h._tts_queue.enqueue = AsyncMock()
-        h._tts_queue.flush_remainder = AsyncMock()
+        h.ctx.stream_epoch = 5
+        h.ctx.tts_queue.enqueue = AsyncMock()
+        h.ctx.tts_queue.flush_remainder = AsyncMock()
 
         async def events():
             # 模拟流中途被 barge：推进 epoch
-            h._stream_epoch += 1
+            h.ctx.stream_epoch += 1
             yield StreamEvent(
                 kind=EventKind.TOKEN,
                 token="你好",
@@ -109,18 +109,18 @@ class TestBargeEpoch:
 
         last = await h._stream_events_with_tts(events(), auto_hint=False)
         assert last is None
-        h._tts_queue.enqueue.assert_not_awaited()
+        h.ctx.tts_queue.enqueue.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_process_user_text_skips_open_mic_after_barge(self) -> None:
         h = _make_handler()
-        h.runner = MagicMock()
+        h.ctx.runner = MagicMock()
         h._open_mic_after_playback = AsyncMock()
-        start_epoch = h._stream_epoch
+        start_epoch = h.ctx.stream_epoch
 
         async def fake_stream(*_a, **_k):
-            h._stream_epoch = start_epoch + 1
-            h.turn_state = TurnState.USER_SPEAKING
+            h.ctx.stream_epoch = start_epoch + 1
+            h.ctx.turn_state = TurnState.USER_SPEAKING
             return None
 
         h._stream_events_with_tts = fake_stream  # type: ignore[method-assign]
@@ -131,13 +131,13 @@ class TestBargeEpoch:
     @pytest.mark.asyncio
     async def test_open_mic_aborts_when_epoch_changed(self) -> None:
         h = _make_handler()
-        h._tts_sent_this_turn = False
-        h.turn_state = TurnState.AI_SPEAKING
-        epoch = h._stream_epoch
+        h.ctx.tts_sent_this_turn = False
+        h.ctx.turn_state = TurnState.AI_SPEAKING
+        epoch = h.ctx.stream_epoch
 
         async def wait_then_barge():
-            h._stream_epoch = epoch + 1
-            h.turn_state = TurnState.USER_SPEAKING
+            h.ctx.stream_epoch = epoch + 1
+            h.ctx.turn_state = TurnState.USER_SPEAKING
 
         h._wait_client_playback = wait_then_barge  # type: ignore[method-assign]
         h.set_turn = AsyncMock()
@@ -149,12 +149,12 @@ class TestSttAlwaysRuns:
     @pytest.mark.asyncio
     async def test_asr_always_called_for_pcm(self) -> None:
         h = _make_handler()
-        h.turn_state = TurnState.USER_SPEAKING
-        h.agent = None
-        h.llm = MagicMock(api_base="https://api.openai.com/v1", api_key="sk-t")
-        h._stt_creds = SttCredentials(
+        h.ctx.turn_state = TurnState.USER_SPEAKING
+        h.ctx.agent = None
+        h.ctx.llm = MagicMock(api_base="https://api.openai.com/v1", api_key="sk-t")
+        h.ctx.stt_creds = SttCredentials(
             provider="openai_compat",
-            api_base=h.llm.api_base,
+            api_base=h.ctx.llm.api_base,
             api_key="sk-stt",
             model="whisper-1",
         )
@@ -179,12 +179,12 @@ class TestSttAlwaysRuns:
     @pytest.mark.asyncio
     async def test_asr_preferred_for_english_mix(self) -> None:
         h = _make_handler()
-        h.turn_state = TurnState.USER_SPEAKING
-        h.agent = None
-        h.llm = MagicMock(api_base="https://api.openai.com/v1", api_key="sk-t")
-        h._stt_creds = SttCredentials(
+        h.ctx.turn_state = TurnState.USER_SPEAKING
+        h.ctx.agent = None
+        h.ctx.llm = MagicMock(api_base="https://api.openai.com/v1", api_key="sk-t")
+        h.ctx.stt_creds = SttCredentials(
             provider="openai_compat",
-            api_base=h.llm.api_base,
+            api_base=h.ctx.llm.api_base,
             api_key="sk-stt",
             model="whisper-1",
         )

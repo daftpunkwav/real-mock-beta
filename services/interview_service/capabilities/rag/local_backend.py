@@ -6,8 +6,8 @@
 实现要点：
 
 - 持久化目录 ``services/shared/data/chroma``（与
-  :data:`shared.capabilities.knowledge.rag.company_rag.COLLECTION_NAME` 一致）；
-- 文档切片策略沿用 :func:`shared.capabilities.knowledge.rag.company_rag._build_documents`；
+  :data:`interview_service.capabilities.rag.company_rag.COLLECTION_NAME` 一致）；
+- 文档切片策略沿用 :func:`interview_service.capabilities.rag.company_rag._build_documents`；
 - 嵌入调用走 :meth:`shared.capabilities.ai.llm.client.LLMClient.embed`,
   后者已支持独立 ``LLM_EMBEDDINGS_*`` 配置。
 """
@@ -19,7 +19,7 @@ from typing import Any
 
 from shared.config import Settings
 from shared.core.constants import RAGBackendKind
-from shared.capabilities.knowledge.rag._kb_data import COLLECTION_NAME, _build_documents, _data_dir
+from interview_service.capabilities.rag._kb_data import COLLECTION_NAME, _build_documents, _data_dir
 from shared.capabilities.ai.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)

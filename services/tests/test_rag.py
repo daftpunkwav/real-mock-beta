@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from shared.capabilities.knowledge.rag.company_rag import (
+from interview_service.capabilities.rag.company_rag import (
     CompanyKnowledgeRAG,
     _build_documents,
     format_context,
@@ -24,7 +24,7 @@ def rag(tmp_path: Path, monkeypatch) -> CompanyKnowledgeRAG:
     """为每个测试提供独立的 chroma 目录 + collection name 的 RAG 实例。"""
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
     # 改写 _data_dir，使 chroma 持久化到临时目录
-    from shared.capabilities.knowledge.rag import company_rag
+    from interview_service.capabilities.rag import company_rag
 
     monkeypatch.setattr(
         company_rag, "_data_dir", lambda: tmp_path / "chroma"

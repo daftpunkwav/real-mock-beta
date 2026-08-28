@@ -20,9 +20,7 @@ from typing import Any
 from fastapi import WebSocket
 from sqlalchemy.orm import Session
 
-from interview_service.agents.orchestrator import InterviewOrchestrator
-from shared.config import get_settings
-from interview_service.models import InterviewSession
+from interview_service.realtime.context import ConnectionContext
 from interview_service.realtime.connection_lifecycle import ConnectionLifecycleMixin
 from interview_service.realtime.events import TurnState
 from interview_service.realtime.hint_service import HintServiceMixin
@@ -47,12 +45,12 @@ from interview_service.realtime.voice_pipeline import (
     _pick_stt_text,
     _should_skip_whisper,
 )
-from interview_service.services.interview.agent import InterviewAgent, strip_markers
-from interview_service.services.interview.runner import InterviewRunner
-from shared.capabilities.ai.llm.client import LLMClient
+from interview_service.models import InterviewSession
+from interview_service.services.interview.agent import strip_markers
 from shared.capabilities.voice.stt import SttCredentials, SttResult, transcribe_utterance  # noqa: F401
 from shared.capabilities.voice.tts import TtsCredentials, synthesize_speech  # noqa: F401 — 测试 patch
 from shared.capabilities.voice.tts.voice_resolve import VoiceProsody
+from shared.config import get_settings
 
 
 logger = logging.getLogger(__name__)
@@ -83,79 +81,67 @@ class InterviewWSHandler(
         access_token: str | None = None,
         ws_subprotocol: str | None = None,
     ) -> None:
-        self.ws = websocket
-        self.session_id = session_id
-        self._client_access_token = (access_token or "").strip()
-        self._ws_subprotocol = ws_subprotocol
-        self.turn_state = TurnState.IDLE
-        self.orchestrator = InterviewOrchestrator()
-        self.audio_buffer: list[str] = []
-        self._audio_buffer_bytes = 0
-        self.agent: InterviewAgent | None = None
-        self.llm: LLMClient | None = None
-        self.runner: InterviewRunner | None = None
-        self.tts_voice = settings.tts_voice
-        self._session_prosody: VoiceProsody = VoiceProsody(voice=settings.tts_voice)
-        self._whisper_model = settings.whisper_model
-        self._stt_creds: SttCredentials = SttCredentials(provider="local", model="base")
-        self._tts_creds: TtsCredentials = TtsCredentials(handler="edge")
-        self._tts_queue = _SentenceTTSQueue()
-        self._superseded = False
-        self._last_nudge_at: float = 0.0
-        self._stt_fail_streak: int = 0
-        self._nudge_cooldown_sec: float = float(
-            max(5, int(getattr(settings, "silence_nudge_seconds", 25) or 25))
+        self.ctx = ConnectionContext(
+            ws=websocket,
+            session_id=session_id,
+            client_access_token=(access_token or "").strip(),
+            ws_subprotocol=ws_subprotocol,
+            tts_voice=settings.tts_voice,
+            session_prosody=VoiceProsody(voice=settings.tts_voice),
+            whisper_model=settings.whisper_model,
+            nudge_cooldown_sec=float(max(5, int(getattr(settings, "silence_nudge_seconds", 25) or 25))),
+            tts_queue=_SentenceTTSQueue(),
         )
-        self._mic_opened_at: float = 0.0
-        self._nudge_grace_sec: float = 15.0
-        self._playback_done = asyncio.Event()
-        self._tts_sent_this_turn = False
-        self._playback_wait_timeout_sec: float = 45.0
-        self._playback_generation: int = 0
-        self._awaiting_playback_gen: int = 0
-        self._closing: bool = False
-        self._turn_busy: bool = False
-        self._busy_epoch: int = 0
-        self._hint_inflight: str | None = None
-        self._report_task: asyncio.Task | None = None
-        self._stream_epoch: int = 0
-        self._tts_soft_idx: int = 0
-        self._candidate_interrupts: int = 0
-        self._ai_interrupts: int = 0
-        self._bg_tasks: set[asyncio.Task[Any]] = set()
+
+    # ── SessionConnection 协议委托属性 ──────────────
+    @property
+    def session_id(self) -> int:
+        return self.ctx.session_id
+
+    @property
+    def ws(self) -> WebSocket:
+        return self.ctx.ws
+
+    @property
+    def _superseded(self) -> bool:
+        return self.ctx.superseded
+
+    @_superseded.setter
+    def _superseded(self, value: bool) -> None:
+        self.ctx.superseded = value
 
     def _spawn(self, coro) -> asyncio.Task[Any]:
         """创建后台任务并登记，完成后自动从集合移除。"""
         task = asyncio.create_task(coro)
-        self._bg_tasks.add(task)
+        self.ctx.bg_tasks.add(task)
 
         def _done(t: asyncio.Task[Any]) -> None:
-            self._bg_tasks.discard(t)
+            self.ctx.bg_tasks.discard(t)
             if t.cancelled():
                 return
             exc = t.exception()
             if exc is not None:
-                logger.exception("WS 后台任务异常 sid=%s: %s", self.session_id, exc)
+                logger.exception("WS 后台任务异常 sid=%s: %s", self.ctx.session_id, exc)
 
         task.add_done_callback(_done)
         return task
 
     async def _cancel_bg_tasks(self) -> None:
         """取消并等待所有后台任务（含报告）。"""
-        tasks = list(self._bg_tasks)
-        if self._report_task is not None and not self._report_task.done():
-            tasks.append(self._report_task)
+        tasks = list(self.ctx.bg_tasks)
+        if self.ctx.report_task is not None and not self.ctx.report_task.done():
+            tasks.append(self.ctx.report_task)
         for t in tasks:
             t.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
-        self._bg_tasks.clear()
-        self._report_task = None
+        self.ctx.bg_tasks.clear()
+        self.ctx.report_task = None
 
     def _load_session(self, db: Session) -> InterviewSession | None:
         return (
             db.query(InterviewSession)
-            .filter(InterviewSession.id == self.session_id)
+            .filter(InterviewSession.id == self.ctx.session_id)
             .first()
         )
 

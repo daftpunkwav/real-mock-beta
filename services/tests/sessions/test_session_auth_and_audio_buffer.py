@@ -33,15 +33,15 @@ async def test_audio_chunk_uses_running_byte_total() -> None:
     raw = b"\x00\x01" * 100
     chunk = base64.b64encode(raw).decode("ascii")
     await handler._dispatch({"type": "audio_chunk", "data": chunk}, MagicMock(), MagicMock())
-    assert handler._audio_buffer_bytes == len(raw)
-    assert len(handler.audio_buffer) == 1
+    assert handler.ctx.audio_buffer_bytes == len(raw)
+    assert len(handler.ctx.audio_buffer) == 1
 
     # 再追加不应全量重算（字节应累加）
     await handler._dispatch({"type": "audio_chunk", "data": chunk}, MagicMock(), MagicMock())
-    assert handler._audio_buffer_bytes == len(raw) * 2
+    assert handler.ctx.audio_buffer_bytes == len(raw) * 2
 
     # 超限清空
-    handler._audio_buffer_bytes = _AUDIO_BUFFER_MAX_BYTES
+    handler.ctx.audio_buffer_bytes = _AUDIO_BUFFER_MAX_BYTES
     await handler._dispatch({"type": "audio_chunk", "data": chunk}, MagicMock(), MagicMock())
-    assert handler.audio_buffer == []
-    assert handler._audio_buffer_bytes == 0
+    assert handler.ctx.audio_buffer == []
+    assert handler.ctx.audio_buffer_bytes == 0

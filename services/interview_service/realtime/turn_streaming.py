@@ -16,32 +16,22 @@ from shared.capabilities.voice.tts.edge import (
     should_flush_sentence_buffer,
 )
 
+if TYPE_CHECKING:
+    from interview_service.realtime.context import ConnectionContext
+
 logger = logging.getLogger(__name__)
 
 _IMAGE_BASE64_MAX_LEN: int = 300_000
 
 
 class TurnStreamingMixin:
-    """依赖宿主提供 runner/orchestrator/tts/_spawn/send/_stream_epoch 等。"""
+    """回合流式消费；依赖 ctx.runner/orchestrator/tts_queue/stream_epoch 等。"""
 
-    if TYPE_CHECKING:
-        # 宿主字段契约（mypy 可见，运行时跳过）：由 InterviewWSHandler.__init__ 注入
-        session_id: int
-        runner: Any
-        orchestrator: Any
-        _stream_epoch: int
-        _tts_soft_idx: int
-        _awaiting_playback_gen: int
-        _tts_queue: Any
-
-        async def send(self, msg_type: str, **payload: Any) -> None: ...
-        def _spawn(self, coro) -> Any: ...
-        def _begin_playback_wait(self) -> None: ...
-        async def _on_request_hint(self, data: dict[str, Any]) -> None: ...
+    ctx: "ConnectionContext"
 
     async def _consume_runner_opening(self, db: Session):
-        assert self.runner is not None
-        async for event in self.runner.stream_opening(db):
+        assert self.ctx.runner is not None
+        async for event in self.ctx.runner.stream_opening(db):
             yield event
 
     async def _consume_runner_turn(
@@ -50,21 +40,20 @@ class TurnStreamingMixin:
         data: dict[str, Any],
         db: Session,
     ):
-        assert self.runner is not None
-        face = data.get("face_analysis") or self.orchestrator.snapshot.face_analysis
+        assert self.ctx.runner is not None
+        face = data.get("face_analysis") or self.ctx.orchestrator.snapshot.face_analysis
         image_b64 = data.get("image_base64")
-        # 与 HTTP 一致：超大 base64 会撑爆内存/LLM 账单，丢弃图像并记日志
         if isinstance(image_b64, str) and len(image_b64) > _IMAGE_BASE64_MAX_LEN:
             logger.warning(
                 "WS image_base64 超限 sid=%s len=%d，已丢弃",
-                self.session_id,
+                self.ctx.session_id,
                 len(image_b64),
             )
             image_b64 = None
-        self.orchestrator.snapshot.last_user_text = text
-        self.orchestrator.snapshot.merge_face(face)
+        self.ctx.orchestrator.snapshot.last_user_text = text
+        self.ctx.orchestrator.snapshot.merge_face(face)
 
-        async for event in self.runner.stream_turn(
+        async for event in self.ctx.runner.stream_turn(
             text,
             db,
             face=face,
@@ -86,30 +75,28 @@ class TurnStreamingMixin:
         think_filter = ThinkStreamFilter()
         last: StreamEvent | None = None
         turn_emotion = "neutral"
-        epoch = self._stream_epoch
-        soft_min, self._tts_soft_idx = next_soft_min(self._tts_soft_idx)
+        epoch = self.ctx.stream_epoch
+        soft_min, self.ctx.tts_soft_idx = next_soft_min(self.ctx.tts_soft_idx)
         async for event in events:
-            if epoch != self._stream_epoch:
-                # 候选人打断：停止消费本轮 LLM/TTS
+            if epoch != self.ctx.stream_epoch:
                 return None
             if event.kind == EventKind.TOKEN:
                 visible = think_filter.feed(event.token or "")
                 if visible:
                     await self.send("assistant_token", token=visible)
                     sentence_buf += visible
-                    # 同步捕获句内情绪标记供后续句子使用
                     if "[emotion:" in visible:
                         turn_emotion = extract_emotion(sentence_buf) or turn_emotion
                     if should_flush_sentence_buffer(sentence_buf, soft_min=soft_min):
-                        if epoch != self._stream_epoch:
+                        if epoch != self.ctx.stream_epoch:
                             return None
-                        await self._tts_queue.enqueue(
+                        await self.ctx.tts_queue.enqueue(
                             sentence_buf, emotion=turn_emotion
                         )
                         sentence_buf = ""
-                        soft_min, self._tts_soft_idx = next_soft_min(self._tts_soft_idx)
+                        soft_min, self.ctx.tts_soft_idx = next_soft_min(self.ctx.tts_soft_idx)
             elif event.kind == EventKind.TURN_COMPLETE:
-                if epoch != self._stream_epoch:
+                if epoch != self.ctx.stream_epoch:
                     return None
                 tail = think_filter.flush()
                 if tail:
@@ -124,28 +111,27 @@ class TurnStreamingMixin:
                     phase=event.phase_id,
                     is_complete=event.is_complete,
                     emotion=event.emotion,
-                    playback_generation=self._awaiting_playback_gen,
+                    playback_generation=self.ctx.awaiting_playback_gen,
                 )
                 if event.phase_id:
                     await self.send("phase_changed", phase=event.phase_id)
-                # 服务端自触发提纲，不依赖客户端往返（避免队头阻塞丢 hint）
                 if (
                     auto_hint
                     and not event.is_complete
                     and clean.strip()
                 ):
                     self._spawn(self._on_request_hint({"question": clean}))
-                if epoch != self._stream_epoch:
+                if epoch != self.ctx.stream_epoch:
                     return None
                 if sentence_buf.strip():
-                    await self._tts_queue.enqueue(
+                    await self.ctx.tts_queue.enqueue(
                         sentence_buf, emotion=turn_emotion
                     )
                     sentence_buf = ""
-                if epoch != self._stream_epoch:
+                if epoch != self.ctx.stream_epoch:
                     return None
-                await self._tts_queue.flush_remainder("", emotion=turn_emotion)
-                if epoch != self._stream_epoch:
+                await self.ctx.tts_queue.flush_remainder("", emotion=turn_emotion)
+                if epoch != self.ctx.stream_epoch:
                     return None
                 last = event
             elif event.kind == EventKind.ERROR:
@@ -156,6 +142,6 @@ class TurnStreamingMixin:
                     retryable=event.error_retryable,
                 )
                 last = event
-        if epoch != self._stream_epoch:
+        if epoch != self.ctx.stream_epoch:
             return None
         return last

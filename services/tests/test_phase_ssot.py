@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from shared.core.constants import InterviewPhaseId
+from interview_service.constants import InterviewPhaseId
 from interview_service.services.interview.workflows import WORKFLOWS, phase_label_map, technical_phase_order
 
 

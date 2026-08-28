@@ -46,17 +46,17 @@ def _make_handler() -> ws_handler.InterviewWSHandler:
     ws.send_json = AsyncMock()
     ws.receive_json = AsyncMock()
     h = ws_handler.InterviewWSHandler(ws, session_id=1)
-    h.llm = MagicMock()
-    h.llm.api_base = "https://api.openai.com/v1"
-    h.llm.api_key = "sk-test"
+    h.ctx.llm = MagicMock()
+    h.ctx.llm.api_base = "https://api.openai.com/v1"
+    h.ctx.llm.api_key = "sk-test"
 
-    h._stt_creds = SttCredentials(
+    h.ctx.stt_creds = SttCredentials(
         provider="openai_compat",
         api_base="https://api.openai.com/v1",
         api_key="sk-stt-only",
         model="whisper-1",
     )
-    h._whisper_model = "whisper-1"
+    h.ctx.whisper_model = "whisper-1"
     return h
 
 
@@ -64,8 +64,8 @@ class TestCloudSttPath:
     @pytest.mark.asyncio
     async def test_user_turn_uses_cloud_asr(self) -> None:
         h = _make_handler()
-        h.turn_state = TurnState.USER_SPEAKING
-        h.agent = None
+        h.ctx.turn_state = TurnState.USER_SPEAKING
+        h.ctx.agent = None
         h._process_user_text = AsyncMock()
         with patch(
             "interview_service.realtime.turn_coordinator.transcribe_utterance_result",
@@ -84,9 +84,9 @@ class TestCloudSttPath:
             mock_tr.assert_awaited()
             # 必须传入独立 creds，不得静默用思考 Key
             kwargs = mock_tr.await_args.kwargs
-            assert kwargs.get("creds") is h._stt_creds
-            assert h._stt_creds.api_key == "sk-stt-only"
-            assert h._stt_creds.api_key != h.llm.api_key
+            assert kwargs.get("creds") is h.ctx.stt_creds
+            assert h.ctx.stt_creds.api_key == "sk-stt-only"
+            assert h.ctx.stt_creds.api_key != h.ctx.llm.api_key
             args = h._process_user_text.await_args
             assert args.args[0] == "你好面试官都能听到的"
 

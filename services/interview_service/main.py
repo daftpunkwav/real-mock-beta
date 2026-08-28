@@ -23,7 +23,7 @@ async def _bootstrap() -> None:
 
 
 app = create_service_app(
-    service_router=service_router,
+    service_routers=service_router,
     title="Interview Service",
     description="RealMock 模拟面试域（面试引擎 / 实时对话 / 报告 / 成长）",
     service_name="interview-service",

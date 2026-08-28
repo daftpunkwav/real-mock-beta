@@ -248,26 +248,22 @@ class _SentenceTTSQueue:
 
 
 class VoicePipelineMixin:
-    """短句 TTS；依赖宿主 tts_voice / _session_prosody / _tts_creds / send。"""
+    """短句 TTS；依赖 ctx.tts_voice / ctx.session_prosody / ctx.tts_creds / send。"""
 
     if TYPE_CHECKING:
-        # 宿主字段契约（mypy 可见，运行时跳过）：由 InterviewWSHandler.__init__ 注入
-        tts_voice: str
-        _tts_creds: Any
+        from interview_service.realtime.context import ConnectionContext
 
-        async def send(self, msg_type: str, **payload: Any) -> None: ...
-        async def _tts_send(self, msg_type: str, **payload: Any) -> None: ...
-        def _mark_tts_sent(self) -> None: ...
+    ctx: "ConnectionContext"
 
     async def _speak_one(self, sentence: str) -> None:
         clean = _plain_text_for_tts(strip_markers(sentence))
         if not clean:
             return
-        base = getattr(self, "_session_prosody", None) or VoiceProsody(voice=self.tts_voice)
+        base = self.ctx.session_prosody or VoiceProsody(voice=self.ctx.tts_voice)
         emo = extract_emotion(sentence)
         p = with_emotion(base, emo)
         try:
-            tts_creds = getattr(self, "_tts_creds", None) or TtsCredentials(
+            tts_creds = self.ctx.tts_creds or TtsCredentials(
                 handler="edge", voice=p.voice
             )
             audio_b64 = await synthesize_speech(

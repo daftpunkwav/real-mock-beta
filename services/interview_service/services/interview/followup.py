@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from shared.core.constants import FollowupCategory
+from interview_service.constants import FollowupCategory
 
 
 # 中文模糊词（高频口语化弱化词）

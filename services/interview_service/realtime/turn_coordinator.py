@@ -16,6 +16,9 @@ from interview_service.realtime.turn_streaming import TurnStreamingMixin, _IMAGE
 from interview_service.realtime.voice_pipeline import _is_echo_of_assistant, _pick_stt_text
 from shared.capabilities.voice.stt import transcribe_utterance_result  # noqa: F401 — 测试 patch 目标
 
+if TYPE_CHECKING:
+    from interview_service.realtime.context import ConnectionContext
+
 logger = logging.getLogger(__name__)
 
 _AUDIO_BUFFER_MAX_BYTES: int = 5 * 1024 * 1024
@@ -30,57 +33,30 @@ __all__ = [
 class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
     """候选人回合入口；组合流式消费与打断/收尾副作用。"""
 
-    if TYPE_CHECKING:
-        # 宿主字段契约（mypy 可见，运行时跳过）：由 InterviewWSHandler.__init__ 注入
-        session_id: int
-        turn_state: TurnState
-        agent: Any
-        audio_buffer: list[str]
-        _audio_buffer_bytes: int
-        _closing: bool
-        _turn_busy: bool
-        _busy_epoch: int
-        _stream_epoch: int
-        _playback_generation: int
-        _awaiting_playback_gen: int
-        _playback_done: asyncio.Event
-        _playback_wait_timeout_sec: float
-        _tts_sent_this_turn: bool
-        _stt_creds: Any
-        _stt_fail_streak: int
-
-        async def send(self, msg_type: str, **payload: Any) -> None: ...
-        async def set_turn(self, state: TurnState) -> None: ...
-        def _load_session(self, db: Session) -> Any: ...
-        async def _process_user_text(
-            self, text: str, data: dict[str, Any], db: Session, session: InterviewSession
-        ) -> None: ...
+    ctx: "ConnectionContext"
 
     def _can_start_user_turn(self) -> bool:
         """是否允许启动新的候选人回合（含打断后接棒）。"""
-        if self._closing:
+        if self.ctx.closing:
             return False
-        if not self._turn_busy:
+        if not self.ctx.turn_busy:
             return True
-        # 旧回合已被 barge invalidate，允许新 user_turn_end 接棒
-        return self._busy_epoch != self._stream_epoch
+        return self.ctx.busy_epoch != self.ctx.stream_epoch
 
     def _begin_user_turn(self) -> int | None:
         """占用回合锁并绑定当前 epoch；不可启动时返回 None。"""
         if not self._can_start_user_turn():
             return None
-        epoch = self._stream_epoch
-        self._turn_busy = True
-        self._busy_epoch = epoch
+        epoch = self.ctx.stream_epoch
+        self.ctx.turn_busy = True
+        self.ctx.busy_epoch = epoch
         return epoch
 
     def _end_user_turn(self, epoch: int) -> None:
         """仅当仍是本回合占用时释放锁。"""
-        if self._busy_epoch == epoch:
-            self._turn_busy = False
+        if self.ctx.busy_epoch == epoch:
+            self.ctx.turn_busy = False
 
-    # ------------------------------------------------------------------
-    # 传输层工具
     async def _run_user_text(
         self,
         text: str,
@@ -98,9 +74,9 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
             await self.send("stt_final", text=text)
             await self._process_user_text(text, data, db, session)
         except Exception:
-            logger.exception("user_text 回合失败 sid=%s", self.session_id)
+            logger.exception("user_text 回合失败 sid=%s", self.ctx.session_id)
             try:
-                if epoch == self._stream_epoch:
+                if epoch == self.ctx.stream_epoch:
                     await self.set_turn(TurnState.USER_SPEAKING)
             except Exception:
                 pass
@@ -125,9 +101,9 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
                 return
             await self._on_user_turn_end(data, db, session)
         except Exception:
-            logger.exception("user_turn_end 失败 sid=%s", self.session_id)
+            logger.exception("user_turn_end 失败 sid=%s", self.ctx.session_id)
             try:
-                if epoch == self._stream_epoch:
+                if epoch == self.ctx.stream_epoch:
                     await self.set_turn(TurnState.USER_SPEAKING)
             except Exception:
                 pass
@@ -139,68 +115,63 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
                 pass
 
     def _mark_tts_sent(self) -> None:
-        self._tts_sent_this_turn = True
+        self.ctx.tts_sent_this_turn = True
 
     def _begin_playback_wait(self) -> None:
         """新回合开始：提升世代并清空完成信号。"""
-        self._playback_generation += 1
-        self._awaiting_playback_gen = self._playback_generation
-        self._tts_sent_this_turn = False
-        self._playback_done.clear()
+        self.ctx.playback_generation += 1
+        self.ctx.awaiting_playback_gen = self.ctx.playback_generation
+        self.ctx.tts_sent_this_turn = False
+        self.ctx.playback_done.clear()
 
     async def _wait_client_playback(self) -> None:
         """若本回合发过 TTS，则等待客户端 tts_playback_done（或超时）。"""
-        if not self._tts_sent_this_turn:
+        if not self.ctx.tts_sent_this_turn:
             return
-        wait_gen = self._awaiting_playback_gen
-        # 若客户端已提前播完并上报，则不再 clear，直接放行
-        if not self._playback_done.is_set():
+        wait_gen = self.ctx.awaiting_playback_gen
+        if not self.ctx.playback_done.is_set():
             try:
                 await asyncio.wait_for(
-                    self._playback_done.wait(),
-                    timeout=self._playback_wait_timeout_sec,
+                    self.ctx.playback_done.wait(),
+                    timeout=self.ctx.playback_wait_timeout_sec,
                 )
             except asyncio.TimeoutError:
                 logger.warning(
                     "tts_playback_done 超时 sid=%s gen=%s，继续",
-                    self.session_id,
+                    self.ctx.session_id,
                     wait_gen,
                 )
         await asyncio.sleep(0.15)
-        # 仅清理本世代等待，避免覆盖更新回合
-        if self._awaiting_playback_gen == wait_gen:
-            self._tts_sent_this_turn = False
-            self._playback_done.clear()
+        if self.ctx.awaiting_playback_gen == wait_gen:
+            self.ctx.tts_sent_this_turn = False
+            self.ctx.playback_done.clear()
 
     async def _open_mic_after_playback(self) -> None:
         """服务端合成发完后，等客户端播完（或超时）再切 USER_SPEAKING，防回采。"""
-        wait_epoch = self._stream_epoch
+        wait_epoch = self.ctx.stream_epoch
         await self._wait_client_playback()
-        # 打断后勿抢麦：epoch 已变或话轮已是候选人
-        if wait_epoch != self._stream_epoch:
+        if wait_epoch != self.ctx.stream_epoch:
             return
-        if self.turn_state == TurnState.USER_SPEAKING:
+        if self.ctx.turn_state == TurnState.USER_SPEAKING:
             return
         await self.set_turn(TurnState.USER_SPEAKING)
 
     async def _on_user_turn_end(
         self, data: dict[str, Any], db: Session, session: InterviewSession
     ) -> None:
-        if self.turn_state == TurnState.PROCESSING:
+        if self.ctx.turn_state == TurnState.PROCESSING:
             return
-        # AI 发言中拒绝提交，防止回采在打断前被当成候选人作答
-        if self.turn_state == TurnState.AI_SPEAKING:
-            logger.info("忽略 AI_SPEAKING 期间的 user_turn_end sid=%s", self.session_id)
+        if self.ctx.turn_state == TurnState.AI_SPEAKING:
+            logger.info("忽略 AI_SPEAKING 期间的 user_turn_end sid=%s", self.ctx.session_id)
             return
         await self.set_turn(TurnState.PROCESSING)
 
-        # 浏览器 STT 仅作预览；有 PCM 时始终跑云端 ASR（失败回退本地 Whisper）
         browser_text = (data.get("text") or "").strip()
         pcm_b64 = data.get("pcm") or data.get("data") or ""
         if isinstance(pcm_b64, str) and len(pcm_b64) > _AUDIO_BUFFER_MAX_BYTES:
             logger.warning(
                 "user_turn_end pcm 超限 sid=%s len=%d",
-                self.session_id,
+                self.ctx.session_id,
                 len(pcm_b64),
             )
             await self.send(
@@ -223,7 +194,7 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
             stt_result = await transcribe_utterance_result(
                 pcm_b64,
                 sample_rate=sample_rate,
-                creds=self._stt_creds,
+                creds=self.ctx.stt_creds,
             )
             asr_text = stt_result.text
             if stt_result.fallback:
@@ -241,10 +212,10 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
                     provider=stt_result.provider,
                     requested_provider=stt_result.requested_provider,
                 )
-        elif self.audio_buffer and not browser_text:
-            pcm = "".join(self.audio_buffer)
-            self.audio_buffer = []
-            self._audio_buffer_bytes = 0
+        elif self.ctx.audio_buffer and not browser_text:
+            pcm = "".join(self.ctx.audio_buffer)
+            self.ctx.audio_buffer = []
+            self.ctx.audio_buffer_bytes = 0
             if len(pcm) > _AUDIO_BUFFER_MAX_BYTES:
                 await self.send(
                     "error",
@@ -255,7 +226,7 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
                 return
             stt_result = await transcribe_utterance_result(
                 pcm,
-                creds=self._stt_creds,
+                creds=self.ctx.stt_creds,
             )
             asr_text = stt_result.text
             if stt_result.fallback:
@@ -265,17 +236,15 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
                     fallback=True,
                     provider=stt_result.provider,
                 )
-        elif self.audio_buffer:
-            # 已有浏览器文本时仍清空缓冲，避免下次串音
-            self.audio_buffer = []
-            self._audio_buffer_bytes = 0
+        elif self.ctx.audio_buffer:
+            self.ctx.audio_buffer = []
+            self.ctx.audio_buffer_bytes = 0
 
         text = _pick_stt_text(browser_text, asr_text)
         if text:
-            # 服务端兜底：丢弃与上一句面试官高度相似的回采
             last_assistant = ""
-            if self.agent and self.agent.messages:
-                for m in reversed(self.agent.messages):
+            if self.ctx.agent and self.ctx.agent.messages:
+                for m in reversed(self.ctx.agent.messages):
                     role = getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else None)
                     content = getattr(m, "content", None) or (
                         m.get("content") if isinstance(m, dict) else None
@@ -286,7 +255,7 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
             if last_assistant and _is_echo_of_assistant(text, last_assistant):
                 logger.warning(
                     "丢弃疑似回采 sid=%s text=%s",
-                    self.session_id,
+                    self.ctx.session_id,
                     text[:80],
                 )
                 await self.send(
@@ -299,7 +268,7 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
                 return
             await self.send("stt_final", text=text)
         else:
-            self._stt_fail_streak += 1
+            self.ctx.stt_fail_streak += 1
             await self.send(
                 "error",
                 message="未能识别语音内容，请重新说话或手动输入",
@@ -309,6 +278,5 @@ class TurnCoordinatorMixin(TurnStreamingMixin, TurnControlMixin):
             await self.set_turn(TurnState.USER_SPEAKING)
             return
 
-        self._stt_fail_streak = 0
+        self.ctx.stt_fail_streak = 0
         await self._process_user_text(text, data, db, session)
-

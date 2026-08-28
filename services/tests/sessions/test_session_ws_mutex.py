@@ -58,10 +58,10 @@ async def test_image_base64_oversize_dropped() -> None:
                 emotion="neutral",
             )
 
-    handler.runner = _Runner()
-    handler.orchestrator = MagicMock()
-    handler.orchestrator.snapshot.face_analysis = {}
-    handler.orchestrator.snapshot.merge_face = MagicMock()
+    handler.ctx.runner = _Runner()
+    handler.ctx.orchestrator = MagicMock()
+    handler.ctx.orchestrator.snapshot.face_analysis = {}
+    handler.ctx.orchestrator.snapshot.merge_face = MagicMock()
 
     huge = "A" * (_IMAGE_BASE64_MAX_LEN + 10)
     events = []

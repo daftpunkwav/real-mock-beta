@@ -1,7 +1,7 @@
 """面试流程 Workflow 定义（阶段元数据唯一数据源）。
 
 阶段 id / 中文名 / 描述 / 题量上下限只在本模块维护。
-``shared.core.constants.InterviewPhaseId`` 仅作 id 枚举与类型约束；
+``interview_service.constants.InterviewPhaseId`` 仅作 id 枚举与类型约束；
 前端展示文案应与本模块一致（由 options API 的 ``phase_labels`` 下发，
 ``frontend/src/config/phases.ts`` 作离线回退并由单测锁同步）。
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from shared.core.constants import InterviewPhaseId, WorkflowType
+from interview_service.constants import InterviewPhaseId, WorkflowType
 
 
 @dataclass(frozen=True)

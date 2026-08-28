@@ -18,11 +18,11 @@ import pytest
 from shared.config import Settings, get_settings
 from shared.core.constants import RAGBackendKind
 from shared.capabilities.ai.llm.client import LLMClient
-from shared.capabilities.knowledge.rag.base import RAGBackend
-from shared.capabilities.knowledge.rag.company_rag import CompanyKnowledgeRAG
-from shared.capabilities.knowledge.rag.factory import _NullRAG, build_rag_backend
-from shared.capabilities.knowledge.rag.local_backend import LocalEmbeddingRAG
-from shared.capabilities.knowledge.rag.stepfun_backend import (
+from interview_service.capabilities.rag.base import RAGBackend
+from interview_service.capabilities.rag.company_rag import CompanyKnowledgeRAG
+from interview_service.capabilities.rag.factory import _NullRAG, build_rag_backend
+from interview_service.capabilities.rag.local_backend import LocalEmbeddingRAG
+from interview_service.capabilities.rag.stepfun_backend import (
     StepFunRetrievalRAG,
     _serialize_documents_to_jsonl,
 )
@@ -71,7 +71,7 @@ def test_factory_returns_null_rag_when_disabled() -> None:
 
 def test_local_embedding_rag_satisfies_protocol(tmp_path, monkeypatch) -> None:
     """使用 tmp_path 隔离 Chroma 目录,验证 LocalEmbeddingRAG 满足 RAGBackend 协议。"""
-    from shared.capabilities.knowledge.rag import _kb_data, local_backend
+    from interview_service.capabilities.rag import _kb_data, local_backend
 
     # local_backend 从 _kb_data 绑定 _data_dir，两处都需 patch
     monkeypatch.setattr(_kb_data, "_data_dir", lambda: tmp_path / "chroma")
@@ -202,7 +202,7 @@ def test_stepfun_ensure_index_uses_configured_vector_store_id(monkeypatch) -> No
 
     # 聚焦 HTTP 序列：URL 校验放行（真实 DNS 在不同环境解析结果不同），
     # 且 make_pinned_async_client 内部会真实解析 DNS，需一并替换
-    from shared.capabilities.knowledge.rag import stepfun_backend as sb
+    from interview_service.capabilities.rag import stepfun_backend as sb
 
     monkeypatch.setattr(sb, "is_safe_http_url", lambda *a, **kw: True)
     monkeypatch.setattr(sb, "assert_safe_http_url", lambda *a, **kw: None)
@@ -269,7 +269,7 @@ def test_llm_client_embed_uses_dedicated_embeddings_base(monkeypatch) -> None:
             captured["url"] = url
             return _StubResp()
 
-    import shared.capabilities.ai.llm.client as llm_mod
+    import shared.capabilities.ai.llm.client.llm_client as llm_mod
 
     monkeypatch.setattr(llm_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
     # 重置 settings 缓存,让本次测试读到独立 embeddings base
@@ -318,7 +318,7 @@ def test_llm_client_embed_falls_back_to_chat_base_when_no_override(monkeypatch) 
             captured["url"] = url
             return _StubResp()
 
-    import shared.capabilities.ai.llm.client as llm_mod
+    import shared.capabilities.ai.llm.client.llm_client as llm_mod
 
     monkeypatch.setattr(llm_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
     monkeypatch.setattr(llm_mod, "is_safe_http_url", lambda *a, **kw: True)
@@ -428,7 +428,7 @@ def test_llm_client_embed_decrypt_failure_fails_closed(monkeypatch, tmp_path) ->
     import asyncio
 
 
-    import shared.capabilities.ai.llm.client as llm_mod
+    import shared.capabilities.ai.llm.client.llm_client as llm_mod
     from shared.core import secrets as secrets_mod
     from shared.core.secrets import encrypt_secret
 

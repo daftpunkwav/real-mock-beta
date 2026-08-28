@@ -28,7 +28,7 @@ async def ensure_rag_index() -> None:
     """
     try:
         from shared.capabilities.ai.llm.client import LLMClient
-        from shared.capabilities.knowledge.rag.company_rag import CompanyKnowledgeRAG
+        from interview_service.capabilities.rag.company_rag import CompanyKnowledgeRAG
 
         db = SessionLocal()
         try:

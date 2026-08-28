@@ -4,7 +4,7 @@
 llm=None 时降级为空 stub(测试场景)。显式委托方法,无 __getattr__ 魔法。
 
 纯数据/工具函数(_build_documents / _data_dir / format_context / COLLECTION_NAME)
-在 :mod:`shared.capabilities.knowledge.rag._kb_data`。
+在 :mod:`interview_service.capabilities.rag._kb_data`。
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from shared.capabilities.knowledge.rag._kb_data import COLLECTION_NAME, _build_documents, _data_dir, format_context
-from shared.capabilities.knowledge.rag.factory import build_rag_backend
+from interview_service.capabilities.rag._kb_data import COLLECTION_NAME, _build_documents, _data_dir, format_context
+from interview_service.capabilities.rag.factory import build_rag_backend
 
 logger = logging.getLogger(__name__)
 

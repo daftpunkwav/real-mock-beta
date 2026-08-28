@@ -53,7 +53,7 @@ class TestAudioBufferCap:
             db=MagicMock(),
             session=MagicMock(),
         )
-        assert len(handler.audio_buffer) == 1
+        assert len(handler.ctx.audio_buffer) == 1
 
     @pytest.mark.asyncio
     async def test_audio_buffer_overflow_clears(self) -> None:
@@ -72,7 +72,7 @@ class TestAudioBufferCap:
             session=MagicMock(),
         )
         # 超阈应当被清空并发 error
-        assert handler.audio_buffer == []
+        assert handler.ctx.audio_buffer == []
         # 至少一次 error 事件
         ws.send_json.assert_called()
         sent = [c.args[0] for c in ws.send_json.call_args_list]
@@ -124,7 +124,7 @@ class TestSetTurn:
         ws = _make_mock_ws()
         handler = InterviewWSHandler(ws, session_id=1)
         await handler.set_turn(TurnState.USER_SPEAKING)
-        assert handler.turn_state == TurnState.USER_SPEAKING
+        assert handler.ctx.turn_state == TurnState.USER_SPEAKING
         ws.send_json.assert_called_once_with(
             {"type": "turn_state", "state": "USER_SPEAKING"}
         )
@@ -198,8 +198,13 @@ class TestTraceId:
                     yield  # 空异步生成器
 
         monkeypatch.setattr(LLMClient, "from_db", classmethod(lambda cls, db: MagicMock(api_key="")))
-        monkeypatch.setattr(ws_mod, "InterviewOrchestrator", MagicMock())
-        monkeypatch.setattr(ws_mod, "InterviewRunner", lambda *a, **kw: _StubRunner())
+        monkeypatch.setattr(
+            "interview_service.realtime.context.InterviewOrchestrator", MagicMock()
+        )
+        monkeypatch.setattr(
+            "interview_service.realtime.connection_lifecycle.InterviewRunner",
+            lambda *a, **kw: _StubRunner(),
+        )
         # 模拟 db.query 拿到 session
         class _StubSession:
             id = 1

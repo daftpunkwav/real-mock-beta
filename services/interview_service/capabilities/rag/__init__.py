@@ -8,13 +8,13 @@
 - :func:`format_context` —— 命中片段 → 中文上下文片段（与具体后端无关）
 """
 
-from shared.capabilities.knowledge.rag.base import RAGBackend
-from shared.capabilities.knowledge.rag.company_rag import (
+from interview_service.capabilities.rag.base import RAGBackend
+from interview_service.capabilities.rag.company_rag import (
     COLLECTION_NAME,
     CompanyKnowledgeRAG,
     format_context,
 )
-from shared.capabilities.knowledge.rag.factory import build_rag_backend
+from interview_service.capabilities.rag.factory import build_rag_backend
 
 __all__ = [
     "RAGBackend",

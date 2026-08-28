@@ -22,7 +22,7 @@ from interview_service.services.interview.tools import (
 )
 from shared.capabilities.ai.llm.tool_args import parse_tool_arguments
 from shared.capabilities.ai.llm.client import LLMClient
-from shared.capabilities.knowledge.rag.company_rag import CompanyKnowledgeRAG, format_context as format_rag_context
+from interview_service.capabilities.rag.company_rag import CompanyKnowledgeRAG, format_context as format_rag_context
 
 logger = logging.getLogger(__name__)
 

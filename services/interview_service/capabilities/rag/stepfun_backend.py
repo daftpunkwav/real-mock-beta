@@ -45,7 +45,7 @@ from shared.core.security import (
     redact_api_key,
 )
 from shared.capabilities.ai.llm.client import LLMClient
-from shared.capabilities.knowledge.rag._kb_data import _build_documents
+from interview_service.capabilities.rag._kb_data import _build_documents
 
 logger = logging.getLogger(__name__)
 

@@ -12,30 +12,26 @@ from shared.database import SessionLocal
 from interview_service.models import InterviewSession
 from interview_service.services.interview.agent import strip_markers, strip_think_blocks
 
+if TYPE_CHECKING:
+    from interview_service.realtime.context import ConnectionContext
+
 logger = logging.getLogger(__name__)
 
 
 class HintServiceMixin:
-    """依赖宿主提供 session_id / llm / agent / send / _hint_inflight。"""
+    """参考提纲生成。依赖 ctx.session_id / ctx.llm / ctx.agent / ctx.hint_inflight / send。"""
+
+    ctx: ConnectionContext
 
     _HINT_TIMEOUT_SEC: float = 20.0
     _HINT_CTX_CHARS: int = 1200
-
-    if TYPE_CHECKING:
-        # 宿主字段契约（mypy 可见，运行时跳过）：由 InterviewWSHandler.__init__ 注入
-        session_id: int
-        llm: Any
-        agent: Any
-        _hint_inflight: str | None
-
-        async def send(self, msg_type: str, **payload: Any) -> None: ...
 
     async def _on_request_hint(self, data: dict[str, Any]) -> None:
         """使用独立 DB session，避免与主回合 ORM Session 竞态。"""
         question = strip_think_blocks((data.get("question") or "").strip())
         question = strip_markers(question)
         question = self._extract_hint_question(question)
-        if not question or not self.llm:
+        if not question or not self.ctx.llm:
             await self.send(
                 "reference_hint",
                 question=question or "",
@@ -43,15 +39,15 @@ class HintServiceMixin:
             )
             return
         key = question[:200]
-        if self._hint_inflight == key:
+        if self.ctx.hint_inflight == key:
             return
-        self._hint_inflight = key
+        self.ctx.hint_inflight = key
         hint_db = SessionLocal()
         try:
             await self.send("reference_hint_loading", question=question)
             session = (
                 hint_db.query(InterviewSession)
-                .filter(InterviewSession.id == self.session_id)
+                .filter(InterviewSession.id == self.ctx.session_id)
                 .first()
             )
             try:
@@ -60,18 +56,18 @@ class HintServiceMixin:
                     timeout=self._HINT_TIMEOUT_SEC,
                 )
             except asyncio.TimeoutError:
-                logger.warning("参考提纲超时 sid=%s", self.session_id)
+                logger.warning("参考提纲超时 sid=%s", self.ctx.session_id)
                 hint = "生成超时。可先按 STAR 结构自拟要点：情境 → 任务 → 行动 → 结果（尽量带量化）。"
             except Exception as e:
-                logger.warning("参考提纲异常 sid=%s: %s", self.session_id, e)
+                logger.warning("参考提纲异常 sid=%s: %s", self.ctx.session_id, e)
                 hint = "暂时无法生成参考回答，请根据你的实际经历组织语言。"
             hint = strip_markers(strip_think_blocks(hint or ""))
             if not hint.strip():
                 hint = "暂时无法生成参考回答，请根据你的实际经历组织语言。"
             await self.send("reference_hint", question=question, content=hint)
         finally:
-            if self._hint_inflight == key:
-                self._hint_inflight = None
+            if self.ctx.hint_inflight == key:
+                self.ctx.hint_inflight = None
             try:
                 hint_db.close()
             except Exception:
@@ -94,10 +90,10 @@ class HintServiceMixin:
     async def _generate_reference_hint(
         self, question: str, db: Session, session: InterviewSession | None
     ) -> str:
-        assert self.llm and self.agent
-        _ = db, session  # 预留：可按 session 拉简历片段；当前用 agent.messages
+        assert self.ctx.llm and self.ctx.agent
+        _ = db, session
         system_ctx = ""
-        for m in self.agent.messages:
+        for m in self.ctx.agent.messages:
             if m.get("role") == "system":
                 system_ctx = str(m.get("content", ""))[: self._HINT_CTX_CHARS]
                 break
@@ -121,11 +117,7 @@ class HintServiceMixin:
             },
         ]
         try:
-            return await self.llm.chat(messages, temperature=0.4, max_tokens=400)
+            return await self.ctx.llm.chat(messages, temperature=0.4, max_tokens=400)
         except Exception as e:
             logger.warning("参考提纲生成失败: %s", e)
             return "暂时无法生成参考回答，请根据你的实际经历组织语言。"
-
-    # ------------------------------------------------------------------
-    # 静默追问
-    # ------------------------------------------------------------------

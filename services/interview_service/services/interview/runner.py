@@ -33,7 +33,7 @@ from interview_service.services.interview.followup import analyze as analyze_fol
 from interview_service.services.interview.prompt_assembler import PromptAssembler
 from interview_service.services.interview.tool_round_runner import ToolRoundRunner
 from shared.capabilities.ai.llm.client import LLMClient
-from shared.capabilities.knowledge.rag.company_rag import CompanyKnowledgeRAG
+from interview_service.capabilities.rag.company_rag import CompanyKnowledgeRAG
 
 logger = logging.getLogger(__name__)
 

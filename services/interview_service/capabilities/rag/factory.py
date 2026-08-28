@@ -13,7 +13,7 @@ from typing import Any
 from shared.config import Settings
 from shared.core.constants import RAGBackendKind
 from shared.capabilities.ai.llm.client import LLMClient
-from shared.capabilities.knowledge.rag.base import RAGBackend
+from interview_service.capabilities.rag.base import RAGBackend
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +70,13 @@ def build_rag_backend(llm: LLMClient, settings: Settings) -> RAGBackend:
 
     if kind == RAGBackendKind.STEPFUN:
         # 延迟导入：避免 stepfun_backend 强依赖在未使用时也被加载。
-        from shared.capabilities.knowledge.rag.stepfun_backend import StepFunRetrievalRAG
+        from interview_service.capabilities.rag.stepfun_backend import StepFunRetrievalRAG
 
         logger.info("RAG 后端 = stepfun（StepFun 托管 vector_stores）")
         return StepFunRetrievalRAG(llm=llm, settings=settings)
 
     # 默认：本地 Chroma + OpenAI 兼容 /embeddings
-    from shared.capabilities.knowledge.rag.local_backend import LocalEmbeddingRAG
+    from interview_service.capabilities.rag.local_backend import LocalEmbeddingRAG
 
     logger.info("RAG 后端 = local（本地 Chroma + /embeddings）")
     return LocalEmbeddingRAG(llm=llm, settings=settings)
