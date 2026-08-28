@@ -10,3 +10,8 @@ This repository has a generated `openwiki/` evidence index. It is optional just-
 The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
 
 <!-- OPENWIKI:END -->
+
+## Commit 提交规范
+
+- 格式:`<type>(<scope>): <subject>`,如 `feat(auth): 新增登录接口`
+- type:feat / fix / refactor / chore / docs / test / perf
