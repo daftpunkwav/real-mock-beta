@@ -20,7 +20,7 @@ from interview_service.services.interview.tools import (
     execute_interview_tool,
     get_interview_tool_definitions,
 )
-from shared.capabilities.ai.llm.tool_args import parse_tool_arguments
+from shared.capabilities.ai.agent import run_agent_loop
 from shared.capabilities.ai.llm.client import LLMClient
 from interview_service.capabilities.rag.company_rag import CompanyKnowledgeRAG, format_context as format_rag_context
 
@@ -131,67 +131,34 @@ class ToolRoundRunner:
         if not tools:
             return api_messages, None
 
-        working = list(api_messages)
-        any_tool_used = False
-        for round_i in range(max_rounds):
-            try:
-                msg = await self.llm.chat_message(
-                    working,
-                    temperature=temperature,
-                    tools=tools,
-                )
-            except Exception as e:
-                logger.warning("工具轮次 LLM 失败 round=%s: %s", round_i, e)
-                break
+        async def execute(name: str, args: dict[str, Any]) -> str:
+            return await execute_interview_tool(
+                name,
+                args,
+                db=db,
+                resume_id=self.session.resume_id,
+                profile_id=self.session.profile_id,
+                agent_state=self.agent.agent_state,
+            )
 
-            tool_calls = msg.get("tool_calls") or []
-            if not tool_calls:
-                content = msg.get("content")
-                if content and not any_tool_used:
-                    # 首轮无工具：直接复用文本，避免二次请求
-                    return working, str(content)
-                break
-
-            any_tool_used = True
-            working.append({
-                "role": "assistant",
-                "content": msg.get("content"),
-                "tool_calls": tool_calls,
-            })
+        async def on_tool(name: str, args: dict[str, Any], result: str, tc_id: str) -> None:
+            del args, tc_id
             trace = self.agent.agent_state.setdefault("tool_trace", [])
-            for tc in tool_calls:
-                fn = tc.get("function") or {}
-                name = fn.get("name") or ""
-                args = parse_tool_arguments(fn.get("arguments"))
-                tc_id = tc.get("id") or f"call_{round_i}_{name}"
-                logger.info(
-                    "工具调用: session=%s round=%s tool=%s",
-                    self.session.id, round_i, name,
-                )
-                try:
-                    result = await execute_interview_tool(
-                        name,
-                        args,
-                        db=db,
-                        resume_id=self.session.resume_id,
-                        profile_id=self.session.profile_id,
-                        agent_state=self.agent.agent_state,
-                    )
-                    tool_ok = True
-                except Exception as tool_exc:
-                    result = f"工具执行失败: {tool_exc}"
-                    tool_ok = False
-                    logger.warning("工具执行异常 tool=%s: %s", name, tool_exc)
-                working.append({
-                    "role": "tool",
-                    "tool_call_id": tc_id,
-                    "content": result,
-                })
-                trace.append({"round": round_i, "tool": name, "ok": tool_ok})
+            trace.append({"tool": name, "ok": not result.startswith("工具执行失败")})
             if len(trace) > 40:
                 del trace[:-40]
+            logger.info("工具调用: session=%s tool=%s", self.session.id, name)
 
-        return working, None
+        loop = await run_agent_loop(
+            self.llm,
+            api_messages,
+            tools=tools,
+            execute=execute,
+            max_rounds=max_rounds,
+            temperature=temperature,
+            on_tool=on_tool,
+        )
+        return loop.messages, loop.final_content
 
 
 __all__ = ["ToolRoundRunner"]

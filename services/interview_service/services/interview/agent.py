@@ -37,6 +37,7 @@ from interview_service.services.interview.workflows import (
     InterviewPhase,
     get_workflow,
 )
+from shared.capabilities.ai.agent import WorkingMemory
 from shared.capabilities.ai.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -213,24 +214,10 @@ class InterviewAgent:
 
     def _memory_section(self) -> str:
         """结构化记忆摘要（压缩后仍可用）。"""
-        parts: list[str] = []
-        asked = self.agent_state.get("asked_questions") or []
-        if asked:
-            parts.append("已问问题摘要：\n- " + "\n- ".join(str(q)[:80] for q in asked[-12:]))
-        weak = self.agent_state.get("weak_points") or []
-        if weak:
-            parts.append("已知薄弱点：\n- " + "\n- ".join(str(w)[:80] for w in weak[-8:]))
-        findings = self.agent_state.get("github_findings") or []
-        if findings:
-            previews = []
-            for f in findings[-5:]:
-                if isinstance(f, dict):
-                    previews.append(f"{f.get('tool')}: {str(f.get('preview', ''))[:120]}")
-            if previews:
-                parts.append("GitHub 核验摘要：\n- " + "\n- ".join(previews))
-        if not parts:
+        text = WorkingMemory.from_state(self.agent_state).render()
+        if not text:
             return ""
-        return "\n\n## 会话结构化记忆（请勿重复已问问题）\n" + "\n".join(parts)
+        return "\n\n## 会话结构化记忆（请勿重复已问问题）\n" + text
 
     def build_opening_prompt(self, db: Session) -> str:
         """构建首回合系统提示。"""

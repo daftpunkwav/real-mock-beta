@@ -14,9 +14,12 @@ from shared.core.prompts import with_agent_output_rules
 from agent_service.models import PrepSession
 from shared.models import Resume
 from shared.capabilities.knowledge.company.knowledge import get_company_context
-from shared.capabilities.ai.context_manager import compress_messages, estimate_tokens
+from shared.capabilities.ai.agent import WorkingMemory, run_agent_loop
+from shared.capabilities.ai.context_manager import (
+    estimate_tokens,
+    prepare_llm_context,
+)
 from shared.capabilities.integrations.github.tools import GITHUB_TOOL_DEFINITIONS, execute_github_tool
-from shared.capabilities.ai.llm.tool_args import parse_tool_arguments
 from shared.capabilities.ai.llm.client import LLMClient
 from shared.capabilities.knowledge.search.web import SearchHit, web_search_with_hits
 
@@ -112,6 +115,7 @@ class PrepAgent:
         self.session = session
         self.llm = llm
         self._load_messages()
+        self.memory = WorkingMemory.load_from_messages(self.messages)
 
     def _load_messages(self) -> None:
         try:
@@ -140,12 +144,17 @@ class PrepAgent:
             {"role": "system", "content": f"{PREP_SYSTEM}\n\n{company}\n{ctx}"},
         ]
 
+    def _prepare_messages(self) -> list[dict[str, Any]]:
+        return prepare_llm_context(self.messages, 128000, memory=self.memory)
+
     async def _run_named_tool(
         self, name: str, args: dict[str, Any], db: Session
     ) -> tuple[str, list[SearchHit]]:
         """执行白名单工具；返回 ``(observation_text, search_hits)``。"""
         if name == "web_search":
             query = str(args.get("query", "") or "")
+            if query:
+                self.memory.remember("note", f"检索:{query}")
             text, hits = await asyncio.to_thread(
                 web_search_with_hits, query, _WEB_SEARCH_MAX_RESULTS
             )
@@ -154,103 +163,68 @@ class PrepAgent:
             company = str(args.get("company", "") or "")
             return await asyncio.to_thread(get_company_context, company), []
         if name == "quiz":
+            question = str(args.get("question", "") or "")
+            qtype = str(args.get("type", "open") or "open")
+            self.memory.remember("quiz", f"{qtype}:{question}")
             return (
-                f"已出题：{args.get('question', '')}（类型：{args.get('type', 'open')}）",
+                f"已记下练习题，请在正式回答中出题并等待用户作答：{question}（{qtype}）",
                 [],
             )
         if name in _PREP_GITHUB_NAMES:
             return await execute_github_tool(name, args), []
         return f"未知工具：{name}", []
 
-    async def _run_tool_call_safe(
-        self, tc: dict[str, Any], db: Session
-    ) -> tuple[str, dict[str, Any] | None, str]:
-        """返回 ``(observation, search_group, tool_call_id)``。"""
-        fn = tc.get("function") or {}
-        name = str(fn.get("name") or "")
-        args = parse_tool_arguments(fn.get("arguments"))
-        tc_id = str(tc.get("id") or f"call_{name}")
-        query = args.get("query") or args.get("company") or args.get("repo") or ""
-        header = f"[{name}] {query}".strip()
-        hits: list[SearchHit] = []
-        try:
-            obs, hits = await asyncio.wait_for(
-                self._run_named_tool(name, args, db),
-                timeout=_TOOL_TIMEOUT_SEC,
-            )
-        except asyncio.TimeoutError:
-            logger.warning("工具超时 %s (%.0fs)", name, _TOOL_TIMEOUT_SEC)
-            obs = (
-                "SEARCH_UNAVAILABLE\n"
-                f"搜索超时（>{_TOOL_TIMEOUT_SEC:.0f}s）。请勿编造结果；可基于通用知识继续。"
-            )
-        except Exception as e:
-            logger.warning("工具执行失败 %s: %s", name, e)
-            obs = f"执行失败：{e}"
-        group: dict[str, Any] | None = None
-        if name == "web_search" and hits:
-            group = {"query": str(query or ""), "results": hits}
-        return f"{header}\n{obs}", group, tc_id
-
     async def _run_tool_rounds(
         self, working: list[dict[str, Any]], db: Session
     ) -> tuple[list[dict[str, Any]], str | None, list[dict[str, Any]]]:
-        """非流式工具循环。
-
-        Returns:
-            (messages, early_content_or_None, search_groups)
-        """
+        """工具循环。返回 ``(messages, early_content_or_None, search_groups)``。"""
         search_groups: list[dict[str, Any]] = []
-        any_tool = False
-        for round_i in range(_MAX_TOOL_ROUNDS):
+
+        async def execute(name: str, args: dict[str, Any]) -> str:
+            query = args.get("query") or args.get("company") or args.get("repo") or ""
+            header = f"[{name}] {query}".strip()
             try:
-                msg = await self.llm.chat_message(
-                    working,
-                    temperature=0.7,
-                    tools=PREP_TOOL_DEFINITIONS,
+                obs, hits = await asyncio.wait_for(
+                    self._run_named_tool(name, args, db),
+                    timeout=_TOOL_TIMEOUT_SEC,
                 )
-            except Exception as e:
-                logger.warning("Prep 工具轮次失败 round=%s: %s", round_i, e)
-                break
+            except asyncio.TimeoutError:
+                logger.warning("工具超时 %s (%.0fs)", name, _TOOL_TIMEOUT_SEC)
+                obs = (
+                    "SEARCH_UNAVAILABLE\n"
+                    f"搜索超时（>{_TOOL_TIMEOUT_SEC:.0f}s）。请勿编造结果；可基于通用知识继续。"
+                )
+                hits = []
+            if name == "web_search" and hits:
+                search_groups.append({"query": str(query or ""), "results": hits})
+            if "SEARCH_UNAVAILABLE" in obs or "搜索暂时不可用" in obs:
+                obs += (
+                    "\n\n【系统约束】检索未成功。禁止编造「搜索到的结果」清单、链接或引用；"
+                    "请用通用知识继续辅导，并写明「基于通用知识整理，非实时搜索」。"
+                )
+            return f"{header}\n{obs}"
 
-            tool_calls = msg.get("tool_calls") or []
-            if not tool_calls:
-                content = msg.get("content")
-                if content and not any_tool:
-                    return working, str(content), search_groups
-                break
-
-            any_tool = True
-            limited = tool_calls[:_MAX_TOOLS_PER_ROUND]
-            working.append({
-                "role": "assistant",
-                "content": msg.get("content"),
-                "tool_calls": limited,
-            })
-            pairs = await asyncio.gather(
-                *[self._run_tool_call_safe(tc, db) for tc in limited]
+        try:
+            loop = await run_agent_loop(
+                self.llm,
+                working,
+                tools=PREP_TOOL_DEFINITIONS,
+                execute=execute,
+                max_rounds=_MAX_TOOL_ROUNDS,
+                max_tools_per_round=_MAX_TOOLS_PER_ROUND,
+                temperature=0.7,
             )
-            for obs, group, tc_id in pairs:
-                if group:
-                    search_groups.append(group)
-                if "SEARCH_UNAVAILABLE" in obs or "搜索暂时不可用" in obs:
-                    obs += (
-                        "\n\n【系统约束】检索未成功。禁止编造「搜索到的结果」清单、链接或引用；"
-                        "请用通用知识继续辅导，并写明「基于通用知识整理，非实时搜索」。"
-                    )
-                working.append({
-                    "role": "tool",
-                    "tool_call_id": tc_id,
-                    "content": obs,
-                })
-        return working, None, search_groups
+        except Exception as e:
+            logger.warning("Prep 工具轮次失败: %s", e)
+            return working, None, search_groups
+        return loop.messages, loop.final_content, search_groups
 
     async def chat(self, user_text: str, db: Session) -> str:
         self._ensure_system(db)
         self.messages.append({"role": "user", "content": user_text})
-        self.messages = compress_messages(self.messages, 128000)
+        working = self._prepare_messages()
 
-        working, early, _ = await self._run_tool_rounds(list(self.messages), db)
+        working, early, _ = await self._run_tool_rounds(working, db)
         if early:
             final = early
         else:
@@ -258,6 +232,9 @@ class PrepAgent:
 
         self.messages = working
         self.messages.append({"role": "assistant", "content": final})
+        if final:
+            self.memory.remember("asked", final)
+        self.messages = prepare_llm_context(self.messages, 128000, memory=self.memory)
         self.session.token_usage = sum(
             estimate_tokens(str(m.get("content", ""))) for m in self.messages
         )
@@ -273,13 +250,13 @@ class PrepAgent:
         """
         self._ensure_system(db)
         self.messages.append({"role": "user", "content": user_text})
-        self.messages = compress_messages(self.messages, 128000)
+        working = self._prepare_messages()
 
         yield "正在分析问题…\n\n"
         await asyncio.sleep(0)
 
         working, early, search_groups = await self._run_tool_rounds(
-            list(self.messages), db
+            working, db
         )
         if search_groups:
             yield {"type": "search_results", "groups": search_groups}
@@ -297,6 +274,9 @@ class PrepAgent:
 
         self.messages = working
         self.messages.append({"role": "assistant", "content": content_buf})
+        if content_buf:
+            self.memory.remember("asked", content_buf)
+        self.messages = prepare_llm_context(self.messages, 128000, memory=self.memory)
         self.session.token_usage = sum(
             estimate_tokens(str(m.get("content", ""))) for m in self.messages
         )

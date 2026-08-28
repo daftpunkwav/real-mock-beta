@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from interview_service.models import InterviewSession
+from shared.capabilities.ai.agent import WorkingMemory
 from shared.capabilities.ai.context_manager import compress_messages
 from interview_service.services.interview.agent import InterviewAgent
 from shared.services.pipeline_config import get_stage_config_for_runtime
@@ -77,8 +78,10 @@ class PromptAssembler:
                 ],
             }
 
+        memory = WorkingMemory.from_state(self.agent.agent_state)
         if context_window:
-            compressed = compress_messages(messages, context_window)
+            compressed = compress_messages(messages, context_window, memory=memory)
+            self.agent.agent_state.update(memory.to_state_patch())
             if len(compressed) < len(messages):
                 logger.info(
                     "上下文压缩: session=%s %d->%d (budget=%d)",
