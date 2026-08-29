@@ -110,6 +110,13 @@ export default function SettingsPage() {
 
   const isCooling = (stage: StageKey) => (cooldownUntil[stage] || 0) > Date.now();
 
+  /** 失败 toast 的简短文案：超长或含 HTML（如网关 404 页面）时引导看详情区 */
+  const briefError = (m: string) => {
+    const one = (m || "").replace(/\s+/g, " ").trim();
+    if (!one || one.length > 80 || /<html|<body/i.test(one)) return "详情见测试结果区";
+    return one;
+  };
+
   const scrollToStage = (stage: StageKey) => {
     const el = document.getElementById(`stage-${stage}`);
     if (!el) return;
@@ -228,6 +235,10 @@ export default function SettingsPage() {
         const latency =
           typeof result.latency_ms === "number" ? ` · ${result.latency_ms} ms` : "";
         toast.success(`${STAGE_META[stage].title}测试成功${latency}`);
+      } else {
+        toast.error(
+          `${STAGE_META[stage].title}测试失败：${briefError(result.message)}`,
+        );
       }
       if (result.audio_base64 && stage === "speak") {
         try {
@@ -247,13 +258,15 @@ export default function SettingsPage() {
         }
       }
     } catch (e) {
+      const message = e instanceof Error ? e.message : "测试失败";
       setTestResults((prev) => ({
         ...prev,
         [stage]: {
           success: false,
-          message: e instanceof Error ? e.message : "测试失败",
+          message,
         },
       }));
+      toast.error(`${STAGE_META[stage].title}测试失败：${briefError(message)}`);
     } finally {
       // 无论成败都进入冷却，防止频繁点击触发过多真实 API 调用
       setCooldownUntil((prev) => ({ ...prev, [stage]: Date.now() + TEST_COOLDOWN_MS }));
