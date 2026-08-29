@@ -68,6 +68,9 @@ export function useInterviewRoom(sessionId: number) {
   const expectedPlaybackGenRef = useRef(0);
   const localBargeStopRef = useRef(false);
   const lastPlaybackDoneGenRef = useRef<number | null>(null);
+  /** 服务端下发的预计作答毫秒数（turn 协议 wait_seconds；0=未提供用默认） */
+  const waitMsRef = useRef(0);
+  const [lastSources, setLastSources] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const showOutlineRef = useRef(showOutline);
   const sendRef = useRef<(p: ClientEvent) => boolean>(() => false);
@@ -103,6 +106,7 @@ export function useInterviewRoom(sessionId: number) {
     setReferenceHint("");
     setHintLoading(false);
     setLastQuestion("");
+    setLastSources([]);
     setMessages([]);
     setCurrentPhase("");
     finishingRef.current = false;
@@ -281,7 +285,7 @@ export function useInterviewRoom(sessionId: number) {
       clear();
       silenceTimerRef.current = setTimeout(() => {
         sendRef.current({ type: "silence_timeout" });
-      }, silenceNudgeMs);
+      }, waitMsRef.current || silenceNudgeMs);
     };
     if (!micEnabled || Date.now() < sttFailUntil) {
       clear();
@@ -321,12 +325,18 @@ export function useInterviewRoom(sessionId: number) {
       setEmotion(msg.emotion || "neutral");
       setTokenUsage((t) => t + msg.content.length);
       lastAssistantTextRef.current = msg.content || "";
+      setLastSources(Array.isArray(msg.sources) ? msg.sources : []);
       if (typeof msg.playback_generation === "number") {
         playbackGenRef.current = msg.playback_generation;
         expectedPlaybackGenRef.current = Math.max(
           expectedPlaybackGenRef.current,
           msg.playback_generation,
         );
+      }
+      // 服务端预计作答时长 → 静默计时器按题型个性化，替代固定间隔
+      if (typeof msg.wait_seconds === "number" && msg.wait_seconds > 0) {
+        waitMsRef.current = Math.min(120, Math.max(15, msg.wait_seconds)) * 1000;
+        bumpSilenceTimerRef.current();
       }
       if (!msg.is_complete) {
         requestHint(msg.content);
@@ -384,7 +394,9 @@ export function useInterviewRoom(sessionId: number) {
       );
     });
     on("silence_nudge", (msg) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: `[追问] ${msg.content}` }]);
+      // LLM 拟真追问按面试官正常发言展示（不再加提示性前缀）
+      setMessages((prev) => [...prev, { role: "assistant", content: msg.content }]);
+      lastAssistantTextRef.current = msg.content || "";
     });
     on("reference_hint_loading", () => setHintLoading(true));
     on("reference_hint", (msg) => {
@@ -558,6 +570,7 @@ export function useInterviewRoom(sessionId: number) {
     requestHint,
     hintLoading,
     referenceHint,
+    lastSources,
     tokenUsage,
   };
 }

@@ -50,6 +50,7 @@ export function InterviewRoomView({ room }: { room: InterviewRoomModel }) {
     requestHint,
     hintLoading,
     referenceHint,
+    lastSources,
     tokenUsage,
   } = room;
 
@@ -325,6 +326,23 @@ export function InterviewRoomView({ room }: { room: InterviewRoomModel }) {
             {!showOutline && (
               <p className="text-[11px] leading-relaxed text-ink-subtle">
                 参考提纲已隐藏 — 高难度模式,靠自己发挥
+              </p>
+            )}
+            {showOutline && lastSources.length > 0 && lastSources[0] !== "none" && (
+              <p className="mb-2 text-[11px] text-ink-subtle">
+                依据：
+                {lastSources
+                  .map((s) =>
+                    s === "resume"
+                      ? "简历"
+                      : s === "github"
+                        ? "GitHub"
+                        : s === "company_kb"
+                          ? "企业知识库"
+                          : null,
+                  )
+                  .filter(Boolean)
+                  .join("、")}
               </p>
             )}
             {showOutline && hintLoading && (

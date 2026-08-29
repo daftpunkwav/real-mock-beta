@@ -130,6 +130,10 @@ export type ServerEvent =
       is_complete: boolean;
       audio_b64?: string;
       playback_generation?: number;
+      /** 预计候选人作答秒数（turn 协议；0/缺省=未提供） */
+      wait_seconds?: number;
+      /** 本轮作答依据：resume | github | company_kb | none */
+      sources?: string[];
     }
   | { type: "stt_partial"; text: string }
   | { type: "stt_final"; text: string }
@@ -142,7 +146,7 @@ export type ServerEvent =
     }
   | { type: "tts_failed"; message: string }
   | { type: "tts_interrupted"; reason?: string; candidate_interrupts?: number; playback_generation?: number }
-  | { type: "silence_nudge"; content: string; ai_interrupts?: number }
+  | { type: "silence_nudge"; content: string; seq?: number; ai_interrupts?: number }
   | { type: "reference_hint_loading"; question: string }
   | { type: "reference_hint"; content: string; question: string }
   | { type: "phase_changed"; phase: string }
