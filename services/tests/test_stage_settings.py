@@ -211,3 +211,41 @@ def test_protocol_payloads_include_responses_output_limit_and_tool_shapes() -> N
     )
     assert anthropic_payload["messages"][0]["content"][0]["type"] == "tool_use"
     assert anthropic_payload["messages"][1]["content"][0]["type"] == "tool_result"
+
+
+def test_anthropic_payload_converts_openai_image_blocks() -> None:
+    """OpenAI 风格 image_url 块必须转为 Anthropic image block，否则网关 400。"""
+    client = UnifiedLLMClient(
+        "https://api.example.com/anthropic", "key", "model", "anthropic_messages", 123
+    )
+    _, payload = client._build_url_and_payload(
+        [
+            {"role": "user", "content": "纯文本保持不变"},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "描述图片"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/png;base64,QUJD"},
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "https://img.example.com/a.jpg"},
+                    },
+                ],
+            },
+        ]
+    )
+    first, second = payload["messages"]
+    assert first["content"] == "纯文本保持不变"
+    blocks = second["content"]
+    assert blocks[0] == {"type": "text", "text": "描述图片"}
+    assert blocks[1] == {
+        "type": "image",
+        "source": {"type": "base64", "media_type": "image/png", "data": "QUJD"},
+    }
+    assert blocks[2] == {
+        "type": "image",
+        "source": {"type": "url", "url": "https://img.example.com/a.jpg"},
+    }

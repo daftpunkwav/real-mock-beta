@@ -40,6 +40,40 @@ def _json_arguments(value: Any) -> str:
         return "{}"
 
 
+def _anthropic_content_blocks(content: Any) -> Any:
+    """把 OpenAI 风格的数组 content 转为 Anthropic content blocks。
+
+    内部消息采用 OpenAI 风格 ``image_url`` 图像块；Anthropic Messages API
+    只接受 ``text`` / ``image`` blocks，原样透传会被网关拒绝
+    （400 unsupported content type 'image_url'），此处统一转换。
+    """
+    if not isinstance(content, list):
+        return content or ""
+    blocks: list[dict[str, Any]] = []
+    for part in content:
+        if not isinstance(part, dict):
+            blocks.append({"type": "text", "text": str(part)})
+            continue
+        ptype = part.get("type")
+        if ptype == "image_url":
+            url = ((part.get("image_url") or {}).get("url")) or ""
+            if url.startswith("data:"):
+                header, _, data = url.partition(",")
+                media_type = header[5:].split(";", 1)[0] or "image/jpeg"
+                blocks.append({
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": data},
+                })
+            elif url:
+                blocks.append({"type": "image", "source": {"type": "url", "url": url}})
+            continue
+        if ptype == "text":
+            blocks.append({"type": "text", "text": str(part.get("text") or "")})
+            continue
+        blocks.append(part)
+    return blocks
+
+
 def _anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """将内部 OpenAI 风格消息转换为 Anthropic content blocks。"""
     converted: list[dict[str, Any]] = []
@@ -83,7 +117,10 @@ def _anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 )
             converted.append({"role": "assistant", "content": blocks})
             continue
-        converted.append({"role": role or "user", "content": message.get("content") or ""})
+        converted.append({
+            "role": role or "user",
+            "content": _anthropic_content_blocks(message.get("content")),
+        })
     return converted
 
 
