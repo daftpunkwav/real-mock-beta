@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import replace
@@ -28,6 +29,7 @@ from interview_service.services.interview.agent import (
     InterviewAgent,
     ThinkStreamFilter,
     strip_markers,
+    strip_think_blocks,
 )
 from interview_service.services.interview.events import EventKind, StreamEvent
 from interview_service.services.interview.followup import analyze as analyze_followup
@@ -73,6 +75,22 @@ class InterviewRunner:
     # ------------------------------------------------------------------
     # say-first 协议解析
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_complete_output(text: str) -> TurnOutput:
+        """非流式路径（工具轮 early 文本）的 say-first 解析与降级。
+
+        工具轮里模型直接给出文本回答时，正文同样遵循 say-first 协议；
+        整体解析失败时把原文当 say（与流式降级语义一致）。
+        """
+        visible = strip_think_blocks(text or "")
+        try:
+            parsed = json.loads(visible.strip())
+        except Exception:
+            return parse_turn_output(None, say_text=visible, degraded=True)
+        if isinstance(parsed, dict) and isinstance(parsed.get("say"), str):
+            return parse_turn_output(parsed, say_text=parsed["say"])
+        return parse_turn_output(None, say_text=visible, degraded=True)
 
     async def _stream_say_first(
         self,
@@ -136,8 +154,10 @@ class InterviewRunner:
 
             output: TurnOutput
             if early:
-                yield StreamEvent.make_token(early)
-                output = parse_turn_output(None, say_text=early, degraded=True)
+                # 工具轮文本回答同样遵循协议，先解析再下发
+                output = self._parse_complete_output(early)
+                if output.say:
+                    yield StreamEvent.make_token(output.say)
             else:
                 output = None
                 async for item in self._stream_say_first(opening_messages, temperature=0.8):
@@ -253,8 +273,9 @@ class InterviewRunner:
 
             output: TurnOutput
             if early:
-                yield StreamEvent.make_token(early)
-                output = parse_turn_output(None, say_text=early, degraded=True)
+                output = self._parse_complete_output(early)
+                if output.say:
+                    yield StreamEvent.make_token(output.say)
             else:
                 output = None
                 async for item in self._stream_say_first(api_messages, temperature=0.75):
