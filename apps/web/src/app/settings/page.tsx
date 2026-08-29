@@ -26,10 +26,13 @@ import {
 } from "lucide-react";
 import { LoadError } from "@/components/LoadError";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { toast } from "@/components/Toast";
 
 type StageKey = "recognize" | "reason" | "speak";
 
 const KEEP = "keep";
+/** 每次测试后的按钮冷却（毫秒）：防连点触发过多真实 API 调用 */
+const TEST_COOLDOWN_MS = 5_000;
 
 const EMPTY_STAGE = (stage: StageKey): StageConfig => ({
   stage,
@@ -94,6 +97,18 @@ export default function SettingsPage() {
   const [testResults, setTestResults] = useState<Partial<Record<StageKey, LLMTestResponse>>>({});
   const [messages, setMessages] = useState<Partial<Record<StageKey, string>>>({});
   const [showKey, setShowKey] = useState<Partial<Record<StageKey, boolean>>>({});
+  const [cooldownUntil, setCooldownUntil] = useState<Partial<Record<StageKey, number>>>({});
+  const [, tick] = useState(0);
+
+  // 存在未过期的冷却时低频刷新，让按钮恢复
+  const hasActiveCooldown = Object.values(cooldownUntil).some((t) => (t || 0) > Date.now());
+  useEffect(() => {
+    if (!hasActiveCooldown) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 500);
+    return () => window.clearInterval(id);
+  }, [hasActiveCooldown]);
+
+  const isCooling = (stage: StageKey) => (cooldownUntil[stage] || 0) > Date.now();
 
   const scrollToStage = (stage: StageKey) => {
     const el = document.getElementById(`stage-${stage}`);
@@ -203,11 +218,17 @@ export default function SettingsPage() {
   };
 
   const handleTest = async (stage: StageKey) => {
+    if (testing || isCooling(stage)) return;
     setTesting(stage);
     setMessages((m) => ({ ...m, [stage]: "" }));
     try {
       const result = await api.testPipelineStage(stage);
       setTestResults((prev) => ({ ...prev, [stage]: result }));
+      if (result.success) {
+        const latency =
+          typeof result.latency_ms === "number" ? ` · ${result.latency_ms} ms` : "";
+        toast.success(`${STAGE_META[stage].title}测试成功${latency}`);
+      }
       if (result.audio_base64 && stage === "speak") {
         try {
           const bin = atob(result.audio_base64);
@@ -234,6 +255,8 @@ export default function SettingsPage() {
         },
       }));
     } finally {
+      // 无论成败都进入冷却，防止频繁点击触发过多真实 API 调用
+      setCooldownUntil((prev) => ({ ...prev, [stage]: Date.now() + TEST_COOLDOWN_MS }));
       setTesting(null);
     }
   };
@@ -329,6 +352,7 @@ export default function SettingsPage() {
                 config={configs[stage]}
                 testing={testing === stage}
                 saving={saving === stage}
+                cooling={isCooling(stage)}
                 message={messages[stage] || ""}
                 showKey={showKey[stage] || false}
                 testResult={testResults[stage]}
@@ -354,6 +378,7 @@ function StageSection({
   config,
   testing,
   saving,
+  cooling,
   message,
   showKey,
   testResult,
@@ -368,6 +393,7 @@ function StageSection({
   config: StageConfig;
   testing: boolean;
   saving: boolean;
+  cooling: boolean;
   message: string;
   showKey: boolean;
   testResult?: LLMTestResponse;
@@ -409,7 +435,13 @@ function StageSection({
               {message}
             </span>
           )}
-          <button type="button" onClick={onTest} disabled={testing} className="btn-secondary">
+          <button
+            type="button"
+            onClick={onTest}
+            disabled={testing || cooling}
+            title={cooling ? "冷却中，防止频繁调用 API" : undefined}
+            className="btn-secondary"
+          >
             {testing ? (
               <span className="block h-3.5 w-3.5 anim-spin rounded-full border-2 border-current border-t-transparent" />
             ) : (

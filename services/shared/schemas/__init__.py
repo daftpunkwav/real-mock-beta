@@ -145,6 +145,7 @@ class LLMTestResponse(BaseModel):
     transcript: str | None = None
     audio_base64: str | None = None
     fallback: str | None = None
+    latency_ms: int | None = None
 
 
 class StageTestRequest(BaseModel):

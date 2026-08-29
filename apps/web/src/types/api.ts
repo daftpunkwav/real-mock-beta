@@ -116,6 +116,7 @@ export interface LLMTestResponse {
   transcript?: string | null;
   audio_base64?: string | null;
   fallback?: string | null;
+  latency_ms?: number | null;
 }
 
 /** 错误响应统一 envelope */

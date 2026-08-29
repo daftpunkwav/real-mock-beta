@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 from typing import Any
+import time
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -39,6 +40,14 @@ from shared.services.pipeline_config import (
     update_stage_config,
 )
 from api_service.services.stage_tests import test_recognize, test_reason, test_speak
+
+
+async def _timed(stage_test) -> dict:
+    """执行阶段测试并附带耗时（毫秒），供前端 toast 展示。"""
+    start = time.perf_counter()
+    result = await stage_test
+    result["latency_ms"] = int((time.perf_counter() - start) * 1000)
+    return result
 
 router = APIRouter(dependencies=[Depends(require_local_peer)])
 
@@ -248,13 +257,14 @@ def update_stage(
 )
 async def test_llm_connection(db: Session = Depends(get_db)):
     """DEPRECATED: 兼容旧入口：等同于测试「面试思考」阶段，客户端遵循 ``allow_local_llm``。将在 v2.0 移除。"""
-    result = await test_reason(db)
+    result = await _timed(test_reason(db))
     return LLMTestResponse(
         success=bool(result.get("success")),
         message=str(result.get("message") or ""),
         model=result.get("model"),
         transcript=result.get("transcript"),
         fallback=result.get("fallback"),
+        latency_ms=result.get("latency_ms"),
     )
 
 
@@ -267,11 +277,11 @@ async def test_pipeline_stage(stage: str, db: Session = Depends(get_db)):
     """三阶段连通性测试：recognize | reason | speak。"""
     stage = (stage or "").strip().lower()
     if stage == "recognize":
-        result = await test_recognize(db)
+        result = await _timed(test_recognize(db))
     elif stage in ("reason", "reasoning", "llm"):
-        result = await test_reason(db)
+        result = await _timed(test_reason(db))
     elif stage in ("speak", "tts"):
-        result = await test_speak(db)
+        result = await _timed(test_speak(db))
     else:
         raise_error("A4004")
 
@@ -282,4 +292,5 @@ async def test_pipeline_stage(stage: str, db: Session = Depends(get_db)):
         transcript=result.get("transcript"),
         audio_base64=result.get("audio_base64"),
         fallback=result.get("fallback"),
+        latency_ms=result.get("latency_ms"),
     )
