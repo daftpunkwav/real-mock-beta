@@ -166,9 +166,10 @@ class TestIsSafeHttpUrl:
             ("http://172.16.0.1", False, False),
             ("http://169.254.169.254/latest/meta-data", False, False),
             ("http://[::1]", False, False),
-            # 文档 / 基准网段（is_private=True，未列入显式黑名单，靠通用 is_private 拦截）
-            ("http://198.18.0.10", False, False),  # RFC 2544 基准测试段
-            ("http://198.18.0.10", True, False),  # allow_local=True 也不放行
+            # fake-ip 段：代理 TUN 接管 DNS 时公网域名被解析到该段，由代理转发至
+            # 真实目标，视为安全全局放行（allow_local 与否均一致）
+            ("http://198.18.0.10", False, True),  # RFC 2544 段 = fake-ip 段
+            ("http://198.18.0.10", True, True),
             ("http://192.0.2.1", False, False),  # TEST-NET-1
             ("http://198.51.100.1", False, False),  # TEST-NET-2
             ("http://203.0.113.1", False, False),  # TEST-NET-3

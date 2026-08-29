@@ -44,7 +44,8 @@ _LOOPBACK_NETS = (
 # 允许的对外端口：dev 模式可放行任意；生产期仅 HTTP/HTTPS。
 _DEFAULT_ALLOWED_PORTS = frozenset({80, 443})
 
-# 运行环境的 DNS 代理可能把部分国内公网服务解析到 198.18.0.0/15。
+# 198.18.0.0/15（RFC 2544 benchmark 保留段）：代理 TUN fake-ip 模式会把公网域名
+# 解析到该段，TCP 连接由代理接管转发至真实目标，并非真实内网，全局放行。
 _PROVIDER_NETWORKS = (ipaddress.ip_network("198.18.0.0/15"),)
 MIMO_TRUSTED_HOSTS = frozenset(
     {
@@ -96,9 +97,13 @@ def _ip_is_safe(ip: ipaddress._BaseAddress, *, allow_local: bool) -> bool:
     """单个解析结果是否允许出站。
 
     ``allow_local=True`` 仅额外放行 loopback；私网 / metadata 仍拒绝。
+    fake-ip 段（198.18.0.0/15）无条件放行，见 `_PROVIDER_NETWORKS` 注释。
     """
     if allow_local and _is_loopback_ip(ip):
         return True
+    for net in _PROVIDER_NETWORKS:
+        if ip in net:
+            return True
     for net in _DEFAULT_BLOCKED_NETS:
         if ip in net:
             return False
