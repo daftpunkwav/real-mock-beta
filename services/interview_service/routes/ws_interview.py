@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Query, WebSocket
 
-from shared.core.session_auth import extract_ws_token, ws_token_subprotocol
+from shared.core.session_auth import extract_ws_token
 from interview_service.realtime.ws_handler import InterviewWSHandler
 
 router = APIRouter()
@@ -17,8 +17,10 @@ async def interview_websocket(
     access, chosen_proto = extract_ws_token(
         websocket, session_id=session_id, query_token=token
     )
-    # 若客户端用 mock.<token> 子协议传令牌，握手必须回显该子协议
-    echo_proto = chosen_proto or (ws_token_subprotocol(access) if access else None)
+    # 仅回显客户端握手声明的 mock.<token> 子协议；cookie/query 提取的令牌不得
+    # 生成响应子协议——RFC 6455 要求响应子协议取自客户端请求列表，否则浏览器
+    # 直接拒绝握手（前端已改用 cookie 传令牌，此处不再主动构造）。
+    echo_proto = chosen_proto
     handler = InterviewWSHandler(
         websocket,
         session_id,
