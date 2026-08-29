@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[3]  # 仓库根
-_WS_HOOK = _ROOT / "apps" / "web" / "src" / "features" / "media" / "useInterviewWS.ts"
-_ROOM = _ROOT / "apps" / "web" / "src" / "app" / "interview" / "[id]" / "page.tsx"
+# 前端 0c14d0c 按域收口后，hook 从 features/media/ 移至 features/interview/hooks/
+_WS_HOOK = _ROOT / "apps" / "web" / "src" / "features" / "interview" / "hooks" / "useInterviewWS.ts"
+_ROOM = _ROOT / "apps" / "web" / "src" / "features" / "interview" / "hooks" / "useInterviewRoom.ts"
 
 
 def test_retry_now_uses_reconnect_key() -> None:
