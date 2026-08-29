@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { TalkingHeadAvatar } from "@/features/avatar/TalkingHeadAvatar";
-import { Flag, Send, WifiOff, Radio, Volume2, AlertTriangle } from "lucide-react";
+import { Flag, Send, WifiOff, Radio, Volume2, AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatBubble } from "./ChatBubble";
 import { VideoPanel } from "./VideoPanel";
@@ -47,6 +47,7 @@ export function InterviewRoomView({ room }: { room: InterviewRoomModel }) {
     showOutline,
     handleOutlineChange,
     lastQuestion,
+    requestHint,
     hintLoading,
     referenceHint,
     tokenUsage,
@@ -221,7 +222,7 @@ export function InterviewRoomView({ room }: { room: InterviewRoomModel }) {
       </header>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(0,1.8fr)] gap-2 p-2 min-h-0 overflow-hidden">
-        <div className="grid grid-rows-[minmax(140px,0.9fr)_minmax(180px,1.1fr)] lg:grid-rows-[1.2fr_1fr] gap-2 min-h-0 order-2 lg:order-1">
+        <div className="grid grid-rows-[minmax(140px,0.9fr)_minmax(180px,1.1fr)] lg:grid-rows-[1.618fr_1fr] gap-2 min-h-0 order-2 lg:order-1">
           <VideoPanel
             ref={videoRef}
             enabled
@@ -282,15 +283,29 @@ export function InterviewRoomView({ room }: { room: InterviewRoomModel }) {
           <div className="rounded-lg border border-surface-border bg-surface-card p-3.5 sm:p-4 overflow-y-auto flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-3 shrink-0 gap-2">
               <h3 className="text-[13px] font-medium text-ink">参考提纲</h3>
-              <label className="flex items-center gap-1.5 text-[11px] text-ink-muted cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="rounded border-surface-border bg-surface-card text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0"
-                  checked={showOutline}
-                  onChange={(e) => handleOutlineChange(e.target.checked)}
-                />
-                显示参考
-              </label>
+              <div className="flex items-center gap-2">
+                {showOutline && (
+                  <button
+                    type="button"
+                    onClick={() => requestHint(lastQuestion)}
+                    disabled={!lastQuestion || hintLoading}
+                    className="inline-flex items-center gap-1 rounded-full border border-surface-border px-2 py-0.5 text-[11px] text-ink-muted transition-colors hover:bg-surface-alt hover:text-ink disabled:opacity-40"
+                    title="根据面试官最近的问题重新生成参考回答"
+                  >
+                    <RefreshCw size={11} className={hintLoading ? "anim-spin" : ""} />
+                    重新生成
+                  </button>
+                )}
+                <label className="flex items-center gap-1.5 text-[11px] text-ink-muted cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="rounded border-surface-border bg-surface-card text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0"
+                    checked={showOutline}
+                    onChange={(e) => handleOutlineChange(e.target.checked)}
+                  />
+                  显示参考
+                </label>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-[11px] text-ink-muted mb-3 shrink-0">
               <div className="kpi-card !p-2.5">

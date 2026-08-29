@@ -494,8 +494,9 @@ export function useInterviewRoom(sessionId: number) {
   const handleOutlineChange = (checked: boolean) => {
     setShowOutline(checked);
     showOutlineRef.current = checked;
-    if (!checked) setReferenceHint("");
-    else if (lastQuestion) requestHint(lastQuestion);
+    // 关闭仅隐藏，保留已生成的参考答案；重新打开时直接展示缓存
+    if (!checked) return;
+    if (!referenceHint && lastQuestion) requestHint(lastQuestion);
   };
 
   const voiceStatus = micError
