@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { TalkingHeadAvatar } from "@/features/avatar/TalkingHeadAvatar";
+import { AvatarStage } from "@/features/avatar/AvatarStage";
 import { Flag, Send, WifiOff, Radio, Volume2, AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatBubble } from "./ChatBubble";
@@ -273,7 +273,7 @@ export function InterviewRoomView({ room }: { room: InterviewRoomModel }) {
         </div>
 
         <div className="grid grid-rows-[minmax(180px,1.4fr)_minmax(120px,0.85fr)] lg:grid-rows-[1.618fr_1fr] gap-2 min-h-0 order-1 lg:order-2">
-          <TalkingHeadAvatar
+          <AvatarStage
             avatarId={sessionMeta.avatar_id}
             sceneId={sessionMeta.scene_id}
             emotion={emotion}

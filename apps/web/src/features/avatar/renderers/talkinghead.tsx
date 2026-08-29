@@ -1,34 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { InterviewerAvatar } from "@/features/avatar/InterviewerAvatar";
-import { Loader2 } from "lucide-react";
-
-/** TalkingHead 内置 mood；传入其它值（如 serious）会在 showAvatar 内抛 Unknown mood */
-const VALID_MOODS = new Set([
-  "neutral",
-  "happy",
-  "angry",
-  "sad",
-  "fear",
-  "disgust",
-  "love",
-  "sleep",
-] as const);
-
-type TalkingMood = "neutral" | "happy" | "angry" | "sad" | "fear" | "disgust" | "love" | "sleep";
-
-function safeMood(mood: string | undefined, fallback: TalkingMood = "neutral"): TalkingMood {
-  if (mood && VALID_MOODS.has(mood as TalkingMood)) return mood as TalkingMood;
-  return fallback;
-}
+import { useEffect, useRef } from "react";
+import type { AvatarExpression, AvatarRendererDef, AvatarRendererProps } from "../contract";
 
 /**
- * 同源 GLB（见 public/avatars/）。
- * 男模：TalkingHead 示例 avatarsdk.glb（body M）；女模：brunette.glb。
- * mood 必须是 TalkingHead 内置名（无 serious），否则 showAvatar 会抛 Unknown mood。
+ * 3D 头像渲染通道：@met4citizen/talkinghead 适配器。
+ *
+ * 本文件是唯一允许 import 该库的边界；表情（expression）→ 库内 mood +
+ * morph 的映射、音色光照等资产定制全部收拢在此。替换渲染通道时只替换
+ * renderers/ 下的适配器，调用方零改动。
  */
-const AVATAR_URLS: Record<
+
+/** 同源 GLB 资产与该通道的渲染定制（基线姿态/光照/默认心境）。 */
+const AVATAR_ASSETS: Record<
   string,
   {
     url: string;
@@ -115,39 +99,35 @@ const AVATAR_URLS: Record<
   },
 };
 
-/** 预取当前人像 GLB，缩短进房等待 */
-export function prefetchAvatarGlb(avatarId: string): void {
-  if (typeof window === "undefined") return;
-  const profile = AVATAR_URLS[avatarId] || AVATAR_URLS.professional_male;
-  if (!profile) return;
-  const link = document.createElement("link");
-  link.rel = "prefetch";
-  link.as = "fetch";
-  link.href = profile.url;
-  link.crossOrigin = "anonymous";
-  document.head.appendChild(link);
+/** 库内置心境名（无 serious；未列出值一律回落 neutral）。 */
+type TalkingMood =
+  | "neutral"
+  | "happy"
+  | "angry"
+  | "sad"
+  | "fear"
+  | "disgust"
+  | "love"
+  | "sleep";
+
+const VALID_MOODS: ReadonlySet<TalkingMood> = new Set([
+  "neutral",
+  "happy",
+  "angry",
+  "sad",
+  "fear",
+  "disgust",
+  "love",
+  "sleep",
+]);
+
+function safeMood(mood: string | undefined, fallback: TalkingMood = "neutral"): TalkingMood {
+  if (mood && VALID_MOODS.has(mood as TalkingMood)) return mood as TalkingMood;
+  return fallback;
 }
 
-const SCENE_IMG: Record<string, string> = {
-  meeting_room: "/scenes/meeting_room.svg",
-  glass_office: "/scenes/glass_office.svg",
-  online_interview: "/scenes/online_interview.svg",
-  boardroom: "/scenes/boardroom.svg",
-  startup_loft: "/scenes/startup_loft.svg",
-  library_corner: "/scenes/library_corner.svg",
-};
-
-const SCENE_FALLBACK: Record<string, string> = {
-  meeting_room: "linear-gradient(160deg, #0f172a 0%, #1e3a5f 55%, #0b1220 100%)",
-  glass_office: "linear-gradient(160deg, #111827 0%, #1f2937 50%, #0f172a 100%)",
-  online_interview: "linear-gradient(160deg, #020617 0%, #1e293b 60%, #0f172a 100%)",
-  boardroom: "linear-gradient(160deg, #1c1917 0%, #44403c 50%, #0c0a09 100%)",
-  startup_loft: "linear-gradient(160deg, #292524 0%, #57534e 45%, #1c1917 100%)",
-  library_corner: "linear-gradient(160deg, #1e1b4b 0%, #312e81 50%, #0f172a 100%)",
-};
-
-/** 情绪 → TalkingHead mood（仅使用库内存在的键；serious 映射为 neutral） */
-const EMOTION_TO_MOOD: Record<string, TalkingMood> = {
+/** 表情 → 库内心境（mood 粒度不够时由辅助 morph 补一层）。 */
+const EXPRESSION_TO_MOOD: Record<string, TalkingMood> = {
   neutral: "neutral",
   smile: "happy",
   happy: "happy",
@@ -160,8 +140,8 @@ const EMOTION_TO_MOOD: Record<string, TalkingMood> = {
   sad: "sad",
 };
 
-/** 情绪 → 辅助 morph（眉/眼/嘴角），mood 不够细时补一层 */
-const EMOTION_MORPH: Record<
+/** 表情 → 辅助 morph（眉/眼/嘴角）。 */
+const EXPRESSION_MORPH: Record<
   string,
   { browInnerUp?: number; eyeSquint?: number; mouthSmile?: number; eyesClosed?: number }
 > = {
@@ -176,14 +156,6 @@ const EMOTION_MORPH: Record<
   angry: { browInnerUp: 0.55, mouthSmile: 0 },
   sad: { browInnerUp: 0.3, mouthSmile: 0, eyesClosed: 0.12 },
 };
-
-interface TalkingHeadAvatarProps {
-  avatarId: string;
-  sceneId: string;
-  emotion?: string;
-  speaking?: boolean;
-  audioLevel?: number;
-}
 
 type HeadInstance = {
   showAvatar: (avatar: Record<string, unknown>, onprogress?: (ev: unknown) => void) => Promise<void>;
@@ -206,25 +178,22 @@ function mapAudioToMouth(level: number, speaking: boolean): number {
   return Math.min(0.95, 0.12 + shaped * 0.88);
 }
 
-/**
- * TalkingHead 3D 面试官：Edge TTS 音量驱动口型；WebGL 失败时回退 CSS 矢量人像。
- */
-export function TalkingHeadAvatar({
+function TalkingHeadRenderer({
   avatarId,
-  sceneId,
-  emotion = "neutral",
-  speaking = false,
-  audioLevel = 0,
-}: TalkingHeadAvatarProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  emotion,
+  speaking,
+  audioLevel,
+  onProgress,
+  onReady,
+  onFailed,
+}: AvatarRendererProps) {
+  const mountRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HeadInstance | null>(null);
   const mouthSmoothRef = useRef(0);
   const rafRef = useRef<number>(0);
   const bootGenRef = useRef(0);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
-  const [loadPct, setLoadPct] = useState(0);
 
+  // 就绪状态上抛由 boot 流程驱动；失败上抛后由舞台切通道
   useEffect(() => {
     const gen = ++bootGenRef.current;
     let cancelled = false;
@@ -232,32 +201,20 @@ export function TalkingHeadAvatar({
     /** 每次 boot 独立挂载点，避免 Strict Mode 双挂载时 stop() 清掉下一次的 DOM */
     let mount: HTMLDivElement | null = null;
 
-    setLoading(true);
-    setFailed(false);
-    setLoadPct(0);
-
     const boot = async () => {
-      const node = containerRef.current;
+      const node = mountRef.current;
       if (!node) return;
       try {
-        const canvas = document.createElement("canvas");
-        const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-        if (!gl) throw new Error("no webgl");
-      } catch {
-        if (!cancelled && bootGenRef.current === gen) setFailed(true);
-        return;
-      }
-
-      try {
         const mod = await import("@met4citizen/talkinghead");
-        const TalkingHead = (mod as { TalkingHead: new (n: HTMLElement, o?: object) => HeadInstance }).TalkingHead;
-        if (cancelled || !containerRef.current || bootGenRef.current !== gen) return;
+        const TalkingHead = (mod as { TalkingHead: new (n: HTMLElement, o?: object) => HeadInstance })
+          .TalkingHead;
+        if (cancelled || bootGenRef.current !== gen) return;
 
-        const profile = AVATAR_URLS[avatarId] || AVATAR_URLS.professional_male!;
+        const profile = AVATAR_ASSETS[avatarId] || AVATAR_ASSETS.professional_male!;
         const mood = safeMood(profile.mood);
         mount = document.createElement("div");
         mount.style.cssText = "position:absolute;inset:0;width:100%;height:100%;";
-        containerRef.current.replaceChildren(mount);
+        node.replaceChildren(mount);
 
         const light = profile.light;
         head = new TalkingHead(mount, {
@@ -291,9 +248,7 @@ export function TalkingHeadAvatar({
           const e = ev as { lengthComputable?: boolean; loaded?: number; total?: number };
           if (e?.lengthComputable && e.total && e.total > 0) {
             const raw = Math.round((100 * (e.loaded || 0)) / e.total);
-            if (bootGenRef.current === gen) {
-              setLoadPct(Math.min(100, Math.max(0, raw)));
-            }
+            if (bootGenRef.current === gen) onProgress?.(Math.min(100, Math.max(0, raw)));
           }
         });
         if (cancelled || bootGenRef.current !== gen) {
@@ -305,28 +260,22 @@ export function TalkingHeadAvatar({
           mount?.remove();
           return;
         }
-        const lockGaze = () => {
-          try {
-            head?.setBaselineValue?.("eyesLookDown", 0);
-            head?.setFixedValue?.("eyesLookDown", 0, 200);
-            head?.setValue("eyesLookDown", 0, 200);
-            head?.setValue("eyesLookUp", 0.08, 200);
-            head?.setValue("headRotateX", 0.1, 300);
-            head?.lookAtCamera?.(1500);
-            head?.makeEyeContact?.(3000);
-          } catch {
-            /* ignore */
-          }
-        };
-        lockGaze();
-        setLoading(false);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn("TalkingHead 加载失败，回退 CSS 人像", avatarId, msg, err);
-        if (!cancelled && bootGenRef.current === gen) {
-          setFailed(true);
-          setLoading(false);
+        // 进房后锁定视线看向镜头，避免长时间低头/瞟向别处
+        try {
+          head.setBaselineValue?.("eyesLookDown", 0);
+          head.setFixedValue?.("eyesLookDown", 0, 200);
+          head.setValue("eyesLookDown", 0, 200);
+          head.setValue("eyesLookUp", 0.08, 200);
+          head.setValue("headRotateX", 0.1, 300);
+          head.lookAtCamera?.(1500);
+          head.makeEyeContact?.(3000);
+        } catch {
+          /* ignore */
         }
+        if (bootGenRef.current === gen) onReady?.();
+      } catch (err) {
+        console.warn("3D 头像通道加载失败", avatarId, err);
+        if (!cancelled && bootGenRef.current === gen) onFailed?.(err);
       }
     };
 
@@ -345,12 +294,14 @@ export function TalkingHeadAvatar({
         /* noop */
       }
     };
+    // avatarId 变化即重建；回调经引用稳定约定由舞台保证
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [avatarId]);
 
-  // 说话时周期性看向镜头，避免长时间低头/瞟向别处
+  // 说话时周期性看向镜头
   useEffect(() => {
     const head = headRef.current;
-    if (!head || failed || loading) return;
+    if (!head) return;
     const lockGaze = () => {
       try {
         head.setBaselineValue?.("eyesLookDown", 0);
@@ -367,13 +318,13 @@ export function TalkingHeadAvatar({
     lockGaze();
     const id = window.setInterval(lockGaze, 2800);
     return () => window.clearInterval(id);
-  }, [speaking, failed, loading, emotion]);
+  }, [speaking]);
 
-  // 情绪 → mood + 辅助 morph
+  // 表情 → 心境 + 辅助 morph
   useEffect(() => {
     const head = headRef.current;
-    if (!head || failed) return;
-    const mood = safeMood(EMOTION_TO_MOOD[emotion], "neutral");
+    if (!head) return;
+    const mood = EXPRESSION_TO_MOOD[emotion] ?? "neutral";
     try {
       const names = head.getMoodNames?.() || [];
       if (names.length === 0 || names.includes(mood)) {
@@ -389,7 +340,7 @@ export function TalkingHeadAvatar({
       }
     }
 
-    const morph = EMOTION_MORPH[emotion] || {};
+    const morph = EXPRESSION_MORPH[emotion] ?? {};
     const trySet = (name: string, val: number) => {
       try {
         head.setValue(name, val, 180);
@@ -402,12 +353,12 @@ export function TalkingHeadAvatar({
     trySet("eyeSquintRight", morph.eyeSquint ?? 0);
     trySet("mouthSmile", morph.mouthSmile ?? 0);
     trySet("eyesClosed", morph.eyesClosed ?? 0);
-  }, [emotion, failed]);
+  }, [emotion]);
 
   // 音量 → 平滑口型（攻击快、衰减慢）
   useEffect(() => {
     const head = headRef.current;
-    if (!head || failed || loading) return;
+    if (!head) return;
 
     const target = mapAudioToMouth(audioLevel, speaking);
     const tick = () => {
@@ -434,47 +385,38 @@ export function TalkingHeadAvatar({
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [audioLevel, speaking, failed, loading]);
+  }, [audioLevel, speaking]);
 
-  if (failed) {
-    return (
-      <div className="relative w-full h-full min-h-[180px]">
-        <InterviewerAvatar
-          avatarId={avatarId}
-          sceneId={sceneId}
-          emotion={emotion}
-          speaking={speaking}
-          audioLevel={audioLevel}
-        />
-        <div className="absolute bottom-2 left-2 right-2 z-10 rounded-md bg-black/65 px-2 py-1.5 text-[11px] text-amber-200/95 text-center">
-          3D 人像加载失败，已回退平面形象
-        </div>
-      </div>
-    );
-  }
-
-  const bg = SCENE_FALLBACK[sceneId] || SCENE_FALLBACK.meeting_room;
-  const sceneImg = SCENE_IMG[sceneId] || SCENE_IMG.meeting_room;
-
-  return (
-    <div
-      className="relative w-full h-full min-h-[180px] rounded-xl overflow-hidden border border-white/10"
-      style={{ background: bg }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={sceneImg}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover opacity-85 pointer-events-none"
-      />
-      <div ref={containerRef} className="absolute inset-0" />
-      {loading && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/50 text-white/80 text-xs">
-          <Loader2 className="animate-spin text-brand-400" size={22} />
-          <span>加载 3D 面试官…{loadPct > 0 ? ` ${loadPct}%` : ""}</span>
-          <span className="text-white/40">不阻塞进房与麦克风</span>
-        </div>
-      )}
-    </div>
-  );
+  return <div ref={mountRef} className="absolute inset-0" />;
 }
+
+function webglSupported(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const canvas = document.createElement("canvas");
+    return Boolean(
+      canvas.getContext("webgl") || canvas.getContext("experimental-webgl"),
+    );
+  } catch {
+    return false;
+  }
+}
+
+export const talkingheadRenderer: AvatarRendererDef = {
+  id: "3d-head",
+  isSupported: webglSupported,
+  Component: TalkingHeadRenderer,
+  prefetch(avatarId: string): void {
+    if (typeof window === "undefined") return;
+    const profile = AVATAR_ASSETS[avatarId] || AVATAR_ASSETS.professional_male;
+    if (!profile) return;
+    const link = document.createElement("link");
+    link.rel = "prefetch";
+    link.as = "fetch";
+    link.href = profile.url;
+    link.crossOrigin = "anonymous";
+    document.head.appendChild(link);
+  },
+};
+
+export type { AvatarExpression };

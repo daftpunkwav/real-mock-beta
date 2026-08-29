@@ -57,8 +57,8 @@ export function useInterviewRoomBootstrap(sessionId: number) {
         });
         setRestoredPhase(session.current_phase || "");
         setSessionStatus(session.status || "");
-        void import("@/features/avatar/TalkingHeadAvatar").then((m) => {
-          m.prefetchAvatarGlb(session.avatar_id || "professional_male");
+        void import("@/features/avatar/AvatarStage").then((m) => {
+          m.prefetchAvatar(session.avatar_id || "professional_male");
         });
       } catch (e) {
         if (cancelled) return;

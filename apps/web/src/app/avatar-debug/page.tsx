@@ -1,7 +1,7 @@
 "use client";
 
 import { notFound } from "next/navigation";
-import { TalkingHeadAvatar } from "@/features/avatar/TalkingHeadAvatar";
+import { AvatarStage } from "@/features/avatar/AvatarStage";
 
 const CASES = [
   { id: "professional_male", label: "专业男" },
@@ -9,7 +9,7 @@ const CASES = [
   { id: "gentle_female", label: "温和女" },
 ] as const;
 
-/** 用真实 TalkingHeadAvatar 组件并排验证三人像（含 Strict Mode 竞态） */
+/** 用真实 AvatarStage 组件并排验证三人像（含 Strict Mode 竞态） */
 export default function AvatarDebugPage() {
   if (process.env.NODE_ENV === "production") {
     notFound();
@@ -26,7 +26,7 @@ export default function AvatarDebugPage() {
           <div key={c.id} className="space-y-2">
             <div className="text-sm font-medium">{c.label}</div>
             <div className="h-[320px] rounded-xl overflow-hidden border border-white/10">
-              <TalkingHeadAvatar avatarId={c.id} sceneId="meeting_room" emotion="neutral" />
+              <AvatarStage avatarId={c.id} sceneId="meeting_room" emotion="neutral" />
             </div>
           </div>
         ))}
