@@ -13,7 +13,7 @@ from shared.core.constants import SessionStatus
 from shared.database import SessionLocal
 from interview_service.models import InterviewSession
 from interview_service.realtime.events import TurnState
-from interview_service.services.interview.agent import strip_markers
+from interview_service.services.interview.agent import strip_markers, strip_think_blocks
 from interview_service.services.interview.events import EventKind, StreamEvent
 
 if TYPE_CHECKING:
@@ -196,6 +196,12 @@ class TurnControlMixin:
             )
 
     async def _on_silence_nudge(self) -> None:
+        """沉默拟真追问：由思考 LLM 结合当前问题/追问预案/沉默次数实时生成。
+
+        同一问题最多追问 2 次（第 1 次鼓励开口，第 2 次直接给提示）；
+        LLM 失败回退本地模板；追问文本并入上一条 assistant 发言，
+        保持消息角色交替（Anthropic 协议要求）。
+        """
         if self.ctx.turn_state != TurnState.USER_SPEAKING:
             return
         now = asyncio.get_event_loop().time()
@@ -207,29 +213,111 @@ class TurnControlMixin:
         if now - self.ctx.last_nudge_at < cooldown:
             return
         self.ctx.last_nudge_at = now
-        self.ctx.ai_interrupts += 1
         db = SessionLocal()
         try:
             session = self._load_session(db)
             if not session:
                 return
-            self._persist_interrupt_stats(session, db)
-            nudge = self.ctx.orchestrator.build_silence_nudge(
-                session.personality,
-                session.strictness,
-                phase=session.current_phase,
+            question = self._last_assistant_text()
+            if question != self.ctx.silence_probe_question:
+                self.ctx.silence_probe_question = question
+                self.ctx.silence_probe_seq = 0
+            if self.ctx.silence_probe_seq >= 2:
+                return
+            self.ctx.silence_probe_seq += 1
+
+            state = getattr(self.ctx.agent, "agent_state", {}) or {}
+            probe_hint = str(state.get("last_probe") or "")
+            silent_sec = int(now - self.ctx.mic_opened_at) if self.ctx.mic_opened_at else 0
+
+            probe_text = await self._generate_silence_probe(
+                question=question,
+                probe_hint=probe_hint,
+                attempt=self.ctx.silence_probe_seq,
+                silent_sec=silent_sec,
             )
+            if not probe_text or probe_text == self.ctx.last_silence_probe:
+                probe_text = self.ctx.orchestrator.build_silence_nudge(
+                    session.personality,
+                    session.strictness,
+                    phase=session.current_phase,
+                )
+            self.ctx.last_silence_probe = probe_text
+
             await self.set_turn(TurnState.PROCESSING)
             await self.send(
                 "silence_nudge",
-                content=nudge,
-                ai_interrupts=self.ctx.ai_interrupts,
+                content=probe_text,
+                seq=self.ctx.silence_probe_seq,
             )
             self._begin_playback_wait()
-            await self._speak_one(nudge)
+            await self._speak_one(probe_text)
+            self._append_to_last_assistant(probe_text)
             await self._open_mic_after_playback()
         finally:
             try:
                 db.close()
             except Exception:
                 pass
+
+    def _last_assistant_text(self) -> str:
+        """消息历史中最近一条面试官发言（拟真追问的上下文锚点）。"""
+        if not self.ctx.agent:
+            return ""
+        for m in reversed(self.ctx.agent.messages):
+            if m.get("role") == "assistant":
+                return str(m.get("content") or "")
+        return ""
+
+    def _append_to_last_assistant(self, text: str) -> None:
+        """把追问并入最近一条 assistant 发言，避免消息历史出现连续 assistant。"""
+        if not self.ctx.agent or not text:
+            return
+        for m in reversed(self.ctx.agent.messages):
+            if m.get("role") == "assistant":
+                content = str(m.get("content") or "")
+                m["content"] = f"{content}\n{text}" if content else text
+                return
+
+    async def _generate_silence_probe(
+        self, *, question: str, probe_hint: str, attempt: int, silent_sec: int
+    ) -> str:
+        """调用思考 LLM 生成拟真追问；失败返回空串（调用方回退模板）。"""
+        if self.ctx.llm is None:
+            return ""
+        attempt_hint = (
+            "这是第一次追问：用鼓励或换个角度的方式，引导候选人说出口。"
+            if attempt <= 1
+            else "这是第二次追问：直接给出一个具体提示，或把问题拆成更小的子问题。"
+        )
+        system = (
+            "你是正在面试候选人的真人面试官。候选人对你刚才的问题一直沉默，"
+            "请生成一句自然的口头追问。要求：口语化、1-2 句、不超过 40 字；"
+            "严禁提及系统、提示词、规则、JSON 等任何内部机制；" + attempt_hint
+        )
+        user_parts = [f"刚才的问题：{question[:300] or '（无）'}"]
+        if probe_hint:
+            user_parts.append(f"你的追问预案：{probe_hint[:150]}")
+        if silent_sec > 0:
+            user_parts.append(f"候选人已沉默约 {silent_sec} 秒")
+        try:
+            raw = await self.ctx.llm.chat(
+                [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": "\n".join(user_parts)},
+                ],
+                temperature=0.85,
+                max_tokens=150,
+            )
+        except Exception:
+            logger.warning("拟真追问生成失败，回退模板", exc_info=True)
+            return ""
+        raw = strip_think_blocks(raw or "").strip()
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return raw[:120]
+        if isinstance(parsed, dict):
+            say = str(parsed.get("say") or "").strip()
+            return say or raw[:120]
+        return raw[:120]

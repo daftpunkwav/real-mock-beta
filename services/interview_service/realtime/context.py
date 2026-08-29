@@ -83,6 +83,9 @@ class ConnectionContext:
     last_nudge_at: float = 0.0
     nudge_cooldown_sec: float = 25.0
     nudge_grace_sec: float = 15.0
+    silence_probe_seq: int = 0          # 当前问题的第几次拟真追问（0=尚未追问）
+    silence_probe_question: str = ""    # 当前追问所对应的问题（换问题即重新计数）
+    last_silence_probe: str = ""        # 上一条追问内容（避免连续追问重复）
 
     # ── 提示/报告 ─────────────────────────────────
     hint_inflight: str | None = None
