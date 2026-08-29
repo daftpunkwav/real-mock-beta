@@ -23,14 +23,16 @@ class StreamEvent:
 
     kind: EventKind
     token: str = ""
-    content: str = ""             # 完整文本（仅 TURN_COMPLETE 时填充）
+    content: str = ""             # 完整文本（仅 TURN_COMPLETE 时填充；协议下为 say 纯文本）
     phase_id: str = ""            # 当前阶段 id
-    is_complete: bool = False     # 是否面试整体结束（[INTERVIEW_COMPLETE]）
+    is_complete: bool = False     # 是否面试整体结束（interview_complete）
     phase_changed: bool = False   # 本回合是否切换了阶段
-    emotion: str = "neutral"      # 情感标签
+    emotion: str = "neutral"      # 情感标签（turn 协议 emotion 字段）
     error: str = ""               # 错误信息
     error_code: str = ""          # 业务错误码（如 C0001）；空时前端按 B0001 兜底
     error_retryable: bool = False # 是否可重试
+    wait_seconds: int = 0         # 预计候选人作答秒数（0=未提供）
+    sources: tuple[str, ...] = () # 本轮作答依据（resume/github/company_kb/none）
 
     @classmethod
     def make_token(cls, token: str) -> "StreamEvent":
@@ -45,6 +47,8 @@ class StreamEvent:
         is_complete: bool,
         phase_changed: bool,
         emotion: str = "neutral",
+        wait_seconds: int = 0,
+        sources: tuple[str, ...] = (),
     ) -> "StreamEvent":
         return cls(
             kind=EventKind.TURN_COMPLETE,
@@ -53,6 +57,8 @@ class StreamEvent:
             is_complete=is_complete,
             phase_changed=phase_changed,
             emotion=emotion,
+            wait_seconds=wait_seconds,
+            sources=sources,
         )
 
     @classmethod

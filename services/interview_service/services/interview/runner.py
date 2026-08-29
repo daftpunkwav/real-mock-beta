@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -25,14 +26,16 @@ from interview_service.models import InterviewSession
 from interview_service.services.interview.agent import (
     INTERVIEW_COMPLETE_MARKER,
     InterviewAgent,
-    detect_emotion,
+    ThinkStreamFilter,
     strip_markers,
 )
 from interview_service.services.interview.events import EventKind, StreamEvent
 from interview_service.services.interview.followup import analyze as analyze_followup
 from interview_service.services.interview.prompt_assembler import PromptAssembler
 from interview_service.services.interview.tool_round_runner import ToolRoundRunner
+from interview_service.services.interview.turn_output import TurnOutput, parse_turn_output
 from shared.capabilities.ai.llm.client import LLMClient
+from shared.capabilities.ai.llm.say_first_stream import SayFirstStreamParser
 from interview_service.capabilities.rag.company_rag import CompanyKnowledgeRAG
 
 logger = logging.getLogger(__name__)
@@ -68,6 +71,47 @@ class InterviewRunner:
         self.tools = ToolRoundRunner(session, llm, self.agent, rag)
 
     # ------------------------------------------------------------------
+    # say-first 协议解析
+    # ------------------------------------------------------------------
+
+    async def _stream_say_first(
+        self,
+        api_messages: list[dict[str, Any]],
+        *,
+        temperature: float,
+    ) -> AsyncIterator[StreamEvent | TurnOutput]:
+        """流式调用 LLM 并按 say-first 协议解析。
+
+        产出 TOKEN 事件（say 明文增量），末尾 yield TurnOutput 供调用方收尾。
+        think 剥离在前、协议解析在后，两层独立；降级（未按协议输出）时
+        TurnOutput.say 为全部可见文本，控制字段走默认值。
+        """
+        think_filter = ThinkStreamFilter()
+        parser = SayFirstStreamParser()
+        say_parts: list[str] = []
+        stream_tools = self.tools.collect_chat_tools(include_function_tools=False)
+        async for token in self.llm.chat_stream(
+            api_messages, temperature=temperature, tools=stream_tools
+        ):
+            visible = think_filter.feed(token or "")
+            if not visible:
+                continue
+            say_chunk = parser.feed(visible)
+            if say_chunk:
+                say_parts.append(say_chunk)
+                yield StreamEvent.make_token(say_chunk)
+        tail = parser.finish()
+        if tail:
+            say_parts.append(tail)
+            yield StreamEvent.make_token(tail)
+        say_text = parser.raw_text if parser.degraded else "".join(say_parts)
+        yield parse_turn_output(
+            parser.controls,
+            say_text=say_text,
+            degraded=parser.degraded,
+        )
+
+    # ------------------------------------------------------------------
     # 开场
     # ------------------------------------------------------------------
 
@@ -90,29 +134,36 @@ class InterviewRunner:
                 opening_messages, db, temperature=0.8
             )
 
-            content_buf = ""
+            output: TurnOutput
             if early:
-                content_buf = early
                 yield StreamEvent.make_token(early)
+                output = parse_turn_output(None, say_text=early, degraded=True)
             else:
-                stream_tools = self.tools.collect_chat_tools(include_function_tools=False)
-                async for token in self.llm.chat_stream(
-                    opening_messages, temperature=0.8, tools=stream_tools
-                ):
-                    content_buf += token
-                    yield StreamEvent.make_token(token)
+                output = None
+                async for item in self._stream_say_first(opening_messages, temperature=0.8):
+                    if isinstance(item, TurnOutput):
+                        output = item
+                    else:
+                        yield item
+                output = output or parse_turn_output(None, say_text="", degraded=True)
 
-            self.agent.record_assistant_text(content_buf)
+            self.agent.record_assistant_text(output.say)
+            self.agent.note_turn_output(output)
             self.agent.set_questions_in_phase(1)
             self.agent.mark_active()
             self.agent.save_state(db)
+            # 开场不触发问题数上限推进；仅协议明确给出 phase_complete 时切换
+            if output.phase_complete:
+                self.agent.advance_phase_if_needed(output.say, phase_complete=True)
 
             yield StreamEvent.make_turn_done(
-                content=strip_markers(content_buf),
+                content=output.say,
                 phase_id=self.agent.current_phase().id,
-                is_complete=False,
-                phase_changed=False,
-                emotion=detect_emotion(content_buf),
+                is_complete=output.interview_complete,
+                phase_changed=output.phase_complete,
+                emotion=output.emotion,
+                wait_seconds=output.wait_seconds,
+                sources=output.sources,
             )
         except Exception as e:
             logger.exception("开场回合失败: %s", e)
@@ -200,32 +251,37 @@ class InterviewRunner:
                 api_messages, db, temperature=0.75
             )
 
-            content_buf = ""
+            output: TurnOutput
             if early:
-                content_buf = early
                 yield StreamEvent.make_token(early)
+                output = parse_turn_output(None, say_text=early, degraded=True)
             else:
-                stream_tools = self.tools.collect_chat_tools(include_function_tools=False)
-                async for token in self.llm.chat_stream(
-                    api_messages, temperature=0.75, tools=stream_tools
-                ):
-                    content_buf += token
-                    yield StreamEvent.make_token(token)
+                output = None
+                async for item in self._stream_say_first(api_messages, temperature=0.75):
+                    if isinstance(item, TurnOutput):
+                        output = item
+                    else:
+                        yield item
+                output = output or parse_turn_output(None, say_text="", degraded=True)
 
-            self.agent.record_assistant_text(content_buf)
-            is_complete = INTERVIEW_COMPLETE_MARKER in content_buf
-            phase_changed = self.agent.advance_phase_if_needed(content_buf)
+            self.agent.record_assistant_text(output.say)
+            self.agent.note_turn_output(output)
+            phase_changed = self.agent.advance_phase_if_needed(
+                output.say, phase_complete=output.phase_complete
+            )
 
-            if is_complete:
+            if output.interview_complete:
                 self.agent.mark_completed()
             self.agent.save_state(db)
 
             yield StreamEvent.make_turn_done(
-                content=strip_markers(content_buf),
+                content=output.say,
                 phase_id=self.agent.current_phase().id,
-                is_complete=is_complete,
+                is_complete=output.interview_complete,
                 phase_changed=phase_changed,
-                emotion=detect_emotion(content_buf),
+                emotion=output.emotion,
+                wait_seconds=output.wait_seconds,
+                sources=output.sources,
             )
         except Exception as e:
             logger.exception("回合执行失败: %s", e)
@@ -269,9 +325,9 @@ class InterviewRunner:
                 + nl
                 + f"3. 人设与语气：{style_hint}"
                 + nl
-                + "4. 不要输出 JSON、表格或报告标题；不要捏造未提及的项目细节；"
+                + "4. 不要输出表格或报告标题；不要捏造未提及的项目细节；"
                 + nl
-                + "5. 结尾单独一行写：[INTERVIEW_COMPLETE]"
+                + "5. 把回复中的 interview_complete 设为 true"
             )
             self.agent.messages.append({"role": "system", "content": closing_system})
             self.agent.refresh_system_memory()
@@ -286,27 +342,34 @@ class InterviewRunner:
                 {"role": "user", "content": "（系统）请按指示完成口头收尾与评价。"},
             ]
 
-            content_buf = ""
-            stream_tools = self.tools.collect_chat_tools(include_function_tools=False)
-            async for token in self.llm.chat_stream(
-                api_messages, temperature=0.7, tools=stream_tools
-            ):
-                content_buf += token
-                yield StreamEvent.make_token(token)
+            output: TurnOutput | None = None
+            say_parts: list[str] = []
+            async for item in self._stream_say_first(api_messages, temperature=0.7):
+                if isinstance(item, TurnOutput):
+                    output = item
+                else:
+                    say_parts.append(item.token)
+                    yield item
+            output = output or parse_turn_output(
+                None, say_text="".join(say_parts), degraded=True
+            )
+            # 收尾即完成：模型漏给 interview_complete 时由服务端兜底置位
+            if output.interview_complete is False:
+                output = replace(output, interview_complete=True)
 
-            if INTERVIEW_COMPLETE_MARKER not in content_buf:
-                content_buf = content_buf.rstrip() + "\n" + INTERVIEW_COMPLETE_MARKER
-
-            self.agent.record_assistant_text(content_buf)
+            self.agent.record_assistant_text(output.say)
+            self.agent.note_turn_output(output)
             self.agent.mark_completed()
             self.agent.save_state(db)
 
             yield StreamEvent.make_turn_done(
-                content=strip_markers(content_buf),
+                content=output.say,
                 phase_id=self.agent.current_phase().id,
                 is_complete=True,
                 phase_changed=True,
-                emotion=detect_emotion(content_buf) or "smile",
+                emotion=output.emotion or "smile",
+                wait_seconds=output.wait_seconds,
+                sources=output.sources,
             )
         except Exception as e:
             logger.exception("收尾发言失败: %s", e)

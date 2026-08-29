@@ -44,8 +44,11 @@ class FakeLLMClient:
         json_payload: dict | None = None,
         api_key: str = "test-key",
         embed_dim: int = 32,
+        stream_sequences: list[list[str]] | None = None,
     ):
         self.tokens: list[str] = tokens or ["你好，", "请先自我介绍。"]
+        # 每次 chat_stream 依次消费一个序列（超出后停在最后一个）；不提供时始终用 tokens
+        self.stream_sequences: list[list[str]] = stream_sequences or []
         self.json_payload = json_payload or {"overall_score": 80}
         self.api_key = api_key
         self.api_base = "http://test/v1"
@@ -54,6 +57,7 @@ class FakeLLMClient:
         self.chat_calls: list[list[dict[str, Any]]] = []
         self.stream_calls: list[list[dict[str, Any]]] = []
         self.embed_calls: list[list[str]] = []
+        self._stream_round = 0
 
     async def chat(self, messages, temperature: float = 0.7, response_format=None) -> str:
         self.chat_calls.append(messages)
@@ -72,7 +76,13 @@ class FakeLLMClient:
         测试不消费 ``tools``,仅按需记入 ``stream_calls`` 便于断言。
         """
         self.stream_calls.append(messages)
-        for t in self.tokens:
+        if self.stream_sequences:
+            idx = min(self._stream_round, len(self.stream_sequences) - 1)
+            seq = self.stream_sequences[idx]
+        else:
+            seq = self.tokens
+        self._stream_round += 1
+        for t in seq:
             yield t
 
     async def chat_json(self, messages, temperature: float = 0.3) -> dict[str, Any]:

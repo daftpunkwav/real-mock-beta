@@ -8,10 +8,9 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.orm import Session
 
 from interview_service.models import InterviewSession
-from interview_service.services.interview.agent import ThinkStreamFilter, strip_markers
+from interview_service.services.interview.agent import strip_markers
 from interview_service.services.interview.events import EventKind, StreamEvent
 from shared.capabilities.voice.tts.edge import (
-    extract_emotion,
     next_soft_min,
     should_flush_sentence_buffer,
 )
@@ -69,10 +68,13 @@ class TurnStreamingMixin:
         session: InterviewSession | None = None,
         auto_hint: bool = True,
     ) -> StreamEvent | None:
-        """按句入队 TTS，并剥离 think；返回最后一个 TURN_COMPLETE/ERROR。"""
+        """按句入队 TTS；返回最后一个 TURN_COMPLETE/ERROR。
+
+        runner 已按 say-first 协议解析：TOKEN 均为 say 明文（think 已剥离），
+        TURN_COMPLETE 携带控制字段（emotion/wait_seconds/sources）。
+        """
         self._begin_playback_wait()
         sentence_buf = ""
-        think_filter = ThinkStreamFilter()
         last: StreamEvent | None = None
         turn_emotion = "neutral"
         epoch = self.ctx.stream_epoch
@@ -81,12 +83,10 @@ class TurnStreamingMixin:
             if epoch != self.ctx.stream_epoch:
                 return None
             if event.kind == EventKind.TOKEN:
-                visible = think_filter.feed(event.token or "")
+                visible = event.token or ""
                 if visible:
                     await self.send("assistant_token", token=visible)
                     sentence_buf += visible
-                    if "[emotion:" in visible:
-                        turn_emotion = extract_emotion(sentence_buf) or turn_emotion
                     if should_flush_sentence_buffer(sentence_buf, soft_min=soft_min):
                         if epoch != self.ctx.stream_epoch:
                             return None
@@ -98,10 +98,6 @@ class TurnStreamingMixin:
             elif event.kind == EventKind.TURN_COMPLETE:
                 if epoch != self.ctx.stream_epoch:
                     return None
-                tail = think_filter.flush()
-                if tail:
-                    sentence_buf += tail
-                    await self.send("assistant_token", token=tail)
                 if event.emotion:
                     turn_emotion = event.emotion
                 clean = strip_markers(event.content or "")
@@ -111,6 +107,8 @@ class TurnStreamingMixin:
                     phase=event.phase_id,
                     is_complete=event.is_complete,
                     emotion=event.emotion,
+                    wait_seconds=event.wait_seconds,
+                    sources=list(event.sources),
                     playback_generation=self.ctx.awaiting_playback_gen,
                 )
                 if event.phase_id:

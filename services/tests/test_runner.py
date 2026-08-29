@@ -38,10 +38,29 @@ async def _consume(events: AsyncIterator) -> list:
     return [e async for e in events]
 
 
+def _proto_tokens(say: str, **controls) -> list[str]:
+    """构造 say-first 协议 JSON 并切成多段，模拟流式输出（覆盖跨 token 场景）。"""
+    payload = {
+        "say": say,
+        "v": 1,
+        "wait_seconds": 30,
+        "emotion": "neutral",
+        "phase_complete": False,
+        "interview_complete": False,
+        "turn_score": None,
+        "probe": None,
+        "sources": [],
+    }
+    payload.update(controls)
+    text = json.dumps(payload, ensure_ascii=False)
+    return [text[i : i + 7] for i in range(0, len(text), 7)]
+
+
 def test_stream_opening_records_first_question(db) -> None:
-    """开场回合应流式输出 token 并保存状态。"""
+    """开场回合应流式输出 say 明文并保存状态；控制字段随 TURN_COMPLETE 下发。"""
     session = _make_session(db)
-    llm = FakeLLMClient(tokens=["你好，", "我是面试官。", "请自我介绍一下。"])
+    say = "你好，我是面试官。请自我介绍一下。"
+    llm = FakeLLMClient(tokens=_proto_tokens(say, wait_seconds=60))
     runner = InterviewRunner(session, llm)
 
     events = []
@@ -54,12 +73,13 @@ def test_stream_opening_records_first_question(db) -> None:
     asyncio.run(run())
 
     tokens = [e.token for e in events if e.kind == EventKind.TOKEN]
-    assert tokens == ["你好，", "我是面试官。", "请自我介绍一下。"]
+    assert "".join(tokens) == say
 
     turn_done = next(e for e in events if e.kind == EventKind.TURN_COMPLETE)
-    assert turn_done.content == "你好，我是面试官。请自我介绍一下。"
+    assert turn_done.content == say
     assert turn_done.phase_id == "identity_check"
     assert turn_done.is_complete is False
+    assert turn_done.wait_seconds == 60
 
     db.refresh(session)
     assert session.status == "active"
@@ -67,6 +87,32 @@ def test_stream_opening_records_first_question(db) -> None:
     state = json.loads(session.agent_state)
     assert state["phase_idx"] == 0
     assert state["questions_in_phase"] == 1
+
+
+def test_stream_turn_plain_text_falls_back(db) -> None:
+    """模型未按协议输出（纯文本）时应整体降级为 say，回合不中断。"""
+    session = _make_session(db)
+    session.agent_state = json.dumps({"phase_idx": 3, "questions_in_phase": 0})
+    session.current_phase = "project_deep_dive"
+    db.commit()
+    db.refresh(session)
+
+    llm = FakeLLMClient(tokens=["直接说话，", "没有 JSON 结构。"])
+    runner = InterviewRunner(session, llm)
+
+    import asyncio
+
+    async def run():
+        events = []
+        async for e in runner.stream_turn("我叫张三", db):
+            events.append(e)
+        return events
+
+    events = asyncio.run(run())
+    turn_done = next(e for e in events if e.kind == EventKind.TURN_COMPLETE)
+    assert turn_done.content == "直接说话，没有 JSON 结构。"
+    assert turn_done.phase_changed is False
+    assert turn_done.emotion == "neutral"
 
 
 def test_stream_turn_increments_question_count(db) -> None:
@@ -100,9 +146,14 @@ def test_stream_turn_increments_question_count(db) -> None:
 
 
 def test_stream_turn_advances_phase_on_marker(db) -> None:
-    """LLM 输出 [PHASE_COMPLETE] 时应推进到下一阶段。"""
+    """回合协议 phase_complete=true 时应推进到下一阶段。"""
     session = _make_session(db)
-    llm = FakeLLMClient(tokens=["好的，", "身份确认完毕。", "[PHASE_COMPLETE]"])
+    llm = FakeLLMClient(
+        stream_sequences=[
+            _proto_tokens("你好，先核实一下身份信息。"),  # 开场
+            _proto_tokens("好的，身份确认完毕。", phase_complete=True),  # 回合
+        ]
+    )
     runner = InterviewRunner(session, llm)
 
     import asyncio
@@ -127,10 +178,10 @@ def test_stream_turn_advances_phase_on_marker(db) -> None:
 
 
 def test_stream_turn_advances_phase_on_max_reached(db) -> None:
-    """问题数达到当前阶段 max 时自动推进。"""
+    """问题数达到当前阶段 max 时自动推进（无需协议标志）。"""
     session = _make_session(db)
     # identity_check 阶段 max_questions = 1
-    llm = FakeLLMClient(tokens=["继续。"])
+    llm = FakeLLMClient(tokens=_proto_tokens("继续。"))
     runner = InterviewRunner(session, llm)
 
     import asyncio
@@ -149,10 +200,12 @@ def test_stream_turn_advances_phase_on_max_reached(db) -> None:
     assert turn_done.phase_id == "self_intro"
 
 
-def test_stream_turn_marks_complete_on_interview_marker(db) -> None:
-    """[INTERVIEW_COMPLETE] 标记应结束面试。"""
+def test_stream_turn_marks_complete_on_interview_flag(db) -> None:
+    """协议 interview_complete=true 应结束面试。"""
     session = _make_session(db)
-    llm = FakeLLMClient(tokens=["面试结束，", "感谢你的时间。", "[INTERVIEW_COMPLETE]"])
+    llm = FakeLLMClient(
+        tokens=_proto_tokens("面试结束，感谢你的时间。", interview_complete=True)
+    )
     runner = InterviewRunner(session, llm)
 
     import asyncio

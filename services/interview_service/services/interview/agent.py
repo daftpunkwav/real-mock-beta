@@ -19,6 +19,7 @@ from shared.schemas import CandidateProfile
 from interview_service.schemas import InterviewConfig
 from shared.capabilities.knowledge.company.knowledge import get_company_context
 from interview_service.services.interview.agent_prompts import build_system_prompt
+from interview_service.services.interview.turn_output import TurnOutput
 from interview_service.services.interview.agent_text import (
     INTERVIEW_COMPLETE_MARKER,
     PHASE_COMPLETE_MARKER,
@@ -112,6 +113,20 @@ class InterviewAgent:
             weak.append(p[:200])
         if len(weak) > 30:
             del weak[:-30]
+
+    def note_turn_output(self, output: TurnOutput) -> None:
+        """持久化回合控制信息：追问预案与即时简评（拟真追问/报告复用）。"""
+        if output.probe:
+            self.agent_state["last_probe"] = output.probe
+        ts = output.turn_score
+        if ts:
+            self.agent_state["last_turn_score"] = {
+                "brief": ts.brief,
+                "rating": ts.rating,
+                "weak_points": list(ts.weak_points),
+            }
+            for p in ts.weak_points:
+                self.note_weak_point(p)
 
     # ---- 阶段查询 -----------------------------------------------------------
 
@@ -286,13 +301,19 @@ class InterviewAgent:
     def set_questions_in_phase(self, value: int) -> None:
         self.questions_in_phase = value
 
-    def advance_phase_if_needed(self, reply: str) -> bool:
+    def advance_phase_if_needed(
+        self, reply: str, *, phase_complete: bool | None = None
+    ) -> bool:
         """根据 LLM 回复决定是否推进到下一阶段。
+
+        ``phase_complete`` 来自回合协议控制区；None 时回落旧标记检测
+        （兼容压缩前的历史消息）。
 
         Returns:
             bool: 是否发生阶段切换。
         """
-        phase_complete = has_marker(reply, PHASE_COMPLETE_MARKER)
+        if phase_complete is None:
+            phase_complete = has_marker(reply, PHASE_COMPLETE_MARKER)
         max_reached = self.questions_in_phase >= self.current_phase().max_questions
         if phase_complete or max_reached:
             # 防御：避免越界走到 workflow 末尾之后
