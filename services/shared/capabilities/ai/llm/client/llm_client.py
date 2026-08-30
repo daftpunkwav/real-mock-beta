@@ -357,12 +357,18 @@ class LLMClient:
         self,
         messages: list[dict[str, Any]],
         temperature: float = 0.3,
+        max_tokens: int | None = None,
     ) -> dict[str, Any]:
-        """请求 JSON 格式响应并解析。"""
+        """请求 JSON 格式响应并解析。
+
+        ``max_tokens`` 需按输出体量给足（如简历深度评价的完整 JSON 超过
+        默认 4096 上限，截断会导致 JSON 解析失败）。
+        """
         content = await self.chat(
             messages,
             temperature=temperature,
             response_format={"type": "json_object"},
+            max_tokens=max_tokens,
         )
         if not (isinstance(content, str) and content.strip()):
             logger.warning("chat_json 首次返回空，回退无 response_format 重试")

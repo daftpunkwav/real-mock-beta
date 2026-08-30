@@ -10,6 +10,7 @@
   ``extra="forbid"`` 之外的 Prompt 注入）。
 """
 
+import asyncio
 import json
 import logging
 import uuid
@@ -92,7 +93,11 @@ _RESUME_ANALYZE_PROMPT = with_agent_output_rules("""你是资深技术招聘负�
   "typography_review": "字体与可读性专评：标题层级、正文字号感、中英混排、行距、强调手段，80-160 字",
   "content_review": "内容专评：项目描述是否有证据链、技能是否可验证、教育/经历完整性，150-280 字",
   "market_insights": ["结合联网检索的市场观察，每条注明依据；无检索结果则给空数组"],
-  "search_queries_used": ["你认为有用的检索主题（可与系统已检索对齐）"]
+  "search_queries_used": ["你认为有用的检索主题（可与系统已检索对齐）"],
+  "headline": "一句话人设定位，18-30 字，犀利具体、直指核心竞争力或最大短板，如「Agent 方向广度惊人的实战派，但缺一次深扎」",
+  "first_impression": "模拟面试官翻开简历前 30 秒的第一印象独白，第一人称，80-140 字，有画面感（先看到什么、注意到什么、皱眉的是什么），不要空泛",
+  "interviewer_comments": ["面试官看完简历会在工位上随口说出的点评，3-6 条，每条 12-30 字，可犀利毒舌但必须专业且能回溯到简历事实，如「14 个仓库 star 全 0，广度换不来信任度」"],
+  "benchmark_percentile": 估算该简历超过多少比例的同方向同级候选人，0-100 整数，综合项目数量/深度/表述/量化判断，给出有区分度的数字
 }
 硬性要求：
 1. 禁止假大空（如「继续努力」「整体不错」）；每条评价必须能回溯到简历事实或检索证据
@@ -100,7 +105,8 @@ _RESUME_ANALYZE_PROMPT = with_agent_output_rules("""你是资深技术招聘负�
 3. 若提供了「联网检索参考」，请吸收其中与目标岗相关的真实要求，写入 missing_keywords / market_insights；无法核验则明确说「检索有限」
 4. predicted_questions 必须贴合简历项目；rewrite_examples 至少 3 条，且必须是 {before, after} 对象，禁止把 dict 写成字符串
 5. 叙述与列表字段中，对关键结论、数字指标、必须修改处用 **双星号** 包裹强调（如 **41%→58%**、**缺少量化**）；禁止整段加粗，单条最多 2–4 处
-6. 只返回 JSON，不要 Markdown 代码块包裹
+6. headline / first_impression / interviewer_comments 要生动具体、有画面感，像真人面试官说的话，但保持专业、不做人生攻击、不评判个性
+7. 只返回 JSON，不要 Markdown 代码块包裹
 """)
 
 
@@ -128,31 +134,94 @@ def _infer_target_role_from_resume(r: Resume) -> str:
     return role or "软件工程师"
 
 
-def _gather_resume_market_context(r: Resume) -> tuple[str, list[str]]:
-    """联网检索岗位市场信息；返回（上下文文本, 实际查询列表）。
-
-    站点过滤读取 ``RESUME_MARKET_SEARCH_SITES``（当前默认为空=全网）。
-    """
-    from api_service.services.resume.sites import RESUME_MARKET_SEARCH_SITES
-    from shared.capabilities.knowledge.search.web import web_search
-
+def _default_market_queries(r: Resume) -> list[str]:
+    """无 LLM 时的兜底检索词（按目标岗位模板拼装）。"""
     role = _infer_target_role_from_resume(r)
-    sites = RESUME_MARKET_SEARCH_SITES or None
-    queries = [
+    return [
         f"{role} 简历 要求 技术栈 面试",
         f"{role} JD 关键技能 关键词",
     ]
+
+
+async def _generate_market_queries(r: Resume, llm: LLMClient) -> tuple[list[str], bool]:
+    """Agent 规划步：让模型根据简历内容定制检索词。
+
+    返回 ``(queries, is_customized)``；LLM 失败或输出不合法时回退模板词。
+    """
+    fallback = _default_market_queries(r)
+    profile_hint = (r.parsed_profile or "")[:1500]
+    raw_hint = (r.raw_text or "")[:2500]
+    if not profile_hint and not raw_hint:
+        return fallback, False
+    messages = [
+        {
+            "role": "system",
+            "content": "你是招聘市场的检索规划助手。只输出 JSON：{\"queries\": [\"...\"]}",
+        },
+        {
+            "role": "user",
+            "content": (
+                "简历解析档案：\n"
+                f"{profile_hint}\n\n简历原文节选：\n{raw_hint}\n\n"
+                "请给出 2~3 个中文搜索词，用于检索该候选人目标岗位的真实招聘要求、"
+                "高频技能关键词与面经考点。每个不超过 24 字，贴合岗位市场而非复述简历。"
+                "候选人未明示目标岗位时，按简历技能栈推断最可能的岗位方向。"
+            ),
+        },
+    ]
+    try:
+        data = await asyncio.wait_for(
+            llm.chat_json(messages, temperature=0.2), timeout=25.0
+        )
+        raw = data.get("queries") if isinstance(data, dict) else None
+        if isinstance(raw, list):
+            cleaned = [str(q).strip()[:40] for q in raw if str(q).strip()][:3]
+            if cleaned:
+                return cleaned, True
+    except Exception as e:
+        logger.info("定制检索词生成失败，回退模板词: %s", e)
+    return fallback, False
+
+
+async def _gather_resume_market_context(
+    r: Resume, queries: list[str]
+) -> tuple[str, list[str]]:
+    """按给定检索词联网检索岗位市场信息；返回（上下文文本, 实际查询列表）。
+
+    站点过滤读取 ``RESUME_MARKET_SEARCH_SITES``（当前默认为空=全网）。
+    检索在线程池执行，不阻塞事件循环。
+    """
+    from api_service.services.resume.sites import RESUME_MARKET_SEARCH_SITES
+    from shared.capabilities.knowledge.search.web import web_search_with_hits
+
+    sites = RESUME_MARKET_SEARCH_SITES or None
+    scope = (
+        "限定站点：" + "、".join(sites)
+        if sites
+        else "全网检索"
+    )
+
+    async def _one(q: str) -> tuple[str, str]:
+        def _run() -> tuple[str, str]:
+            text, hits = web_search_with_hits(q, 4, sites=sites)
+            lines = [f"【{scope}】\n查询：{q}", text]
+            for h in hits[:4]:
+                lines.append(f"- {h['title']}（{h['url']}）")
+            return q, "\n".join(lines)
+
+        return await asyncio.to_thread(_run)
+
+    results = await asyncio.gather(
+        *(_one(q) for q in queries), return_exceptions=True
+    )
     blocks: list[str] = []
     used: list[str] = []
-    for q in queries:
+    for q, res in zip(queries, results):
         used.append(q)
-        result = web_search(q, max_results=4, sites=sites)
-        scope = (
-            "限定站点：" + "、".join(sites)
-            if sites
-            else "全网检索（站点限定尚未启用，可在 api_service/services/resume/sites.py 配置）"
-        )
-        blocks.append(f"【{scope}】\n查询：{q}\n{result}")
+        if isinstance(res, BaseException):
+            logger.warning("市场检索单条失败 q=%s: %s", q, res)
+            continue
+        blocks.append(res[1])
     return "\n\n".join(blocks), used
 
 def _sniff_extension(head: bytes, ext: str) -> bool:
@@ -429,8 +498,16 @@ def _normalize_resume_analysis_payload(data: dict) -> dict:
         "layout_review",
         "typography_review",
         "content_review",
+        "headline",
+        "first_impression",
     ):
         out[key] = str(out.get(key) or "")[:4000]
+    # 同岗百分位：非法值一律置 None（前端不渲染该条）
+    pct = out.get("benchmark_percentile")
+    try:
+        out["benchmark_percentile"] = max(0, min(100, int(pct))) if pct is not None else None
+    except (TypeError, ValueError):
+        out["benchmark_percentile"] = None
     # 中文全角标点硬规范化
     normalized = normalize_cn_punctuation_tree(out)
     return normalized if isinstance(normalized, dict) else out
@@ -481,10 +558,11 @@ async def analyze_resume(resume_id: int, db: Session = Depends(get_db)):
     if r.parsed_profile:
         user_blob += f"\n\n---\n已解析档案 JSON：\n{r.parsed_profile[:4000]}"
 
-    # 联网检索失败不应阻断评价
+    # Agent 规划步：按简历内容定制检索词 → 联网检索；任一步失败不阻断评价
     search_queries: list[str] = []
     try:
-        market_ctx, search_queries = _gather_resume_market_context(r)
+        queries, _customized = await _generate_market_queries(r, llm)
+        market_ctx, search_queries = await _gather_resume_market_context(r, queries)
         user_blob += (
             f"\n\n---\n联网检索参考（可能不完整，请甄别后写入 market_insights）：\n{market_ctx}"
         )
@@ -497,7 +575,8 @@ async def analyze_resume(resume_id: int, db: Session = Depends(get_db)):
         {"role": "user", "content": user_blob or "（空简历）"},
     ]
     try:
-        data = await llm.chat_json(messages)
+        # 评价 JSON 体量大(含十维+生动化字段),给足输出预算防截断
+        data = await llm.chat_json(messages, max_tokens=8000)
     except ValueError as e:
         logger.warning("简历评价 LLM JSON 失败: %s", e)
         raise_error("C0002", cause=e)

@@ -134,6 +134,12 @@ class ResumeAnalysis(BaseModel):
     content_review: str = ""
     market_insights: list[str] = Field(default_factory=list)
     search_queries_used: list[str] = Field(default_factory=list)
+    # 生动化扩展：人设定位 / 第一印象 / 面试官随口点评 / 同岗百分位
+    # 全部可选：旧评价数据不含这些字段，前端按空缺降级
+    headline: str = ""
+    first_impression: str = ""
+    interviewer_comments: list[str] = Field(default_factory=list)
+    benchmark_percentile: int | None = Field(default=None, ge=0, le=100)
 
 
 __all__ = [
