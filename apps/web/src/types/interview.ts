@@ -104,9 +104,18 @@ export interface PrepSearchGroup {
   results: PrepSearchHit[];
 }
 
+/** Agent 执行步骤(ReAct 行动记录,前端折叠展示) */
+export interface PrepToolStep {
+  name: string;
+  query: string;
+}
+
 export type PrepSSEEvent =
   | { type: "token"; content: string }
+  | { type: "status"; text: string }
+  | { type: "tool_step"; name: string; query: string }
   | { type: "search_results"; groups: PrepSearchGroup[] }
+  | { type: "ask_user"; question: string; options: string[] }
   | { type: "done"; token_usage: number }
   | SSEErrorEvent;
 

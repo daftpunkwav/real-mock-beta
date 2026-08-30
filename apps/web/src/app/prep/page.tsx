@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { agentService as api } from "@/lib/api/agentService";
 import { PREP_QUICK_PROMPTS } from "@/config/prepPrompts";
-import type { PrepSearchGroup, ResumePickerItem } from "@/types";
-import { SearchResultCards, ThinkAnswerMessage } from "@/features/prep";
+import type { PrepSearchGroup, PrepToolStep, ResumePickerItem } from "@/types";
+import {
+  AgentSteps,
+  AskUserModal,
+  SearchResultCards,
+  ThinkAnswerMessage,
+} from "@/features/prep";
 import {
   Send,
   BookOpen,
@@ -15,9 +20,13 @@ import {
   Lightbulb,
   MessageSquare,
   Zap,
+  ArrowDown,
 } from "lucide-react";
 
 const QUICK_PROMPTS = PREP_QUICK_PROMPTS;
+const RESTORE_KEY = "realmock_prep_session_id";
+/** 距底多少像素内视为「贴着底部」,自动跟随滚动 */
+const FOLLOW_THRESHOLD_PX = 96;
 
 interface ChatMessage {
   id: string;
@@ -25,6 +34,8 @@ interface ChatMessage {
   content: string;
   streaming?: boolean;
   searchGroups?: PrepSearchGroup[];
+  steps?: PrepToolStep[];
+  statusText?: string;
 }
 
 export default function PrepPage() {
@@ -32,15 +43,27 @@ export default function PrepPage() {
   const [resumeId, setResumeId] = useState<number | null>(null);
   const [prepSessionId, setPrepSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [restoring, setRestoring] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [prepError, setPrepError] = useState("");
   const [resumeLoadError, setResumeLoadError] = useState("");
   const [tokenUsage, setTokenUsage] = useState(0);
+  const [askDialog, setAskDialog] = useState<{
+    question: string;
+    options: string[];
+  } | null>(null);
+  const [showJump, setShowJump] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const msgSeqRef = useRef(0);
+  const followRef = useRef(true);
+  const loadingRef = useRef(false);
+  const pendingSendRef = useRef("");
+  // 流式 token 先进缓冲,按帧批量上屏,避免逐 token 触发全列表重渲染
+  const pendingTokenRef = useRef<{ id: string; text: string } | null>(null);
+  const rafRef = useRef(0);
 
   function nextMsgId(prefix: string) {
     msgSeqRef.current += 1;
@@ -61,23 +84,96 @@ export default function PrepPage() {
       });
   }, []);
 
+  // 恢复上次辅导会话(刷新不丢上下文;消息不含检索卡片与执行步骤)
+  useEffect(() => {
+    const saved = Number(window.localStorage.getItem(RESTORE_KEY) || 0);
+    if (!saved) return;
+    setRestoring(true);
+    api
+      .prepMessages(saved)
+      .then((list) => {
+        const restored: ChatMessage[] = (Array.isArray(list) ? list : [])
+          .filter((m) => (m.role === "user" || m.role === "assistant") && m.content)
+          .map((m) => ({
+            id: nextMsgId(m.role === "user" ? "u" : "a"),
+            role: m.role === "user" ? "user" : "assistant",
+            content: String(m.content),
+          }));
+        if (restored.length === 0) throw new Error("empty session");
+        setPrepSessionId(saved);
+        setMessages(restored);
+      })
+      .catch(() => window.localStorage.removeItem(RESTORE_KEY))
+      .finally(() => setRestoring(false));
+  }, []);
+
   const selectedResume = useMemo(
     () => resumes.find((r) => r.id === resumeId) ?? null,
     [resumes, resumeId],
   );
 
-  const scrollToBottom = useCallback(() => {
+  /* ── 滚动:默认贴底跟随;用户上滑后以用户为准,提供回底按钮 ── */
+  const handleScroll = useCallback(() => {
     const el = chatScrollRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-      return;
-    }
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!el) return;
+    const atBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < FOLLOW_THRESHOLD_PX;
+    followRef.current = atBottom;
+    setShowJump(!atBottom);
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    if (!followRef.current) return;
+    const el = chatScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  const jumpToBottom = useCallback(() => {
+    followRef.current = true;
+    setShowJump(false);
+    const el = chatScrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
+
+  /* ── token 批量上屏 ── */
+  const flushPendingToken = useCallback(() => {
+    rafRef.current = 0;
+    const p = pendingTokenRef.current;
+    if (!p) return;
+    pendingTokenRef.current = null;
+    setMessages((m) =>
+      m.map((msg) =>
+        msg.id === p.id ? { ...msg, content: msg.content + p.text } : msg,
+      ),
+    );
+  }, []);
+
+  const queueToken = useCallback(
+    (id: string, text: string) => {
+      const p = pendingTokenRef.current;
+      if (p && p.id === id) {
+        p.text += text;
+      } else {
+        if (p) flushPendingToken();
+        pendingTokenRef.current = { id, text };
+      }
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(flushPendingToken);
+      }
+    },
+    [flushPendingToken],
+  );
+
+  useEffect(
+    () => () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
+
+  const patchMessage = useCallback((id: string, patch: Partial<ChatMessage>) => {
+    setMessages((m) => m.map((msg) => (msg.id === id ? { ...msg, ...patch } : msg)));
+  }, []);
 
   const startPrep = async () => {
     setStarting(true);
@@ -85,6 +181,7 @@ export default function PrepPage() {
     try {
       const { id } = await api.createPrepSession({ resume_id: resumeId ?? undefined });
       setPrepSessionId(id);
+      window.localStorage.setItem(RESTORE_KEY, String(id));
       setMessages([
         {
           id: nextMsgId("a"),
@@ -103,12 +200,15 @@ export default function PrepPage() {
 
   const sendMessage = async (text: string, sessionId?: number) => {
     const sid = sessionId ?? prepSessionId;
-    if (!text.trim() || !sid || loading) return;
+    if (!text.trim() || !sid || loadingRef.current) return;
 
     const userMsg = text.trim();
     const assistantId = nextMsgId("a");
     setInput("");
+    loadingRef.current = true;
     setLoading(true);
+    followRef.current = true;
+    setShowJump(false);
     setMessages((m) => [
       ...m,
       { id: nextMsgId("u"), role: "user", content: userMsg },
@@ -116,17 +216,9 @@ export default function PrepPage() {
     ]);
 
     try {
-      const result = await api.prepMessageStream(
-        sid,
-        userMsg,
-        (token) => {
-          setMessages((m) =>
-            m.map((msg) =>
-              msg.id === assistantId ? { ...msg, content: msg.content + token } : msg,
-            ),
-          );
-        },
-        (groups) => {
+      const result = await api.prepMessageStream(sid, userMsg, {
+        onToken: (token) => queueToken(assistantId, token),
+        onSearchResults: (groups) => {
           setMessages((m) =>
             m.map((msg) =>
               msg.id === assistantId
@@ -138,31 +230,65 @@ export default function PrepPage() {
             ),
           );
         },
-      );
+        onStatus: (text) => {
+          if (text) patchMessage(assistantId, { statusText: text });
+        },
+        onToolStep: (step) => {
+          setMessages((m) =>
+            m.map((msg) =>
+              msg.id === assistantId
+                ? { ...msg, steps: [...(msg.steps ?? []), step] }
+                : msg,
+            ),
+          );
+        },
+        onAskUser: (question, options) => {
+          flushPendingToken();
+          patchMessage(assistantId, { statusText: "" });
+          setAskDialog({ question, options });
+        },
+      });
+      flushPendingToken();
       setTokenUsage(result.token_usage);
-      setMessages((m) =>
-        m.map((msg) => (msg.id === assistantId ? { ...msg, streaming: false } : msg)),
-      );
+      patchMessage(assistantId, { streaming: false, statusText: "" });
     } catch (e) {
+      flushPendingToken();
       setMessages((m) =>
         m.map((msg) =>
           msg.id === assistantId
             ? {
                 ...msg,
                 streaming: false,
+                statusText: "",
                 content: msg.content || `错误:${e instanceof Error ? e.message : "失败"}`,
               }
             : msg,
         ),
       );
     } finally {
+      loadingRef.current = false;
       setLoading(false);
+      const pending = pendingSendRef.current;
+      pendingSendRef.current = "";
+      if (pending) {
+        setTimeout(() => sendMessage(pending), 50);
+      }
     }
   };
 
   const handleSend = () => sendMessage(input);
 
+  const handleAskAnswer = (text: string) => {
+    setAskDialog(null);
+    if (loadingRef.current) {
+      pendingSendRef.current = text;
+      return;
+    }
+    sendMessage(text);
+  };
+
   const handleQuickPrompt = async (prompt: string) => {
+    if (restoring) return; // 会话恢复中,避免误创建新会话
     if (!prepSessionId) {
       const id = await startPrep();
       if (!id) return;
@@ -257,52 +383,72 @@ export default function PrepPage() {
                 </span>
                 <span className="font-mono num-tabular">Token ≈ {tokenUsage || 0}</span>
               </div>
-              <div
-                ref={chatScrollRef}
-                className="surface-card mb-3 flex-1 space-y-3.5 overflow-y-auto p-4"
-              >
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`flex gap-2.5 ${m.role === "user" ? "flex-row-reverse" : ""}`}
-                  >
-                    <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        m.role === "user"
-                          ? "bg-[var(--primary)] text-white"
-                          : "bg-[var(--info-soft)] text-[var(--info-ink)]"
-                      }`}
-                    >
-                      {m.role === "user" ? <User size={14} /> : <Bot size={14} />}
-                    </span>
+              <div className="relative min-h-0 flex-1">
+                <div
+                  ref={chatScrollRef}
+                  onScroll={handleScroll}
+                  className="surface-card h-full space-y-3.5 overflow-y-auto p-4"
+                >
+                  {messages.map((m) => (
                     <div
-                      className={`max-w-[88%] rounded-md px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                        m.role === "user"
-                          ? "rounded-br-sm bg-[var(--primary)] text-white"
-                          : "rounded-bl-sm border border-surface-border bg-surface-alt text-ink"
-                      }`}
+                      key={m.id}
+                      className={`flex gap-2.5 ${m.role === "user" ? "flex-row-reverse" : ""}`}
                     >
-                      {m.role === "assistant" ? (
-                        <>
-                          {m.content || m.streaming ? (
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                          m.role === "user"
+                            ? "bg-[var(--primary)] text-white"
+                            : "bg-[var(--info-soft)] text-[var(--info-ink)]"
+                        }`}
+                      >
+                        {m.role === "user" ? <User size={14} /> : <Bot size={14} />}
+                      </span>
+                      <div
+                        className={`min-w-0 max-w-[88%] rounded-md px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                          m.role === "user"
+                            ? "rounded-br-sm bg-[var(--primary)] text-white"
+                            : "rounded-bl-sm border border-surface-border bg-surface-alt text-ink"
+                        }`}
+                      >
+                        {m.role === "assistant" ? (
+                          <div className="space-y-2">
+                            {m.streaming && m.statusText ? (
+                              <p className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--primary)]" />
+                                {m.statusText}
+                              </p>
+                            ) : null}
+                            {!m.streaming && m.steps && m.steps.length > 0 ? (
+                              <AgentSteps steps={m.steps} />
+                            ) : null}
+                            {!m.streaming && m.searchGroups && m.searchGroups.length > 0 ? (
+                              <SearchResultCards groups={m.searchGroups} />
+                            ) : null}
                             <ThinkAnswerMessage
                               content={m.content}
                               streaming={!!m.streaming}
                             />
-                          ) : null}
-                          {m.searchGroups && m.searchGroups.length > 0 ? (
-                            <SearchResultCards groups={m.searchGroups} />
-                          ) : null}
-                        </>
-                      ) : (
-                        m.content
-                      )}
+                          </div>
+                        ) : (
+                          m.content
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                <div ref={endRef} />
+                  ))}
+                  <div ref={endRef} />
+                </div>
+                {showJump && (
+                  <button
+                    type="button"
+                    onClick={jumpToBottom}
+                    className="btn-primary absolute bottom-3 right-3 !h-9 !w-9 rounded-full !p-0 shadow-lg"
+                    aria-label="回到底部"
+                  >
+                    <ArrowDown size={15} />
+                  </button>
+                )}
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className="mt-3 flex shrink-0 gap-2">
                 <input
                   className="field-input flex-1"
                   value={input}
@@ -396,14 +542,23 @@ export default function PrepPage() {
               使用提示
             </h2>
             <ul className="space-y-2 text-[11px] leading-relaxed text-ink-subtle">
-              <li>· 可要求 Agent 搜索真实面经;结果以可点击来源卡片展示</li>
+              <li>· 教练需要确认方向时会弹出选择框,点击选项即可回答</li>
+              <li>· 检索来源与执行过程默认折叠,可展开查看</li>
               <li>· 描述目标公司与岗位,获得针对性模拟题</li>
-              <li>· 回答后请教练点评,识别表达漏洞</li>
-              <li>· 支持 Markdown 流式回复</li>
+              <li>· 输出时向上滑动可自由阅读,点右下角按钮回到底部</li>
             </ul>
           </div>
         </div>
       </div>
+
+      {askDialog && (
+        <AskUserModal
+          question={askDialog.question}
+          options={askDialog.options}
+          onAnswer={handleAskAnswer}
+          onClose={() => setAskDialog(null)}
+        />
+      )}
     </div>
   );
 }
