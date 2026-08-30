@@ -413,12 +413,58 @@ class LLMClient:
                 text = text[start : end + 1]
         try:
             data = json.loads(text)
-        except json.JSONDecodeError as e:
-            preview = text[:200].replace("\n", " ")
-            raise ValueError(f"LLM 返回非 JSON（预览: {preview!r}）: {e}") from e
+        except json.JSONDecodeError:
+            # LLM 长 JSON 两类高频语法错误:尾随逗号(,} / ,])与字符串内
+            # 裸控制字符(未转义换行/制表符);剥离/转义后重试一次
+            repaired = self._repair_common_json_errors(text)
+            data = json.loads(repaired)
         if not isinstance(data, dict):
             raise ValueError("LLM JSON 根类型必须是 object")
         return data
+
+    @staticmethod
+    def _repair_common_json_errors(text: str) -> str:
+        """修复 LLM 输出 JSON 的常见语法错误。
+
+        - 剥掉对象/数组末尾的尾随逗号；
+        - 字符串内部的裸控制字符（换行/制表符等 <0x20）转义为 \\n / \\t。
+        字符串边界逐字符追踪，字符串外内容原样保留。
+        """
+        out: list[str] = []
+        in_str = False
+        escape = False
+        n = len(text)
+        for i, ch in enumerate(text):
+            if in_str:
+                if escape:
+                    out.append(ch)
+                    escape = False
+                    continue
+                if ch == "\\":
+                    out.append(ch)
+                    escape = True
+                    continue
+                if ch == '"':
+                    in_str = False
+                    out.append(ch)
+                    continue
+                if ord(ch) < 0x20:
+                    out.append("\\n" if ch == "\n" else "\\t" if ch == "\t" else "\\r" if ch == "\r" else f"\\u{ord(ch):04x}")
+                    continue
+                out.append(ch)
+                continue
+            if ch == '"':
+                in_str = True
+                out.append(ch)
+                continue
+            if ch == ",":
+                j = i + 1
+                while j < n and text[j] in " \t\r\n":
+                    j += 1
+                if j < n and text[j] in "}]":
+                    continue  # 尾随逗号,丢弃
+            out.append(ch)
+        return "".join(out)
 
     async def test_connection(self) -> tuple[bool, str]:
         """测试 API 连通性。"""

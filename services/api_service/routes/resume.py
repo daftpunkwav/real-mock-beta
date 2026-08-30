@@ -76,7 +76,9 @@ _RESUME_ANALYZE_PROMPT = with_agent_output_rules("""你是资深技术招聘负�
     "role_fit": {"score": 0-100, "comment": "与目标岗位匹配度"},
     "keyword_ats": {"score": 0-100, "comment": "关键词与 ATS 友好度"},
     "credibility": {"score": 0-100, "comment": "可信度与一致性（时间线/职责/技能）"},
-    "seniority_signal": {"score": 0-100, "comment": "职级信号与 ownership"}
+    "seniority_signal": {"score": 0-100, "comment": "职级信号与 ownership"},
+    "growth_signal": {"score": 0-100, "comment": "成长潜力：学习速度、挑战递进、自驱证据"},
+    "collaboration_signal": {"score": 0-100, "comment": "协作信号：团队角色、跨职能、开源协作痕迹"}
   },
   "ats_keywords": ["简历已覆盖的关键关键词"],
   "missing_keywords": ["目标岗常见但缺失的关键词，优先参考联网检索"],
@@ -97,7 +99,28 @@ _RESUME_ANALYZE_PROMPT = with_agent_output_rules("""你是资深技术招聘负�
   "headline": "一句话人设定位，18-30 字，犀利具体、直指核心竞争力或最大短板，如「Agent 方向广度惊人的实战派，但缺一次深扎」",
   "first_impression": "模拟面试官翻开简历前 30 秒的第一印象独白，第一人称，80-140 字，有画面感（先看到什么、注意到什么、皱眉的是什么），不要空泛",
   "interviewer_comments": ["面试官看完简历会在工位上随口说出的点评，3-6 条，每条 12-30 字，可犀利毒舌但必须专业且能回溯到简历事实，如「14 个仓库 star 全 0，广度换不来信任度」"],
-  "benchmark_percentile": 估算该简历超过多少比例的同方向同级候选人，0-100 整数，综合项目数量/深度/表述/量化判断，给出有区分度的数字
+  "benchmark_percentile": 估算该简历超过多少比例的同方向同级候选人，0-100 整数，综合项目数量/深度/表述/量化判断，给出有区分度的数字,
+  "section_reviews": [
+    {"section": "分区名（教育背景/工作经历/项目经历/技能清单/整体排版 之一）", "score": 0-100, "verdict": "该分区一句话判词，≤20字", "detail": "该分区具体分析：强项、短板、怎么改，80-160字，必须引用简历原文证据"}
+  ],
+  "project_cards": [
+    {"name": "项目名（取简历中最重要的 3-4 个）", "score": 0-100, "one_line": "一句话定位，≤24字", "highlights": ["有证据的真实亮点，≤3条"], "risks": ["面试中最容易被质疑的点，≤3条"], "deep_questions": ["面试官针对该项目必问的深挖问题，≤3条，要具体到实现细节"]}
+  ],
+  "skill_trust": {
+    "solid": ["有项目/数字/证据背书的技能，可放心在面试中主讲"],
+    "claimed": ["仅出现在技能清单、无任何证据支撑的技能，面试时需谨慎"],
+    "missing": ["目标岗位高频出现但简历完全缺失的技能"]
+  },
+  "career_analysis": {
+    "trajectory": "职涯轨迹分析：教育→项目→方向的一致性、成长斜率、决策逻辑，100-200字",
+    "stability_score": 0-100 整数：经历连贯性与方向专注度,
+    "gaps": ["时间线空窗、经历断层、前后矛盾点；无则空数组"],
+    "notes": "补充说明，≤80字"
+  },
+  "company_fit": [
+    {"tier": "层级（一线大厂/二线中厂/AI创业公司/外企 之一）", "fit_score": 0-100, "reason": "30-60字判断依据，结合简历事实与该层级的筛选偏好"}
+  ],
+  "salary_positioning": "薪资区间定位与依据（如「实习 300-450/天」，结合城市/学历/项目力），40-80字"
 }
 硬性要求：
 1. 禁止假大空（如「继续努力」「整体不错」）；每条评价必须能回溯到简历事实或检索证据
@@ -106,7 +129,9 @@ _RESUME_ANALYZE_PROMPT = with_agent_output_rules("""你是资深技术招聘负�
 4. predicted_questions 必须贴合简历项目；rewrite_examples 至少 3 条，且必须是 {before, after} 对象，禁止把 dict 写成字符串
 5. 叙述与列表字段中，对关键结论、数字指标、必须修改处用 **双星号** 包裹强调（如 **41%→58%**、**缺少量化**）；禁止整段加粗，单条最多 2–4 处
 6. headline / first_impression / interviewer_comments 要生动具体、有画面感，像真人面试官说的话，但保持专业、不做人生攻击、不评判个性
-7. 只返回 JSON，不要 Markdown 代码块包裹
+7. section_reviews 必须覆盖五个分区各一条；project_cards 选含金量最高的 3-4 个项目，deep_questions 要问到实现细节（如「为什么不选 X 而是 Y」「QPS 多少怎么测的」）
+8. skill_trust 的三分层判定要有依据：技能出现在项目描述且有细节→solid；只在技能清单出现→claimed；检索到的 JD 高频但简历没有→missing
+9. 只返回 JSON，不要 Markdown 代码块包裹
 """)
 
 
@@ -450,6 +475,95 @@ def _normalize_rewrite_examples(raw: object) -> list[dict[str, str]]:
     return out
 
 
+def _clip_list_str(values: object, limit: int, item_max: int = 200) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [str(v).strip()[:item_max] for v in values if v is not None and str(v).strip()][:limit]
+
+
+def _norm_score(v: object) -> int:
+    try:
+        return max(0, min(100, int(v)))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
+def _normalize_section_reviews(raw: object) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw[:8]:
+        if not isinstance(item, dict):
+            continue
+        out.append({
+            "section": str(item.get("section") or "").strip()[:40],
+            "score": _norm_score(item.get("score")),
+            "verdict": str(item.get("verdict") or "").strip()[:80],
+            "detail": str(item.get("detail") or "").strip()[:1200],
+        })
+    return out
+
+
+def _normalize_project_cards(raw: object) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw[:6]:
+        if not isinstance(item, dict):
+            continue
+        out.append({
+            "name": str(item.get("name") or "").strip()[:80],
+            "score": _norm_score(item.get("score")),
+            "one_line": str(item.get("one_line") or "").strip()[:120],
+            "highlights": _clip_list_str(item.get("highlights"), 4, 300),
+            "risks": _clip_list_str(item.get("risks"), 4, 300),
+            "deep_questions": _clip_list_str(item.get("deep_questions"), 4, 300),
+        })
+    return out
+
+
+def _normalize_skill_trust(raw: object) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    trust = {
+        "solid": _clip_list_str(raw.get("solid"), 12, 80),
+        "claimed": _clip_list_str(raw.get("claimed"), 12, 80),
+        "missing": _clip_list_str(raw.get("missing"), 12, 80),
+    }
+    if not any(trust.values()):
+        return None
+    return trust
+
+
+def _normalize_career_analysis(raw: object) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    analysis = {
+        "trajectory": str(raw.get("trajectory") or "").strip()[:1200],
+        "stability_score": _norm_score(raw.get("stability_score")),
+        "gaps": _clip_list_str(raw.get("gaps"), 6, 160),
+        "notes": str(raw.get("notes") or "").strip()[:300],
+    }
+    if not analysis["trajectory"] and not analysis["gaps"]:
+        return None
+    return analysis
+
+
+def _normalize_company_fit(raw: object) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw[:6]:
+        if not isinstance(item, dict):
+            continue
+        out.append({
+            "tier": str(item.get("tier") or "").strip()[:40],
+            "fit_score": _norm_score(item.get("fit_score")),
+            "reason": str(item.get("reason") or "").strip()[:300],
+        })
+    return out
+
+
 def _normalize_resume_analysis_payload(data: dict) -> dict:
     """容错规范化 LLM 返回，保证能通过 ResumeAnalysis 校验。"""
     if not isinstance(data, dict):
@@ -508,6 +622,13 @@ def _normalize_resume_analysis_payload(data: dict) -> dict:
         out["benchmark_percentile"] = max(0, min(100, int(pct))) if pct is not None else None
     except (TypeError, ValueError):
         out["benchmark_percentile"] = None
+    # 深度扩展字段
+    out["section_reviews"] = _normalize_section_reviews(out.get("section_reviews"))
+    out["project_cards"] = _normalize_project_cards(out.get("project_cards"))
+    out["skill_trust"] = _normalize_skill_trust(out.get("skill_trust"))
+    out["career_analysis"] = _normalize_career_analysis(out.get("career_analysis"))
+    out["company_fit"] = _normalize_company_fit(out.get("company_fit"))
+    out["salary_positioning"] = str(out.get("salary_positioning") or "")[:400]
     # 中文全角标点硬规范化
     normalized = normalize_cn_punctuation_tree(out)
     return normalized if isinstance(normalized, dict) else out
@@ -575,8 +696,8 @@ async def analyze_resume(resume_id: int, db: Session = Depends(get_db)):
         {"role": "user", "content": user_blob or "（空简历）"},
     ]
     try:
-        # 评价 JSON 体量大(含十维+生动化字段),给足输出预算防截断
-        data = await llm.chat_json(messages, max_tokens=8000)
+        # 评价 JSON 体量大(十二维+分区/项目/技能/职涯等深度字段),给足输出预算防截断
+        data = await llm.chat_json(messages, max_tokens=12000)
     except ValueError as e:
         logger.warning("简历评价 LLM JSON 失败: %s", e)
         raise_error("C0002", cause=e)

@@ -55,6 +55,41 @@ export interface RewriteExample {
   after: string;
 }
 
+export interface SectionReview {
+  section: string;
+  score: number;
+  verdict: string;
+  detail: string;
+}
+
+export interface ProjectCardData {
+  name: string;
+  score: number;
+  one_line: string;
+  highlights: string[];
+  risks: string[];
+  deep_questions: string[];
+}
+
+export interface SkillTrustData {
+  solid: string[];
+  claimed: string[];
+  missing: string[];
+}
+
+export interface CareerAnalysisData {
+  trajectory: string;
+  stability_score: number;
+  gaps: string[];
+  notes: string;
+}
+
+export interface CompanyFitData {
+  tier: string;
+  fit_score: number;
+  reason: string;
+}
+
 export interface ResumeAnalysis {
   score: number;
   strengths: string[];
@@ -81,6 +116,13 @@ export interface ResumeAnalysis {
   first_impression?: string;
   interviewer_comments?: string[];
   benchmark_percentile?: number | null;
+  /** 深度扩展:分区审阅/项目卡片/技能核验/职涯分析/公司匹配/薪资定位 */
+  section_reviews?: SectionReview[];
+  project_cards?: ProjectCardData[];
+  skill_trust?: SkillTrustData | null;
+  career_analysis?: CareerAnalysisData | null;
+  company_fit?: CompanyFitData[];
+  salary_positioning?: string;
 }
 
 export interface ResumePickerItem {

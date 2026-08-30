@@ -107,6 +107,46 @@ class RewriteExample(BaseModel):
     after: str = ""
 
 
+class SectionReview(BaseModel):
+    """简历单分区审阅（教育/工作/项目/技能/排版）。"""
+    section: str = ""
+    score: int = Field(ge=0, le=100)
+    verdict: str = ""
+    detail: str = ""
+
+
+class ProjectCard(BaseModel):
+    """单个项目的深挖卡片。"""
+    name: str = ""
+    score: int = Field(ge=0, le=100)
+    one_line: str = ""
+    highlights: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    deep_questions: list[str] = Field(default_factory=list)
+
+
+class SkillTrust(BaseModel):
+    """技能可信度三分层：有证据 / 仅罗列 / 目标岗缺失。"""
+    solid: list[str] = Field(default_factory=list)
+    claimed: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+
+
+class CareerAnalysis(BaseModel):
+    """职涯轨迹分析。"""
+    trajectory: str = ""
+    stability_score: int = Field(ge=0, le=100)
+    gaps: list[str] = Field(default_factory=list)
+    notes: str = ""
+
+
+class CompanyFit(BaseModel):
+    """目标公司层级匹配度。"""
+    tier: str = ""
+    fit_score: int = Field(ge=0, le=100)
+    reason: str = ""
+
+
 class ResumeAnalysis(BaseModel):
     """多维度简历 Agent 评价结果。
 
@@ -140,14 +180,26 @@ class ResumeAnalysis(BaseModel):
     first_impression: str = ""
     interviewer_comments: list[str] = Field(default_factory=list)
     benchmark_percentile: int | None = Field(default=None, ge=0, le=100)
+    # 深度扩展：分区审阅 / 项目卡片 / 技能核验 / 职涯分析 / 公司匹配 / 薪资定位
+    section_reviews: list[SectionReview] = Field(default_factory=list)
+    project_cards: list[ProjectCard] = Field(default_factory=list)
+    skill_trust: SkillTrust | None = None
+    career_analysis: CareerAnalysis | None = None
+    company_fit: list[CompanyFit] = Field(default_factory=list)
+    salary_positioning: str = ""
 
 
 __all__ = [
     "CandidateProfile",
+    "CompanyFit",
+    "CareerAnalysis",
     "DimensionScore",
+    "ProjectCard",
     "ResumeAnalysis",
     "ResumeResponse",
     "RewriteExample",
+    "SectionReview",
+    "SkillTrust",
     "UserProfileResponse",
     "UserProfileUpdate",
 ]
