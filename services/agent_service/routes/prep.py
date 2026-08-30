@@ -34,6 +34,7 @@ from shared.database import get_db
 from agent_service.models import PrepSession
 from agent_service.schemas import ResumePickerItem
 from shared.capabilities.ai.llm.client import LLMClient
+from shared.capabilities.ai.llm.stream_filters import sanitize_special_tokens
 from shared.models import Resume
 
 logger = logging.getLogger(__name__)
@@ -204,4 +205,9 @@ def get_prep_messages(
     if not session:
         raise_error("A3001")
     assert_session_token(session, access, detail=_PREP_FORBIDDEN)
-    return json.loads(session.messages or "[]")
+    messages = json.loads(session.messages or "[]")
+    # 历史消息可能存有净化器上线前的模板 token 泄漏:展示前清洗(不改库)
+    for m in messages:
+        if m.get("role") == "assistant" and isinstance(m.get("content"), str):
+            m["content"] = sanitize_special_tokens(m["content"])
+    return messages

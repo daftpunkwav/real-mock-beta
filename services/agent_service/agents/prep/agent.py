@@ -326,6 +326,12 @@ class PrepAgent:
                 if asked_user is not None:
                     asked_user["on"] = True
                 if events is not None:
+                    # 先补发此前已产生的检索卡片,保证弹窗前卡片事件顺序正确
+                    if search_groups:
+                        await events.put({
+                            "type": "search_results",
+                            "groups": list(search_groups),
+                        })
                     await events.put({
                         "type": "ask_user",
                         "question": question[:200],
@@ -421,8 +427,14 @@ class PrepAgent:
         self.messages.append({"role": "user", "content": user_text})
         working = self._prepare_messages()
 
-        working, early, _ = await self._run_tool_rounds(working, db)
-        if early:
+        asked_user: dict[str, bool] = {"on": False}
+        working, early, _ = await self._run_tool_rounds(
+            working, db, asked_user=asked_user
+        )
+        if asked_user["on"]:
+            # 弹窗已展示:与流式路径一致,等待用户作答,不再编造回答
+            final = _ASK_USER_FALLBACK_REPLY
+        elif early:
             final = early
         else:
             final = await self.llm.chat(working, temperature=0.7)
@@ -477,7 +489,8 @@ class PrepAgent:
                 working, early, search_groups = value
 
         if asked_user["on"]:
-            # 弹窗已展示：不再生成正式回答，等待用户选择
+            # 弹窗事件与检索卡片已在工具执行时即时推送;此处仅清状态行收尾
+            yield {"type": "status", "text": ""}
             final = _ASK_USER_FALLBACK_REPLY
             async for piece in _slice_stream(final):
                 yield piece
@@ -489,6 +502,8 @@ class PrepAgent:
             yield {"type": "status", "text": "正在整理检索要点…"}
             await asyncio.sleep(0)
 
+        # 正文开始:清除状态行
+        yield {"type": "status", "text": ""}
         content_buf = ""
         if early:
             content_buf = early
