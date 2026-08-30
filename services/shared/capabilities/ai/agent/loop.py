@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -22,6 +23,18 @@ OnToolFn = Callable[[str, dict[str, Any], str, str], Awaitable[None] | None]
 MAX_TOOL_RESULT_CHARS = 8_000
 
 
+class AgentHalt(Exception):
+    """工具要求立即终止循环（如 ask_user 等待用户输入）。
+
+    message 会作为该工具的 observation 写回消息序列，
+    保证 assistant.tool_calls 与 tool 结果一一对应。
+    """
+
+    def __init__(self, observation: str = ""):
+        super().__init__(observation or "agent halted by tool")
+        self.observation = observation or "agent halted by tool"
+
+
 def _truncate_tool_result(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
     if len(text) <= limit:
         return text
@@ -35,6 +48,7 @@ class LoopResult:
     messages: list[dict[str, Any]]
     final_content: str | None
     tool_used: bool
+    halted: bool = False
     extras: dict[str, Any] = field(default_factory=dict)
 
 
@@ -53,12 +67,14 @@ async def run_agent_loop(
 
     若首轮无 tool_calls 且已有 content：返回该 content，调用方无需二次 LLM。
     若调用过工具：``final_content`` 为 None，调用方可对流式生成最终回答。
+    同轮多个工具并行执行（结果按 tool_calls 顺序回填，消息序列保持配对）。
     """
     if not tools or max_rounds <= 0:
         return LoopResult(messages=list(messages), final_content=None, tool_used=False)
 
     working = list(messages)
     tool_used = False
+    halted = False
 
     for round_i in range(max_rounds):
         try:
@@ -87,17 +103,27 @@ async def run_agent_loop(
             "content": msg.get("content"),
             "tool_calls": limited,
         })
-        for tc in limited:
+
+        async def _run_one(tc: dict[str, Any]) -> tuple[str, bool]:
+            fn = tc.get("function") or {}
+            name = str(fn.get("name") or "")
+            args = parse_tool_arguments(fn.get("arguments"))
+            try:
+                result = await execute(name, args)
+                return _truncate_tool_result(str(result or "")), False
+            except AgentHalt as halt:
+                return _truncate_tool_result(halt.observation), True
+            except Exception as tool_exc:
+                logger.warning("工具执行失败 tool=%s: %s", name, tool_exc)
+                return f"工具执行失败: {tool_exc}", False
+
+        outcomes = await asyncio.gather(*(_run_one(tc) for tc in limited))
+        halted = False
+        for tc, (result, did_halt) in zip(limited, outcomes):
             fn = tc.get("function") or {}
             name = str(fn.get("name") or "")
             args = parse_tool_arguments(fn.get("arguments"))
             tc_id = str(tc.get("id") or f"call_{round_i}_{name}")
-            try:
-                result = await execute(name, args)
-            except Exception as tool_exc:
-                logger.warning("工具执行失败 tool=%s: %s", name, tool_exc)
-                result = f"工具执行失败: {tool_exc}"
-            result = _truncate_tool_result(str(result or ""))
             working.append({
                 "role": "tool",
                 "tool_call_id": tc_id,
@@ -107,5 +133,10 @@ async def run_agent_loop(
                 maybe = on_tool(name, args, result, tc_id)
                 if maybe is not None:
                     await maybe
+            halted = halted or did_halt
+        if halted:
+            break
 
-    return LoopResult(messages=working, final_content=None, tool_used=tool_used)
+    return LoopResult(
+        messages=working, final_content=None, tool_used=tool_used, halted=halted
+    )

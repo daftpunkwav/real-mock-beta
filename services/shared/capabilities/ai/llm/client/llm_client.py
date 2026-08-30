@@ -31,6 +31,7 @@ from shared.core.secrets import LegacySecretFormatError, decrypt_secret
 from shared.models import LLMSettings
 
 from .base import _extract_message_text, _is_local_allowed, _require_https, _retry_request
+from ..stream_filters import StreamSanitizer
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +279,7 @@ class LLMClient:
         backoff = 0.5
         last_exc: Exception | None = None
         tokens_yielded = False
+        sanitizer = StreamSanitizer()
         async with make_pinned_async_client(
             self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=120.0
         ) as client:
@@ -298,7 +300,6 @@ class LLMClient:
                                 continue
                             resp.raise_for_status()
                         resp.raise_for_status()
-                        reasoning_open = False
                         async for line in resp.aiter_lines():
                             if not line.startswith("data: "):
                                 continue
@@ -317,27 +318,21 @@ class LLMClient:
                                 )
                                 token = delta.get("content") or ""
                                 if isinstance(reasoning, str) and reasoning:
-                                    if not reasoning_open:
-                                        tokens_yielded = True
-                                        yield "<think>"
-                                        reasoning_open = True
-                                    from shared.core.prompts import strip_emojis
-                                    cleaned_r = strip_emojis(reasoning)
+                                    cleaned_r = sanitizer.feed_reasoning(reasoning)
                                     if cleaned_r:
+                                        tokens_yielded = True
                                         yield cleaned_r
                                 if isinstance(token, str) and token:
-                                    if reasoning_open:
-                                        yield "</think>"
-                                        reasoning_open = False
-                                    from shared.core.prompts import strip_emojis
-                                    cleaned = strip_emojis(token)
+                                    cleaned = sanitizer.feed_content(token)
                                     if cleaned:
                                         tokens_yielded = True
                                         yield cleaned
                             except (json.JSONDecodeError, KeyError, IndexError):
                                 continue
-                        if reasoning_open:
-                            yield "</think>"
+                        tail = sanitizer.flush()
+                        if tail:
+                            tokens_yielded = True
+                            yield tail
                         return
                 except (
                     httpx.ConnectError,

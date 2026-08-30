@@ -13,6 +13,7 @@ from shared.config import get_settings
 from shared.core.constants import DEFAULT_LLM_PROTOCOL, LLMProtocol
 from shared.core.security import UnsafeURLError, is_safe_http_url, make_pinned_async_client, redact_api_key
 from shared.core.secrets import LegacySecretFormatError, decrypt_secret
+from shared.capabilities.ai.llm.stream_filters import StreamSanitizer
 
 from .base import _is_local_allowed, _require_https
 
@@ -487,7 +488,11 @@ class UnifiedLLMClient:
         temperature: float = 0.7,
         tools: list[dict[str, Any]] | None = None,
     ) -> AsyncIterator[str]:
-        """解析三种协议的 SSE 文本增量。"""
+        """解析三种协议的 SSE 文本增量。
+
+        reasoning 增量（Anthropic ``thinking_delta`` / OpenAI ``reasoning_content``）
+        统一包裹为 ``<think>...</think>``；正文经 ``StreamSanitizer`` 剥离模板 token。
+        """
         self._safe_check()
         url, payload = self._build_url_and_payload(
             messages,
@@ -496,6 +501,7 @@ class UnifiedLLMClient:
             temperature=temperature,
             tools=tools,
         )
+        sanitizer = StreamSanitizer()
         async with make_pinned_async_client(
             self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=180.0
         ) as client:
@@ -514,10 +520,14 @@ class UnifiedLLMClient:
                     except json.JSONDecodeError:
                         continue
                     token = ""
+                    reasoning = ""
                     if self.protocol == LLMProtocol.ANTHROPIC_MESSAGES:
-                        delta = event.get("delta") or {}
                         if event.get("type") == "content_block_delta":
-                            token = str(delta.get("text") or "")
+                            delta = event.get("delta") or {}
+                            if delta.get("type") == "thinking_delta":
+                                reasoning = str(delta.get("thinking") or "")
+                            else:
+                                token = str(delta.get("text") or "")
                     elif self.protocol == LLMProtocol.OPENAI_RESPONSES:
                         if event.get("type") == "response.output_text.delta":
                             token = str(event.get("delta") or "")
@@ -525,6 +535,20 @@ class UnifiedLLMClient:
                         choices = event.get("choices") or []
                         if choices:
                             delta = choices[0].get("delta") or {}
+                            if not isinstance(delta, dict):
+                                continue
                             token = str(delta.get("content") or "")
+                            reasoning = str(
+                                delta.get("reasoning_content") or delta.get("reasoning") or ""
+                            )
+                    if reasoning:
+                        cleaned = sanitizer.feed_reasoning(reasoning)
+                        if cleaned:
+                            yield cleaned
                     if token:
-                        yield token
+                        cleaned = sanitizer.feed_content(token)
+                        if cleaned:
+                            yield cleaned
+                tail = sanitizer.flush()
+                if tail:
+                    yield tail

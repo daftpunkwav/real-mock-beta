@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from shared.capabilities.ai.agent import WorkingMemory, run_agent_loop
+from shared.capabilities.ai.agent.loop import AgentHalt
 from shared.capabilities.ai.context_manager import compress_messages, prepare_llm_context
 
 
@@ -104,3 +107,76 @@ def test_compress_digest_includes_omitted_user_text() -> None:
     assert summary
     assert "old-topic-0" in summary[0]["content"]
     assert mem.notes
+
+
+@pytest.mark.asyncio
+async def test_agent_halt_appends_observation_and_stops() -> None:
+    llm = _FakeLLM(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {"id": "c1", "function": {"name": "ask_user", "arguments": "{}"}}
+                ],
+            },
+            {"role": "assistant", "content": "不应到达", "tool_calls": None},
+        ]
+    )
+
+    async def execute(name: str, args: dict) -> str:
+        raise AgentHalt("已向用户提问")
+
+    result = await run_agent_loop(
+        llm,
+        [{"role": "user", "content": "hi"}],
+        tools=[{"type": "function", "function": {"name": "ask_user"}}],
+        execute=execute,
+        max_rounds=3,
+    )
+    assert result.halted is True
+    assert result.final_content is None
+    tool_msgs = [m for m in result.messages if m.get("role") == "tool"]
+    assert tool_msgs and "已向用户提问" in tool_msgs[0]["content"]
+    # halt 后不再进下一轮 LLM
+    assert llm.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_parallel_tools_keep_pairing() -> None:
+    llm = _FakeLLM(
+        [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {"id": "c1", "function": {"name": "slow", "arguments": "{}"}},
+                    {"id": "c2", "function": {"name": "fast", "arguments": "{}"}},
+                ],
+            },
+            {"role": "assistant", "content": "done", "tool_calls": None},
+        ]
+    )
+
+    async def execute(name: str, args: dict) -> str:
+        if name == "slow":
+            await asyncio.sleep(0.05)
+            return "slow-result"
+        return "fast-result"
+
+    result = await run_agent_loop(
+        llm,
+        [{"role": "user", "content": "hi"}],
+        tools=[
+            {"type": "function", "function": {"name": "slow"}},
+            {"type": "function", "function": {"name": "fast"}},
+        ],
+        execute=execute,
+        max_rounds=2,
+    )
+    tool_msgs = [m for m in result.messages if m.get("role") == "tool"]
+    assert [m["tool_call_id"] for m in tool_msgs] == ["c1", "c2"]
+    assert "slow-result" in tool_msgs[0]["content"]
+    assert "fast-result" in tool_msgs[1]["content"]
+    # 已调用过工具:final_content 为 None,由调用方流式生成最终回答
+    assert result.final_content is None
