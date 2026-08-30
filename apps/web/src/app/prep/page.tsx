@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { agentService as api } from "@/lib/api/agentService";
 import { PREP_QUICK_PROMPTS } from "@/config/prepPrompts";
 import type { PrepSearchGroup, PrepToolStep, ResumePickerItem } from "@/types";
@@ -198,7 +198,11 @@ export default function PrepPage() {
     }
   };
 
-  const sendMessage = async (text: string, sessionId?: number) => {
+  const sendMessage = async (
+    text: string,
+    sessionId?: number,
+    opts?: { skipUserMessage?: boolean },
+  ) => {
     const sid = sessionId ?? prepSessionId;
     if (!text.trim() || !sid || loadingRef.current) return;
 
@@ -209,9 +213,14 @@ export default function PrepPage() {
     setLoading(true);
     followRef.current = true;
     setShowJump(false);
+    if (!opts?.skipUserMessage) {
+      setMessages((m) => [
+        ...m,
+        { id: nextMsgId("u"), role: "user", content: userMsg },
+      ]);
+    }
     setMessages((m) => [
       ...m,
-      { id: nextMsgId("u"), role: "user", content: userMsg },
       { id: assistantId, role: "assistant", content: "", streaming: true },
     ]);
 
@@ -231,7 +240,8 @@ export default function PrepPage() {
           );
         },
         onStatus: (text) => {
-          if (text) patchMessage(assistantId, { statusText: text });
+          // 空串 = 正文开始,清除状态行
+          patchMessage(assistantId, { statusText: text });
         },
         onToolStep: (step) => {
           setMessages((m) =>
@@ -271,7 +281,8 @@ export default function PrepPage() {
       const pending = pendingSendRef.current;
       pendingSendRef.current = "";
       if (pending) {
-        setTimeout(() => sendMessage(pending), 50);
+        // 弹窗回答在流结束前排队的场景:用户消息已乐观上屏,跳过重复追加
+        setTimeout(() => sendMessage(pending, undefined, { skipUserMessage: true }), 50);
       }
     }
   };
@@ -281,6 +292,11 @@ export default function PrepPage() {
   const handleAskAnswer = (text: string) => {
     setAskDialog(null);
     if (loadingRef.current) {
+      // 流未结束:选择先乐观上屏为用户消息,流结束后自动发送
+      setMessages((m) => [
+        ...m,
+        { id: nextMsgId("u"), role: "user", content: text.trim() },
+      ]);
       pendingSendRef.current = text;
       return;
     }
@@ -389,52 +405,20 @@ export default function PrepPage() {
                   onScroll={handleScroll}
                   className="surface-card h-full space-y-3.5 overflow-y-auto p-4"
                 >
-                  {messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`flex gap-2.5 ${m.role === "user" ? "flex-row-reverse" : ""}`}
-                    >
-                      <span
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                          m.role === "user"
-                            ? "bg-[var(--primary)] text-white"
-                            : "bg-[var(--info-soft)] text-[var(--info-ink)]"
-                        }`}
-                      >
-                        {m.role === "user" ? <User size={14} /> : <Bot size={14} />}
-                      </span>
-                      <div
-                        className={`min-w-0 max-w-[88%] rounded-md px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                          m.role === "user"
-                            ? "rounded-br-sm bg-[var(--primary)] text-white"
-                            : "rounded-bl-sm border border-surface-border bg-surface-alt text-ink"
-                        }`}
-                      >
-                        {m.role === "assistant" ? (
-                          <div className="space-y-2">
-                            {m.streaming && m.statusText ? (
-                              <p className="flex items-center gap-1.5 text-[11px] text-ink-muted">
-                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--primary)]" />
-                                {m.statusText}
-                              </p>
-                            ) : null}
-                            {!m.streaming && m.steps && m.steps.length > 0 ? (
-                              <AgentSteps steps={m.steps} />
-                            ) : null}
-                            {!m.streaming && m.searchGroups && m.searchGroups.length > 0 ? (
-                              <SearchResultCards groups={m.searchGroups} />
-                            ) : null}
-                            <ThinkAnswerMessage
-                              content={m.content}
-                              streaming={!!m.streaming}
-                            />
-                          </div>
-                        ) : (
-                          m.content
-                        )}
+                  {messages.map((m) =>
+                    m.role === "assistant" ? (
+                      <AssistantBubble key={m.id} msg={m} />
+                    ) : (
+                      <div key={m.id} className="flex flex-row-reverse gap-2.5">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-white">
+                          <User size={14} />
+                        </span>
+                        <div className="min-w-0 max-w-[88%] rounded-md rounded-br-sm bg-[var(--primary)] px-3.5 py-2.5 text-[13px] leading-relaxed text-white">
+                          {m.content}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ),
+                  )}
                   <div ref={endRef} />
                 </div>
                 {showJump && (
@@ -562,3 +546,32 @@ export default function PrepPage() {
     </div>
   );
 }
+
+/**
+ * 助手消息气泡(memo 化):流式 token 每帧刷新时,只有 content 变化的
+ * 那条消息重渲染,历史消息整块跳过,避免长回复时全列表 Markdown 重解析。
+ */
+const AssistantBubble = memo(function AssistantBubble({ msg }: { msg: ChatMessage }) {
+  return (
+    <div className="flex gap-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-ink)]">
+        <Bot size={14} />
+      </span>
+      <div className="min-w-0 max-w-[88%] rounded-md rounded-bl-sm border border-surface-border bg-surface-alt px-3.5 py-2.5 text-[13px] leading-relaxed text-ink">
+        <div className="space-y-2">
+          {msg.streaming && msg.statusText ? (
+            <p className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--primary)]" />
+              {msg.statusText}
+            </p>
+          ) : null}
+          {msg.steps && msg.steps.length > 0 ? <AgentSteps steps={msg.steps} /> : null}
+          {msg.searchGroups && msg.searchGroups.length > 0 ? (
+            <SearchResultCards groups={msg.searchGroups} />
+          ) : null}
+          <ThinkAnswerMessage content={msg.content} streaming={!!msg.streaming} />
+        </div>
+      </div>
+    </div>
+  );
+});

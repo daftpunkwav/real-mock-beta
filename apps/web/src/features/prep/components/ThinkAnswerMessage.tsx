@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { ChevronRight, Brain } from "lucide-react";
 import { StreamingReveal } from "@/components/StreamingReveal";
 import { splitThinkAnswer, stripToolCallJson } from "@/lib/thinkStream";
@@ -18,8 +18,9 @@ interface ThinkAnswerMessageProps {
  * - 思考过程默认折叠,可展开
  * - 正式回答走 StreamingReveal 流式渲染
  * - 剥离误流出的 tool JSON
+ * memo 化:消息列表流式刷新时,content 未变的实例跳过重解析与重渲染
  */
-export function ThinkAnswerMessage({
+export const ThinkAnswerMessage = memo(function ThinkAnswerMessage({
   content,
   streaming = false,
   className,
@@ -99,4 +100,4 @@ export function ThinkAnswerMessage({
       ) : null}
     </div>
   );
-}
+});

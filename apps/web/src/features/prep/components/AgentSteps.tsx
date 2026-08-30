@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { ChevronRight, Wrench } from "lucide-react";
 import type { PrepToolStep } from "@/types";
 
@@ -18,7 +18,7 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 /** ReAct 执行过程时间线(思考→行动→观察),默认收起。 */
-export function AgentSteps({ steps }: { steps: PrepToolStep[] }) {
+export const AgentSteps = memo(function AgentSteps({ steps }: { steps: PrepToolStep[] }) {
   const [expanded, setExpanded] = useState(false);
   if (steps.length === 0) return null;
 
@@ -60,4 +60,4 @@ export function AgentSteps({ steps }: { steps: PrepToolStep[] }) {
       )}
     </div>
   );
-}
+});

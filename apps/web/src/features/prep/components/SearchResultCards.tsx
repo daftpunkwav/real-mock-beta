@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { ChevronRight, ExternalLink, Search } from "lucide-react";
 import type { PrepSearchGroup } from "@/types";
 
@@ -26,7 +26,7 @@ function safeHttpUrl(url: string): string | null {
 }
 
 /** 面试准备:可点击打开原文的搜索结果卡片;默认收起,不抢占正文阅读区。 */
-export function SearchResultCards({
+export const SearchResultCards = memo(function SearchResultCards({
   groups,
   defaultExpanded = false,
 }: {
@@ -122,4 +122,4 @@ export function SearchResultCards({
       )}
     </div>
   );
-}
+});
