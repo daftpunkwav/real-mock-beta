@@ -29,7 +29,7 @@ _MAX_PENDING = _MAX_SPECIAL_BODY + 8
 # 非流式一次性剥离：前导分隔 + token 主体 + 尾随分隔（两种闭合形态）
 # 形态一 |<|X|>|：前导 |、<|、body、可选 |、>、尾随 |
 # 形态二 ]<]X[>[：前导 ]、<]、body、可选 [、>、尾随 [
-_SPECIAL_RE = re.compile(r"[|\]]?<[(|\]][^<>]{0,48}[|\]]?>[|\]]?")
+_SPECIAL_RE = re.compile(r"[|\[\]]?<[(|\]][^<>]{0,48}[|\[\]]?>[|\[\]]?")
 
 # 文本内联 XML 工具调用块的提取（quiz 题目转换用）
 _INLINE_QUESTION_RE = re.compile(r"<question>(.*?)</question>", re.S)
@@ -135,6 +135,9 @@ class InlineToolCallCleaner:
     _OPEN = "<tool_call>"
     _CLOSE = "</tool_call>"
     _MAX_BLOCK = 4000
+    # <tool_call> 后(允许空白)必须紧跟 <invoke 才认定为工具块;
+    # 正文合法讨论 <tool_call>(如教学示例)不含 invoke,按正文放行
+    _INVOKE_WINDOW = 64
 
     def __init__(self) -> None:
         self._buf = ""
@@ -176,9 +179,24 @@ class InlineToolCallCleaner:
                         self._emit_local(out, self._buf[:emit_len])
                         self._buf = self._buf[emit_len:]
                     break
+                rest_start = i + len(self._OPEN)
+                window = self._buf[rest_start : rest_start + self._INVOKE_WINDOW]
+                stripped = window.lstrip()
+                if not stripped:
+                    if not final and len(window) < self._INVOKE_WINDOW:
+                        break  # 后面还是空白,等更多数据确认
+                    # 窗口内全是空白:不是工具块,放行 <tool_call> 字样
+                    self._emit_local(out, self._buf[:rest_start])
+                    self._buf = self._buf[rest_start:]
+                    continue
+                if not stripped.startswith("<invoke"):
+                    # 非空白内容不是 <invoke:是正文讨论,放行 <tool_call> 字样
+                    self._emit_local(out, self._buf[:rest_start])
+                    self._buf = self._buf[rest_start:]
+                    continue
                 if i > 0:
                     self._emit_local(out, self._buf[:i])
-                self._buf = self._buf[i + len(self._OPEN):]
+                self._buf = self._buf[rest_start:]
                 self._in_block = True
                 continue
             # 块内：找闭合

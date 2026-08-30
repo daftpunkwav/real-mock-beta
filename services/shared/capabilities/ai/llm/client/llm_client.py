@@ -279,11 +279,13 @@ class LLMClient:
         backoff = 0.5
         last_exc: Exception | None = None
         tokens_yielded = False
-        sanitizer = StreamSanitizer()
         async with make_pinned_async_client(
             self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=120.0
         ) as client:
             for attempt in range(max_retries + 1):
+                # sanitizer 按 attempt 重建:失败重试时丢弃上次残留的
+                # 半截特殊 token 缓冲与 <think> 开合状态,避免污染新流
+                sanitizer = StreamSanitizer()
                 try:
                     async with client.stream(
                         "POST", url, headers=headers, json=payload

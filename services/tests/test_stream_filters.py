@@ -125,6 +125,27 @@ def test_normal_xml_content_kept() -> None:
     assert r == text
 
 
+def test_tool_call_mention_without_invoke_kept() -> None:
+    # 正文教学示例提到 <tool_call> 但没有 <invoke 结构,不误吞
+    text = "先定义 <tool_call> 结构,再填入参数即可。"
+    s = StreamSanitizer()
+    r = s.feed_content(text) + s.flush()
+    assert r == text
+
+
+def test_tool_call_mention_then_real_block() -> None:
+    # 同一段里先提到 <tool_call>(无 invoke),随后才是真实工具块
+    text = (
+        "先看 <tool_call> 的写法,然后系统会自动解析。"
+        "<tool_call><invoke name=\"quiz\"><question>题目A</question></invoke></tool_call>"
+    )
+    s = StreamSanitizer()
+    r = s.feed_content(text) + s.flush()
+    assert "先看 <tool_call> 的写法" in r
+    assert "<invoke" not in r
+    assert "题目A" in r
+
+
 def test_sanitize_special_tokens_one_shot() -> None:
     assert sanitize_special_tokens("。|<|minimax|>|<|tool_call|> X") == "。 X"
     assert sanitize_special_tokens("正常文本") == "正常文本"
