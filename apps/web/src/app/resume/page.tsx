@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { apiService as api } from "@/lib/api/apiService";
 import { toast } from "@/components/Toast";
 import type { Resume } from "@/types";
-import { AnalysisPanel, asAnalysis } from "@/features/resume";
+import { AnalysisPanel, AnalyzeStageProgress, asAnalysis } from "@/features/resume";
 import {
   Upload,
   FileText,
@@ -308,15 +308,7 @@ export default function ResumePage() {
                     <p className="text-[13px] tracking-[0.04em]">选择一份简历后查看评价</p>
                   </div>
                 ) : analyzingId === previewResume.id ? (
-                  <div className="py-14 text-center">
-                    <span className="mx-auto mb-4 block h-7 w-7 anim-spin rounded-full border-2 border-[var(--primary)] border-t-transparent" />
-                    <p className="mb-1.5 text-[13px] tracking-[0.04em] text-ink">
-                      正在生成深度评价
-                    </p>
-                    <p className="mx-auto max-w-sm text-[11px] leading-relaxed tracking-[0.03em] text-ink-subtle">
-                      包含排版、字体、内容审阅与联网岗位参考,通常需要 1–3 分钟
-                    </p>
-                  </div>
+                  <AnalyzeStageProgress />
                 ) : !analysis ? (
                   <div className="py-12 text-center">
                     <div className="empty-state-icon mx-auto mb-4">

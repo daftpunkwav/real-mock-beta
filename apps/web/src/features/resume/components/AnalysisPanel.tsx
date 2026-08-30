@@ -2,8 +2,16 @@
 
 import { AlertTriangle } from "lucide-react";
 import type { Resume, ResumeAnalysis } from "@/types";
-import { normalizeCnPunctuation, parseRewriteExample, tokenizeEvalText } from "@/lib/cnText";
-import type { EvalTextPart } from "@/lib/cnText";
+import { normalizeCnPunctuation, parseRewriteExample } from "@/lib/cnText";
+import { EvalRichText } from "./EvalRichText";
+import { RadarChart } from "./RadarChart";
+import { ScoreRing } from "./ScoreRing";
+import {
+  FirstImpressionCard,
+  HeadlineBanner,
+  InterviewerNotes,
+  PercentileBar,
+} from "./ImpressionCards";
 
 const DIM_LABELS: Record<string, string> = {
   structure_clarity: "结构清晰度",
@@ -54,6 +62,13 @@ export function AnalysisPanel({ analysis }: { analysis: ResumeAnalysis }) {
   const dims = analysis.dimension_scores || {};
   const dimEntries = Object.entries(dims);
   const t = normalizeCnPunctuation;
+  const radarDims = dimEntries.map(([key, v]) => ({
+    key,
+    label: DIM_LABELS[key] || key,
+    score: dimScore(v as never),
+  }));
+  const percentile =
+    typeof analysis.benchmark_percentile === "number" ? analysis.benchmark_percentile : null;
 
   return (
     <article className="eval-sheet">
@@ -62,11 +77,14 @@ export function AnalysisPanel({ analysis }: { analysis: ResumeAnalysis }) {
           <h2 className="eval-masthead-title">Agent 深度评价</h2>
           <p className="eval-masthead-sub">简历审阅意见</p>
         </div>
-        <div className="eval-score" aria-label={`综合得分 ${analysis.score}`}>
-          <div className="eval-score-num">{analysis.score}</div>
-          <div className="eval-score-label">综合</div>
-        </div>
+        <ScoreRing score={analysis.score} />
       </header>
+
+      {analysis.headline?.trim() && <HeadlineBanner text={analysis.headline} />}
+
+      {analysis.first_impression?.trim() && (
+        <FirstImpressionCard text={analysis.first_impression} />
+      )}
 
       {analysis.overall_narrative && (
         <section className="eval-section">
@@ -89,6 +107,46 @@ export function AnalysisPanel({ analysis }: { analysis: ResumeAnalysis }) {
             <EvalRichText text={t(analysis.role_fit_summary)} />
           </p>
         </section>
+      )}
+
+      {radarDims.length >= 3 && (
+        <section className="eval-section">
+          <span className="eval-label">能力雷达</span>
+          <div className="eval-radar-grid">
+            <RadarChart dims={radarDims} />
+            <div className="eval-dim-grid eval-dim-grid-compact">
+              {dimEntries.map(([k, v]) => {
+                const sc = dimScore(v as never);
+                const comment = dimComment(v as never);
+                return (
+                  <div key={k} className="min-w-0">
+                    <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                      <span className="eval-dim-name">{DIM_LABELS[k] || k}</span>
+                      <span className="eval-dim-score">{sc}</span>
+                    </div>
+                    <div className="progress !h-1">
+                      <div
+                        className="progress-bar"
+                        style={{ width: `${Math.min(sc, 100)}%` }}
+                      />
+                    </div>
+                    {comment ? (
+                      <p className="eval-dim-comment">
+                        <EvalRichText text={t(comment)} />
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {percentile != null && <PercentileBar pct={percentile} />}
+
+      {analysis.interviewer_comments && analysis.interviewer_comments.length > 0 && (
+        <InterviewerNotes items={analysis.interviewer_comments} />
       )}
 
       {(analysis.layout_review || analysis.typography_review || analysis.content_review) && (
@@ -118,34 +176,6 @@ export function AnalysisPanel({ analysis }: { analysis: ResumeAnalysis }) {
             </section>
           )}
         </div>
-      )}
-
-      {dimEntries.length > 0 && (
-        <section className="eval-section">
-          <span className="eval-label">维度评分</span>
-          <div className="eval-dim-grid">
-            {dimEntries.map(([k, v]) => {
-              const sc = dimScore(v as never);
-              const comment = dimComment(v as never);
-              return (
-                <div key={k} className="min-w-0">
-                  <div className="flex items-baseline justify-between gap-3 mb-1.5">
-                    <span className="eval-dim-name">{DIM_LABELS[k] || k}</span>
-                    <span className="eval-dim-score">{sc}</span>
-                  </div>
-                  <div className="progress !h-1">
-                    <div className="progress-bar" style={{ width: `${Math.min(sc, 100)}%` }} />
-                  </div>
-                  {comment ? (
-                    <p className="eval-dim-comment">
-                      <EvalRichText text={t(comment)} />
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </section>
       )}
 
       <div className="eval-pair">
@@ -237,28 +267,6 @@ export function AnalysisPanel({ analysis }: { analysis: ResumeAnalysis }) {
       )}
     </article>
   );
-}
-
-/** 评价正文：支持 **强调** / `代码`，旧数据兜底高亮指标 */
-function EvalRichText({ text }: { text: string }) {
-  const parts = tokenizeEvalText(text);
-  return (
-    <>
-      {parts.map((p, i) => (
-        <EvalRichPart key={i} part={p} />
-      ))}
-    </>
-  );
-}
-
-function EvalRichPart({ part }: { part: EvalTextPart }) {
-  if (part.type === "bold") {
-    return <strong className="eval-em">{part.value}</strong>;
-  }
-  if (part.type === "code") {
-    return <code className="eval-code">{part.value}</code>;
-  }
-  return <>{part.value}</>;
 }
 
 function EvalNumberedStack({

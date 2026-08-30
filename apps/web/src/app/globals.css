@@ -1310,6 +1310,139 @@ button:active:not(:disabled),
       gap: 0.5rem;
     }
   }
+
+  /* ---------- 生动化:雷达 / 第一印象 / 便签墙 / 百分位 ---------- */
+  .eval-radar-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (min-width: 860px) {
+    .eval-radar-grid {
+      grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+      gap: 2.25rem;
+    }
+  }
+  .eval-dim-grid-compact {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 520px) {
+    .eval-dim-grid-compact { grid-template-columns: 1fr 1fr; }
+  }
+
+  .eval-impression {
+    position: relative;
+    padding: 1.5rem 1.625rem 1.625rem;
+    border-radius: var(--radius-lg);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--primary) 4%, var(--background-alt)), var(--background-alt));
+    border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+    overflow: hidden;
+  }
+  .eval-impression-quote {
+    position: absolute;
+    top: -0.4rem;
+    right: 0.4rem;
+    color: var(--primary);
+    opacity: 0.09;
+    pointer-events: none;
+  }
+  .eval-impression-body {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.95;
+    letter-spacing: 0.015em;
+    color: var(--foreground);
+    font-style: italic;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .eval-notes-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  @media (min-width: 560px) {
+    .eval-notes-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .eval-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    font-size: 0.8125rem;
+    line-height: 1.75;
+    letter-spacing: 0.012em;
+    color: var(--foreground-muted);
+    transition: transform 0.25s var(--ease, ease), box-shadow 0.25s var(--ease, ease),
+      border-color 0.25s var(--ease, ease);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .eval-note p { margin: 0; min-width: 0; }
+  .eval-note.is-tilt-l { transform: rotate(-0.55deg); }
+  .eval-note.is-tilt-r { transform: rotate(0.55deg); }
+  .eval-note:hover {
+    transform: rotate(0deg) translateY(-1px);
+    border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+  }
+
+  .eval-percentile-track {
+    position: relative;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--muted);
+    overflow: visible;
+  }
+  .eval-percentile-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--danger) 0%,
+      var(--warning) 45%,
+      var(--primary) 75%,
+      var(--success) 100%
+    );
+    opacity: 0.32;
+  }
+  .eval-percentile-pin {
+    position: absolute;
+    top: 50%;
+    margin-top: -1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 999px;
+    border: 2.5px solid var(--card);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    transition: left 1.1s cubic-bezier(0.22, 1, 0.36, 1), transform 0.5s var(--ease, ease);
+  }
+  .eval-percentile-pin-val {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  .eval-percentile-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    color: var(--muted-foreground);
+  }
 }
 
 /* ===========================================================

@@ -76,6 +76,11 @@ export interface ResumeAnalysis {
   content_review?: string;
   market_insights?: string[];
   search_queries_used?: string[];
+  /** 生动化扩展(旧评价数据可空缺,前端按空缺降级) */
+  headline?: string;
+  first_impression?: string;
+  interviewer_comments?: string[];
+  benchmark_percentile?: number | null;
 }
 
 export interface ResumePickerItem {
