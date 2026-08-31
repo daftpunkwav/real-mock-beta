@@ -97,3 +97,10 @@ _test_*.mjs
 /PROJECT_PERFORMANCE_REALMOCK.html
 /PROJECT_TECH_HANDBOOK.html
 
+# 本地审计 / Playwright 抓取 / 手册抽查脚本（不入库）
+.playwright-mcp/
+_backup_pre_fix/
+_color_audit/
+_scripts/
+fix-script-entities.ps1
+
