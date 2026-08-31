@@ -1,6 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  connectElementToAnalyser,
+  createAnalyserNode,
+  createAudioContext,
+  ensureContextRunning,
+  fireSilentProbe,
+} from "./ttsAudio";
+import { createTTSLevelLoop, type TTSLevelLoop } from "./ttsLevelLoop";
 
 /**
  * 顺序播放 base64 MP3；必须先经用户手势 unlock，否则只缓冲不播、不假报 tts_playback_done。
@@ -16,7 +24,6 @@ export function useTTSPlayer() {
   const epochRef = useRef(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const levelRafRef = useRef<number | null>(null);
   /** 未解锁或播放失败时整段缓冲，供重试 */
   const heldQueueRef = useRef<string[]>([]);
   const onSpeakingChangeRef = useRef<(v: boolean) => void>(() => {});
@@ -25,6 +32,14 @@ export function useTTSPlayer() {
   const onPlaybackDoneRef = useRef<() => void>(() => {});
   const [queueDepth, setQueueDepth] = useState(0);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+
+  const levelLoopRef = useRef<TTSLevelLoop | null>(null);
+  if (levelLoopRef.current === null) {
+    levelLoopRef.current = createTTSLevelLoop({
+      getAnalyser: () => analyserRef.current,
+      onLevel: (level) => onLevelRef.current(level),
+    });
+  }
 
   const setOnSpeakingChange = useCallback((fn: (v: boolean) => void) => {
     onSpeakingChangeRef.current = fn;
@@ -41,33 +56,6 @@ export function useTTSPlayer() {
   const setOnPlaybackDone = useCallback((fn: () => void) => {
     onPlaybackDoneRef.current = fn;
   }, []);
-
-  const _stopLevelLoop = useCallback(() => {
-    if (levelRafRef.current != null) {
-      cancelAnimationFrame(levelRafRef.current);
-      levelRafRef.current = null;
-    }
-    onLevelRef.current(0);
-  }, []);
-
-  const _startLevelLoop = useCallback(() => {
-    const analyser = analyserRef.current;
-    if (!analyser) return;
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    const tick = () => {
-      analyser.getByteTimeDomainData(data);
-      let sum = 0;
-      for (let i = 0; i < data.length; i++) {
-        const v = ((data[i] ?? 128) - 128) / 128;
-        sum += v * v;
-      }
-      const rms = Math.sqrt(sum / data.length);
-      onLevelRef.current(Math.min(1, rms * 4));
-      levelRafRef.current = requestAnimationFrame(tick);
-    };
-    _stopLevelLoop();
-    levelRafRef.current = requestAnimationFrame(tick);
-  }, [_stopLevelLoop]);
 
   const _releaseCurrent = useCallback(() => {
     try {
@@ -104,25 +92,16 @@ export function useTTSPlayer() {
   const unlockAudio = useCallback(async () => {
     try {
       if (!audioCtxRef.current) {
-        audioCtxRef.current = new AudioContext();
+        audioCtxRef.current = createAudioContext();
       }
       const ctx = audioCtxRef.current;
-      if (ctx.state === "suspended") {
-        await ctx.resume();
-      }
-      if (ctx.state !== "running") {
+      if (!ctx || !(await ensureContextRunning(ctx))) {
         unlockedRef.current = false;
         setAudioUnlocked(false);
         onBlockedRef.current(true);
         return false;
       }
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      gain.gain.value = 0;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.02);
+      fireSilentProbe(ctx);
       unlockedRef.current = true;
       setAudioUnlocked(true);
       onBlockedRef.current(false);
@@ -163,7 +142,7 @@ export function useTTSPlayer() {
                 currentAudioRef.current = null;
                 speakingRef.current = false;
                 onSpeakingChangeRef.current(false);
-                _stopLevelLoop();
+                levelLoopRef.current?.stop();
                 _notifyIfIdle();
                 resolve();
               };
@@ -179,7 +158,7 @@ export function useTTSPlayer() {
                 currentAudioRef.current = null;
                 speakingRef.current = false;
                 onSpeakingChangeRef.current(false);
-                _stopLevelLoop();
+                levelLoopRef.current?.stop();
                 heldQueueRef.current.push(b64);
                 onBlockedRef.current(true);
                 _notifyIfIdle();
@@ -199,29 +178,24 @@ export function useTTSPlayer() {
 
               const runPlay = async () => {
                 try {
-                  const ctx = audioCtxRef.current ?? new AudioContext();
-                  audioCtxRef.current = ctx;
-                  if (ctx.state === "suspended") {
-                    await ctx.resume();
+                  const ctx = audioCtxRef.current ?? createAudioContext();
+                  if (ctx) {
+                    audioCtxRef.current = ctx;
+                    if (!(await ensureContextRunning(ctx))) {
+                      finishBlocked();
+                      return;
+                    }
+                    if (!analyserRef.current) {
+                      analyserRef.current = createAnalyserNode(ctx);
+                    }
+                    const src = connectElementToAnalyser(ctx, audio, analyserRef.current);
+                    if (src) {
+                      sourceNodeRef.current = src;
+                      levelLoopRef.current?.start();
+                    }
+                    /* MediaElementSource / analyser 失败则 element 直出，无口型电平 */
                   }
-                  if (ctx.state !== "running") {
-                    finishBlocked();
-                    return;
-                  }
-                  if (!analyserRef.current) {
-                    const analyser = ctx.createAnalyser();
-                    analyser.fftSize = 256;
-                    analyserRef.current = analyser;
-                    analyser.connect(ctx.destination);
-                  }
-                  try {
-                    const src = ctx.createMediaElementSource(audio);
-                    sourceNodeRef.current = src;
-                    src.connect(analyserRef.current);
-                    _startLevelLoop();
-                  } catch {
-                    /* MediaElementSource 失败则 element 直出，无口型电平 */
-                  }
+                  /* AudioContext 创建失败：仍尝试 element.play */
                 } catch {
                   /* 仍尝试 element.play */
                 }
@@ -255,7 +229,7 @@ export function useTTSPlayer() {
         );
       queueRef.current = job(queueRef.current);
     },
-    [_releaseCurrent, _startLevelLoop, _stopLevelLoop, _notifyIfIdle],
+    [_releaseCurrent, _notifyIfIdle],
   );
 
   /** 重放整段缓冲（unlock 后或自动播放拦截后） */
@@ -277,21 +251,24 @@ export function useTTSPlayer() {
    * 停止播放并清空队列。
    * @param opts.silent 为 true 时不上报 playback_done（避免 barge 本地 stop 与 tts_interrupted 双重上报）
    */
-  const stop = useCallback((opts?: { silent?: boolean }) => {
-    epochRef.current += 1;
-    _releaseCurrent();
-    speakingRef.current = false;
-    pendingCountRef.current = 0;
-    heldQueueRef.current = [];
-    setQueueDepth(0);
-    onSpeakingChangeRef.current(false);
-    _stopLevelLoop();
-    queueRef.current = Promise.resolve();
-    if (!opts?.silent) {
-      // 用户主动打断：允许服务端开麦
-      onPlaybackDoneRef.current();
-    }
-  }, [_releaseCurrent, _stopLevelLoop]);
+  const stop = useCallback(
+    (opts?: { silent?: boolean }) => {
+      epochRef.current += 1;
+      _releaseCurrent();
+      speakingRef.current = false;
+      pendingCountRef.current = 0;
+      heldQueueRef.current = [];
+      setQueueDepth(0);
+      onSpeakingChangeRef.current(false);
+      levelLoopRef.current?.stop();
+      queueRef.current = Promise.resolve();
+      if (!opts?.silent) {
+        // 用户主动打断：允许服务端开麦
+        onPlaybackDoneRef.current();
+      }
+    },
+    [_releaseCurrent],
+  );
 
   useEffect(() => {
     return () => {

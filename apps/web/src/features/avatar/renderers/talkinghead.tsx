@@ -2,160 +2,17 @@
 
 import { useEffect, useRef } from "react";
 import type { AvatarExpression, AvatarRendererDef, AvatarRendererProps } from "../contract";
+import { AVATAR_ASSETS } from "./talkingheadAssets";
+import { EXPRESSION_MORPH, EXPRESSION_TO_MOOD, safeMood } from "./talkingheadMood";
+import { webglSupported } from "./talkingheadSupport";
 
 /**
  * 3D 头像渲染通道：@met4citizen/talkinghead 适配器。
  *
- * 本文件是唯一允许 import 该库的边界；表情（expression）→ 库内 mood +
- * morph 的映射、音色光照等资产定制全部收拢在此。替换渲染通道时只替换
- * renderers/ 下的适配器，调用方零改动。
+ * 本文件是唯一允许 import 该库的边界；资产表 / 表情映射 / WebGL 探测
+ * 已拆到同目录独立文件。替换渲染通道时只替换 renderers/ 下的适配器，
+ * 调用方零改动。
  */
-
-/** 同源 GLB 资产与该通道的渲染定制（基线姿态/光照/默认心境）。 */
-const AVATAR_ASSETS: Record<
-  string,
-  {
-    url: string;
-    body: "M" | "F";
-    mood: TalkingMood;
-    baseline?: Record<string, number>;
-    light?: { ambient: number; direct: number; directColor: number };
-  }
-> = {
-  professional_male: {
-    url: "/avatars/professional_male.glb",
-    body: "M",
-    mood: "neutral",
-    baseline: {
-      headRotateX: 0.12,
-      eyesLookDown: 0,
-      eyesLookUp: 0.08,
-      eyeBlinkLeft: 0.02,
-      eyeBlinkRight: 0.02,
-    },
-    light: { ambient: 1.25, direct: 8, directColor: 0xffe6cc },
-  },
-  senior_male: {
-    url: "/avatars/senior_male.glb",
-    body: "M",
-    mood: "neutral",
-    baseline: {
-      headRotateX: 0.1,
-      eyesLookDown: 0,
-      eyesLookUp: 0.06,
-      eyeBlinkLeft: 0.02,
-      eyeBlinkRight: 0.02,
-    },
-    light: { ambient: 1.05, direct: 9, directColor: 0xffd8b0 },
-  },
-  strict_expert: {
-    url: "/avatars/senior_male.glb",
-    body: "M",
-    mood: "angry",
-    baseline: {
-      headRotateX: 0.1,
-      eyesLookDown: 0,
-      eyesLookUp: 0.05,
-      browInnerUp: 0.15,
-      eyeBlinkLeft: 0.02,
-      eyeBlinkRight: 0.02,
-    },
-    light: { ambient: 0.9, direct: 11, directColor: 0xffd0b0 },
-  },
-  gentle_female: {
-    url: "/avatars/gentle_female.glb",
-    body: "F",
-    mood: "happy",
-    baseline: {
-      headRotateX: 0.1,
-      eyesLookDown: 0,
-      eyesLookUp: 0.08,
-      mouthSmile: 0.15,
-    },
-    light: { ambient: 1.3, direct: 7.5, directColor: 0xffeef0 },
-  },
-  hr_female: {
-    url: "/avatars/hr_female.glb",
-    body: "F",
-    mood: "neutral",
-    baseline: {
-      headRotateX: 0.1,
-      eyesLookDown: 0,
-      eyesLookUp: 0.07,
-    },
-    light: { ambient: 1.2, direct: 8, directColor: 0xffe8d8 },
-  },
-  young_female: {
-    url: "/avatars/young_female.glb",
-    body: "F",
-    mood: "happy",
-    baseline: {
-      headRotateX: 0.11,
-      eyesLookDown: 0,
-      eyesLookUp: 0.09,
-      mouthSmile: 0.2,
-    },
-    light: { ambient: 1.35, direct: 7, directColor: 0xfff0e8 },
-  },
-};
-
-/** 库内置心境名（无 serious；未列出值一律回落 neutral）。 */
-type TalkingMood =
-  | "neutral"
-  | "happy"
-  | "angry"
-  | "sad"
-  | "fear"
-  | "disgust"
-  | "love"
-  | "sleep";
-
-const VALID_MOODS: ReadonlySet<TalkingMood> = new Set([
-  "neutral",
-  "happy",
-  "angry",
-  "sad",
-  "fear",
-  "disgust",
-  "love",
-  "sleep",
-]);
-
-function safeMood(mood: string | undefined, fallback: TalkingMood = "neutral"): TalkingMood {
-  if (mood && VALID_MOODS.has(mood as TalkingMood)) return mood as TalkingMood;
-  return fallback;
-}
-
-/** 表情 → 库内心境（mood 粒度不够时由辅助 morph 补一层）。 */
-const EXPRESSION_TO_MOOD: Record<string, TalkingMood> = {
-  neutral: "neutral",
-  smile: "happy",
-  happy: "happy",
-  serious: "neutral",
-  curious: "neutral",
-  encouraging: "happy",
-  skeptical: "fear",
-  concerned: "sad",
-  angry: "angry",
-  sad: "sad",
-};
-
-/** 表情 → 辅助 morph（眉/眼/嘴角）。 */
-const EXPRESSION_MORPH: Record<
-  string,
-  { browInnerUp?: number; eyeSquint?: number; mouthSmile?: number; eyesClosed?: number }
-> = {
-  neutral: {},
-  smile: { mouthSmile: 0.45, eyeSquint: 0.15 },
-  happy: { mouthSmile: 0.55, eyeSquint: 0.2 },
-  serious: { browInnerUp: 0.35, mouthSmile: 0 },
-  curious: { browInnerUp: 0.4, mouthSmile: 0.1 },
-  encouraging: { mouthSmile: 0.4, eyeSquint: 0.12 },
-  skeptical: { browInnerUp: 0.25, mouthSmile: 0 },
-  concerned: { browInnerUp: 0.45, mouthSmile: 0, eyesClosed: 0.08 },
-  angry: { browInnerUp: 0.55, mouthSmile: 0 },
-  sad: { browInnerUp: 0.3, mouthSmile: 0, eyesClosed: 0.12 },
-};
 
 type HeadInstance = {
   showAvatar: (avatar: Record<string, unknown>, onprogress?: (ev: unknown) => void) => Promise<void>;
@@ -388,18 +245,6 @@ function TalkingHeadRenderer({
   }, [audioLevel, speaking]);
 
   return <div ref={mountRef} className="absolute inset-0" />;
-}
-
-function webglSupported(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const canvas = document.createElement("canvas");
-    return Boolean(
-      canvas.getContext("webgl") || canvas.getContext("experimental-webgl"),
-    );
-  } catch {
-    return false;
-  }
 }
 
 export const talkingheadRenderer: AvatarRendererDef = {
