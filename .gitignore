@@ -104,3 +104,6 @@ _color_audit/
 _scripts/
 fix-script-entities.ps1
 
+# Agent 架构审查快照（过期本地产物，不入库）
+docs/architecture-review-*.md
+
