@@ -9,7 +9,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_flush_waits_for_all_enqueued(monkeypatch: pytest.MonkeyPatch) -> None:
-    from interview_service.realtime.ws_handler import _SentenceTTSQueue
+    from interview_service.realtime.tts_queue import _SentenceTTSQueue
 
     order: list[str] = []
     delays = {"你好。": 0.05, "第二句。": 0.05, "第三句。": 0.05}
@@ -19,7 +19,7 @@ async def test_flush_waits_for_all_enqueued(monkeypatch: pytest.MonkeyPatch) -> 
         return f"audio:{sentence}"
 
     monkeypatch.setattr(
-        "interview_service.realtime.ws_handler.synthesize_speech",
+        "interview_service.realtime.tts_queue.synthesize_speech",
         slow_synth,
     )
 
@@ -39,14 +39,14 @@ async def test_flush_waits_for_all_enqueued(monkeypatch: pytest.MonkeyPatch) -> 
 
 @pytest.mark.asyncio
 async def test_flush_remainder_enqueues_trailing(monkeypatch: pytest.MonkeyPatch) -> None:
-    from interview_service.realtime.ws_handler import _SentenceTTSQueue
+    from interview_service.realtime.tts_queue import _SentenceTTSQueue
 
     sent: list[str] = []
 
     async def synth(sentence: str, *, creds=None, rate="+0%", pitch="+0Hz") -> str:
         return f"a:{sentence}"
 
-    monkeypatch.setattr("interview_service.realtime.ws_handler.synthesize_speech", synth)
+    monkeypatch.setattr("interview_service.realtime.tts_queue.synthesize_speech", synth)
 
     async def send_cb(msg_type, **payload):
         sent.append(payload["sentence"])

@@ -5,14 +5,14 @@ from __future__ import annotations
 import inspect
 
 from interview_service.routes import interview as interview_api
-from interview_service.services.interview import agent as agent_mod
+from interview_service.services.interview import session_state as agent_mod
 
 
 def test_interview_agent_has_no_start_or_respond() -> None:
-    assert not hasattr(agent_mod.InterviewAgent, "start")
-    assert not hasattr(agent_mod.InterviewAgent, "respond")
-    assert not hasattr(agent_mod.InterviewAgent, "get_phases_remaining")
-    assert hasattr(agent_mod.InterviewAgent, "phases_remaining")
+    assert not hasattr(agent_mod.InterviewSessionState, "start")
+    assert not hasattr(agent_mod.InterviewSessionState, "respond")
+    assert not hasattr(agent_mod.InterviewSessionState, "get_phases_remaining")
+    assert hasattr(agent_mod.InterviewSessionState, "phases_remaining")
 
 
 def test_start_interview_source_uses_runner() -> None:
@@ -33,7 +33,7 @@ def test_phases_remaining_is_callable_list() -> None:
     """防止再把 phases_remaining 当 property 导致 TypeError。"""
     from unittest.mock import MagicMock
 
-    from interview_service.services.interview.agent import InterviewAgent
+    from interview_service.services.interview.session_state import InterviewSessionState
 
     session = MagicMock()
     session.role = "后端"
@@ -50,7 +50,7 @@ def test_phases_remaining_is_callable_list() -> None:
     session.questions_in_phase = 0
     session.asked_questions = "[]"
     llm = MagicMock()
-    agent = InterviewAgent(session, llm)
+    agent = InterviewSessionState(session, llm)
     names = agent.phases_remaining()
     assert isinstance(names, list)
     assert all(isinstance(n, str) for n in names)

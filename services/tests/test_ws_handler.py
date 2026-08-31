@@ -147,12 +147,12 @@ class TestSessionConnectionMutex:
 
         await ws_mod.claim_session_connection(old_h)
         assert old_h._superseded is False
-        assert ws_mod._active_handlers[42] is old_h
+        assert ws_mod.active_handlers_for_tests()[42] is old_h
 
         await ws_mod.claim_session_connection(new_h)
         assert old_h._superseded is True
         assert new_h._superseded is False
-        assert ws_mod._active_handlers[42] is new_h
+        assert ws_mod.active_handlers_for_tests()[42] is new_h
         old_ws.close.assert_awaited()
         # 旧连接应收到 error 提示
         sent = [c.args[0] for c in old_ws.send_json.call_args_list]
@@ -160,10 +160,10 @@ class TestSessionConnectionMutex:
 
         # 释放被顶替的旧 handler 不应误删新连接
         await ws_mod.release_session_connection(old_h)
-        assert ws_mod._active_handlers[42] is new_h
+        assert ws_mod.active_handlers_for_tests()[42] is new_h
 
         await ws_mod.release_session_connection(new_h)
-        assert 42 not in ws_mod._active_handlers
+        assert 42 not in ws_mod.active_handlers_for_tests()
 
     @pytest.mark.asyncio
     async def test_different_sessions_independent(self) -> None:
@@ -176,8 +176,8 @@ class TestSessionConnectionMutex:
         await ws_mod.claim_session_connection(h2)
         assert h1._superseded is False
         assert h2._superseded is False
-        assert ws_mod._active_handlers[1] is h1
-        assert ws_mod._active_handlers[2] is h2
+        assert ws_mod.active_handlers_for_tests()[1] is h1
+        assert ws_mod.active_handlers_for_tests()[2] is h2
         await ws_mod.release_session_connection(h1)
         await ws_mod.release_session_connection(h2)
 
@@ -202,7 +202,7 @@ class TestTraceId:
             "interview_service.realtime.context.InterviewOrchestrator", MagicMock()
         )
         monkeypatch.setattr(
-            "interview_service.realtime.connection_lifecycle.InterviewRunner",
+            "interview_service.realtime.connection_auth.InterviewRunner",
             lambda *a, **kw: _StubRunner(),
         )
         # 模拟 db.query 拿到 session

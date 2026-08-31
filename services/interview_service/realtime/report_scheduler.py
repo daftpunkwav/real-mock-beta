@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from shared.core.constants import SessionStatus
 from shared.database import SessionLocal
 from interview_service.models import InterviewSession
-from interview_service.services.interview.agent import generate_and_persist_report
+from interview_service.services.interview.report import generate_and_persist_report
 
 if TYPE_CHECKING:
     from interview_service.realtime.context import ConnectionContext

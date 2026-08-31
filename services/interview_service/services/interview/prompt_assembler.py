@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from interview_service.models import InterviewSession
 from shared.capabilities.ai.agent import WorkingMemory
 from shared.capabilities.ai.context_manager import compress_messages
-from interview_service.services.interview.agent import InterviewAgent
+from interview_service.services.interview.session_state import InterviewSessionState
 from shared.services.pipeline_config import get_stage_config_for_runtime
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class PromptAssembler:
     def __init__(
         self,
         session: InterviewSession,
-        agent: InterviewAgent,
+        agent: InterviewSessionState,
     ) -> None:
         self.session = session
         self.agent = agent

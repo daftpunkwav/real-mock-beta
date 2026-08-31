@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.orm import Session
 
 from interview_service.models import InterviewSession
-from interview_service.services.interview.agent import strip_markers
+from interview_service.services.interview.agent_text import strip_markers
 from interview_service.services.interview.events import EventKind, StreamEvent
 from shared.capabilities.voice.tts.edge import (
     next_soft_min,

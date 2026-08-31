@@ -14,7 +14,7 @@ from fastapi import WebSocket
 
 from interview_service.agents.orchestrator import InterviewOrchestrator
 from interview_service.realtime.events import TurnState
-from interview_service.services.interview.agent import InterviewAgent
+from interview_service.services.interview.session_state import InterviewSessionState
 from interview_service.services.interview.runner import InterviewRunner
 from shared.capabilities.ai.llm.client import LLMClient
 from shared.capabilities.voice.stt import SttCredentials
@@ -42,7 +42,7 @@ class ConnectionContext:
 
     # ── 业务对象（handle 中赋值）──────────────────
     orchestrator: InterviewOrchestrator = field(default_factory=InterviewOrchestrator)
-    agent: InterviewAgent | None = None
+    agent: InterviewSessionState | None = None
     llm: LLMClient | None = None
     runner: InterviewRunner | None = None
 

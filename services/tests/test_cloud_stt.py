@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from interview_service.realtime import ws_handler
+from interview_service.realtime.voice_pipeline import _pick_stt_text, _should_skip_whisper
 from interview_service.realtime.events import TurnState
 from shared.capabilities.voice.stt.cloud import is_local_stt_model, resolve_cloud_stt_model
 
@@ -23,7 +24,7 @@ def test_resolve_cloud_model_maps_local_sizes():
 
 def test_pick_stt_prefers_asr_over_browser_chinese():
     # 浏览器误听「美食馆」，云端正确「面试官」
-    got = ws_handler._pick_stt_text(
+    got = _pick_stt_text(
         "你好美食馆都是能听到的",
         "你好面试官都能听到的",
     )
@@ -32,11 +33,11 @@ def test_pick_stt_prefers_asr_over_browser_chinese():
 
 
 def test_should_skip_whisper_always_false():
-    assert ws_handler._should_skip_whisper("这是一段足够长的中文回答内容") is False
+    assert _should_skip_whisper("这是一段足够长的中文回答内容") is False
 
 
 def test_pick_stt_prefers_whisper_on_english():
-    got = ws_handler._pick_stt_text("啊啊啊啊", "I used React and Docker")
+    got = _pick_stt_text("啊啊啊啊", "I used React and Docker")
     assert "React" in got
 
 

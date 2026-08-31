@@ -24,7 +24,7 @@ from shared.core.session_auth import assert_session_token, extract_token
 from shared.database import get_db
 from interview_service.models import GrowthRecord, InterviewSession
 from interview_service.schemas import InterviewReport, InterviewReportResponse
-from interview_service.services.interview.agent import generate_and_persist_report
+from interview_service.services.interview.report import generate_and_persist_report
 from shared.capabilities.ai.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)

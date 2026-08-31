@@ -34,7 +34,8 @@ from interview_service.schemas import (
     ResumePickerItem,
 )
 from shared.models import Resume
-from interview_service.services.interview.agent import InterviewAgent, generate_and_persist_report
+from interview_service.services.interview.session_state import InterviewSessionState
+from interview_service.services.interview.report import generate_and_persist_report
 from interview_service.services.interview.events import EventKind
 from interview_service.services.interview.runner import InterviewRunner
 from shared.capabilities.ai.llm.client import LLMClient
@@ -198,7 +199,7 @@ async def start_interview(
     if not llm.api_key:
         raise_error("A0006")
 
-    agent = InterviewAgent(session, llm)
+    agent = InterviewSessionState(session, llm)
     runner = InterviewRunner(session, llm, agent)
     opening, _ = await _collect_turn_result(runner.stream_opening(db))
 
@@ -238,7 +239,7 @@ async def send_message(
     if not llm.api_key:
         raise_error("A0006")
 
-    agent = InterviewAgent(session, llm)
+    agent = InterviewSessionState(session, llm)
     runner = InterviewRunner(session, llm, agent)
     reply, is_complete = await _collect_turn_result(
         runner.stream_turn(

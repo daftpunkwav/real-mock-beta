@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from shared.database import SessionLocal
 from interview_service.models import InterviewSession
-from interview_service.services.interview.agent import strip_markers, strip_think_blocks
+from interview_service.services.interview.agent_text import strip_markers, strip_think_blocks
 
 if TYPE_CHECKING:
     from interview_service.realtime.context import ConnectionContext

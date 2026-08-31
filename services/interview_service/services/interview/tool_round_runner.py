@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from shared.config import get_settings
 from shared.core.constants import RAGBackendKind
-from interview_service.services.interview.agent import InterviewAgent
+from interview_service.services.interview.session_state import InterviewSessionState
 from interview_service.services.interview.tools import (
     MAX_TOOL_ROUNDS,
     execute_interview_tool,
@@ -34,7 +34,7 @@ class ToolRoundRunner:
         self,
         session,
         llm: LLMClient,
-        agent: InterviewAgent,
+        agent: InterviewSessionState,
         rag: CompanyKnowledgeRAG | None,
     ) -> None:
         self.session = session

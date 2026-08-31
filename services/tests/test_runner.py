@@ -489,7 +489,7 @@ def test_stream_turn_rag_error_does_not_break_turn(db) -> None:
 
 def test_agent_public_methods_no_longer_underscore(db) -> None:
     """确保私有字段已被收敛为公共方法（防止 ws_handler 直接访问）。"""
-    from interview_service.services.interview.agent import InterviewAgent
+    from interview_service.services.interview.session_state import InterviewSessionState
 
     public = {
         "save_state", "current_phase", "phases_remaining",
@@ -499,12 +499,12 @@ def test_agent_public_methods_no_longer_underscore(db) -> None:
         "build_opening_prompt", "refresh_system_memory",
         "set_questions_in_phase", "reset_messages",
     }
-    assert public.issubset(set(dir(InterviewAgent)))
+    assert public.issubset(set(dir(InterviewSessionState)))
 
 
 def test_refresh_system_memory_updates_asked_questions(db) -> None:
     """每回合刷新 system prompt 中的结构化记忆，使 asked_questions 反映最新值。"""
-    from interview_service.services.interview.agent import InterviewAgent
+    from interview_service.services.interview.session_state import InterviewSessionState
 
     session = _make_session(db)
     session.messages = json.dumps([
@@ -514,7 +514,7 @@ def test_refresh_system_memory_updates_asked_questions(db) -> None:
     db.refresh(session)
 
     llm = FakeLLMClient(tokens=["好。"])
-    agent = InterviewAgent(session, llm)
+    agent = InterviewSessionState(session, llm)
     # 模拟开场后已问过一个问题
     agent.agent_state.setdefault("asked_questions", [])
     agent.agent_state["asked_questions"].append("请介绍一下你的 Redis 缓存设计方案")
@@ -527,7 +527,7 @@ def test_refresh_system_memory_updates_asked_questions(db) -> None:
 
 def test_refresh_system_memory_replaces_old_memory(db) -> None:
     """刷新应替换旧记忆段落而非重复追加。"""
-    from interview_service.services.interview.agent import InterviewAgent
+    from interview_service.services.interview.session_state import InterviewSessionState
 
     session = _make_session(db)
     session.messages = json.dumps([
@@ -540,7 +540,7 @@ def test_refresh_system_memory_replaces_old_memory(db) -> None:
     db.commit()
     db.refresh(session)
 
-    agent = InterviewAgent(session, FakeLLMClient())
+    agent = InterviewSessionState(session, FakeLLMClient())
     agent.agent_state.setdefault("asked_questions", [])
     agent.agent_state["asked_questions"] = ["新问题B"]
     agent.refresh_system_memory()

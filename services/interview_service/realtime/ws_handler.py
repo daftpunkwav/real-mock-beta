@@ -1,14 +1,19 @@
-"""WebSocket 面试会话处理器（façade）。
+"""WebSocket 面试会话处理器（组装壳）。
 
 具体职责拆到：
 
-- :mod:`connection_lifecycle` — 握手 / 心跳 / 分发
+- :mod:`connection_lifecycle` — 主循环 / 收发基元
+- :mod:`connection_auth` — 鉴权 / 会话绑定 / 管道装配
+- :mod:`heartbeat` — 心跳
+- :mod:`message_dispatcher` — 入站消息分发 / 音频缓冲
 - :mod:`turn_coordinator` — 话轮与候选人回合
+- :mod:`turn_streaming` — 回合流式消费与 TTS 入队
+- :mod:`turn_control` — 打断 / 收尾 / 静默追问
 - :mod:`voice_pipeline` — STT 选择与 TTS 队列
 - :mod:`hint_service` — 参考提纲
 - :mod:`report_scheduler` — 后台报告
 
-本模块保留对外 API 与测试兼容 re-export。
+本模块只做 mixin 组装与 ConnectionContext 构造。
 """
 
 from __future__ import annotations
@@ -20,35 +25,31 @@ from typing import Any
 from fastapi import WebSocket
 from sqlalchemy.orm import Session
 
-from interview_service.realtime.context import ConnectionContext
+from interview_service.realtime.connection_auth import ConnectionAuthMixin
 from interview_service.realtime.connection_lifecycle import ConnectionLifecycleMixin
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.context import ConnectionContext
+from interview_service.realtime.heartbeat import HeartbeatMixin
 from interview_service.realtime.hint_service import HintServiceMixin
+from interview_service.realtime.message_dispatcher import (
+    AUDIO_BUFFER_MAX_BYTES as _AUDIO_BUFFER_MAX_BYTES,
+    MessageDispatcherMixin,
+)
 from interview_service.realtime.report_scheduler import ReportSchedulerMixin
 from interview_service.realtime.session_registry import (
-    _active_handlers,  # noqa: F401 — 测试仍通过 ws_handler 访问
     claim_session_connection,
     release_session_connection,
     reset_session_registry_for_tests,
+    active_handlers_for_tests,
 )
-from interview_service.realtime.turn_coordinator import (
-    TurnCoordinatorMixin,
-    _AUDIO_BUFFER_MAX_BYTES,
+from interview_service.realtime.tts_queue import _SentenceTTSQueue
+from interview_service.realtime.turn_coordinator import TurnCoordinatorMixin
+from interview_service.realtime.turn_control import TurnControlMixin
+from interview_service.realtime.turn_streaming import (
+    TurnStreamingMixin,
     _IMAGE_BASE64_MAX_LEN,
 )
-from interview_service.realtime.voice_pipeline import (
-    VoicePipelineMixin,
-    _SentenceTTSQueue,
-    _is_echo_of_assistant,
-    _latin_letter_ratio,
-    _normalize_echo_text,
-    _pick_stt_text,
-    _should_skip_whisper,
-)
+from interview_service.realtime.voice_pipeline import VoicePipelineMixin
 from interview_service.models import InterviewSession
-from interview_service.services.interview.agent import strip_markers
-from shared.capabilities.voice.stt import SttCredentials, SttResult, transcribe_utterance  # noqa: F401
-from shared.capabilities.voice.tts import TtsCredentials, synthesize_speech  # noqa: F401 — 测试 patch
 from shared.capabilities.voice.tts.voice_resolve import VoiceProsody
 from shared.config import get_settings
 
@@ -56,17 +57,15 @@ from shared.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# 兼容测试 / 外部 import
-_HEARTBEAT_TIMEOUT_SEC: float = 30.0
-_HEARTBEAT_MAX_MISSES: int = 3
-_WS_LLM_RATE_LIMIT = __import__(
-    "shared.core.constants", fromlist=["DEFAULT_LLM_RATE_LIMIT_PER_MINUTE"]
-).DEFAULT_LLM_RATE_LIMIT_PER_MINUTE
-
 
 class InterviewWSHandler(
     ConnectionLifecycleMixin,
+    ConnectionAuthMixin,
+    HeartbeatMixin,
+    MessageDispatcherMixin,
     TurnCoordinatorMixin,
+    TurnStreamingMixin,
+    TurnControlMixin,
     VoicePipelineMixin,
     HintServiceMixin,
     ReportSchedulerMixin,
@@ -145,23 +144,13 @@ class InterviewWSHandler(
             .first()
         )
 
-    # 兼容旧接口
-    _clean_reply = staticmethod(strip_markers)
-
 
 __all__ = [
     "InterviewWSHandler",
-    "_SentenceTTSQueue",
     "_AUDIO_BUFFER_MAX_BYTES",
     "_IMAGE_BASE64_MAX_LEN",
-    "_active_handlers",
     "claim_session_connection",
     "release_session_connection",
     "reset_session_registry_for_tests",
-    "transcribe_utterance",
-    "_pick_stt_text",
-    "_should_skip_whisper",
-    "_is_echo_of_assistant",
-    "_latin_letter_ratio",
-    "_normalize_echo_text",
+    "active_handlers_for_tests",
 ]
