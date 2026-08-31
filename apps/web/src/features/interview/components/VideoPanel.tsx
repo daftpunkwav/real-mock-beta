@@ -1,17 +1,13 @@
 "use client";
 
-import { useEffect, useState, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
-import { Video, VideoOff, Mic, MicOff } from "lucide-react";
-import type { FaceAnalysis as BaseFaceAnalysis } from "@/types";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCameraStream } from "../hooks/useCameraStream";
+import { useFaceAnalysisLoop } from "../hooks/useFaceAnalysisLoop";
+import type { FaceAnalysis } from "../hooks/useFaceAnalysisLoop";
 
-/** VideoPanel 内部使用的扩展版人脸分析字段，保持向后兼容。 */
-export interface FaceAnalysis extends BaseFaceAnalysis {
-  face_detected: boolean;
-  looking_away: boolean;
-  nervousness: number;
-  face_count: number;
-}
+export type { FaceAnalysis };
 
 export interface VideoPanelHandle {
   /** 截取当前视频帧，返回 JPEG base64（不含 data URL 前缀） */
@@ -42,15 +38,14 @@ export const VideoPanel = forwardRef<VideoPanelHandle, VideoPanelProps>(
   ) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [cameraOn, setCameraOn] = useState(false);
-    const streamRef = useRef<MediaStream | null>(null);
-    const faceDetectorRef = useRef<BrowserFaceDetector | null>(null);
-    const acquiringRef = useRef(false);
     const [faceStatus, setFaceStatus] = useState<string>("未检测");
-    const jitterHistory = useRef<number[]>([]);
-    // FaceDetector 不可用时：只上报一次 face_detected:false，避免每 3s 假数据刷新
-    const detectorUnavailableReportedRef = useRef(false);
     const isDark = variant === "dark";
+
+    const { cameraOn, startCamera, stopCamera, toggleCamera } = useCameraStream(
+      videoRef,
+      setFaceStatus,
+    );
+    useFaceAnalysisLoop({ videoRef, cameraOn, enabled, onFaceAnalysis, setFaceStatus });
 
     useImperativeHandle(ref, () => ({
       captureFrame: () => {
@@ -67,135 +62,11 @@ export const VideoPanel = forwardRef<VideoPanelHandle, VideoPanelProps>(
       },
     }));
 
-    const startCamera = async () => {
-      if (acquiringRef.current) return;
-      acquiringRef.current = true;
-      try {
-        // 先停旧流，避免并发 getUserMedia 泄漏
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        if (!acquiringRef.current) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        // 重置「不可用已上报」标记，允许新会话重新检测
-        detectorUnavailableReportedRef.current = false;
-        setCameraOn(true);
-
-        if ("FaceDetector" in window) {
-          try {
-            faceDetectorRef.current = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-          } catch {
-            faceDetectorRef.current = null;
-          }
-        }
-      } catch {
-        setFaceStatus("摄像头权限被拒绝");
-      } finally {
-        acquiringRef.current = false;
-      }
-    };
-
-    const stopCamera = () => {
-      acquiringRef.current = false;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-      faceDetectorRef.current = null;
-      setCameraOn(false);
-      setFaceStatus("未检测");
-    };
-
-    const toggleCamera = () => {
-      if (cameraOn) stopCamera();
-      else void startCamera();
-    };
-
     useEffect(() => {
       if (enabled) void startCamera();
       return () => stopCamera();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enabled]);
-
-    const analyzeFace = useCallback(async () => {
-      const video = videoRef.current;
-      if (!video || !cameraOn || video.readyState < 2) return;
-
-      const analysis: FaceAnalysis = {
-        face_detected: false,
-        looking_away: true,
-        nervousness: 0,
-        face_count: 0,
-      };
-
-      if (faceDetectorRef.current) {
-        try {
-          const faces = await faceDetectorRef.current.detect(video);
-          analysis.face_count = faces.length;
-          analysis.face_detected = faces.length > 0;
-
-          if (faces.length > 0) {
-            const face = faces[0]?.boundingBox;
-            if (face) {
-              const cx = face.x + face.width / 2;
-              const cy = face.y + face.height / 2;
-              const vcx = video.videoWidth / 2;
-              const vcy = video.videoHeight / 2;
-              const offset = Math.hypot(cx - vcx, cy - vcy) / Math.hypot(vcx, vcy);
-              analysis.looking_away = offset > 0.35;
-              jitterHistory.current.push(offset);
-              if (jitterHistory.current.length > 8) jitterHistory.current.shift();
-              if (jitterHistory.current.length >= 3) {
-                const avg =
-                  jitterHistory.current.reduce((a, b) => a + b, 0) /
-                  jitterHistory.current.length;
-                const variance =
-                  jitterHistory.current.reduce((s, v) => s + (v - avg) ** 2, 0) /
-                  jitterHistory.current.length;
-                analysis.nervousness = Math.min(1, variance * 20);
-              }
-            } else {
-              jitterHistory.current.push(0);
-              if (jitterHistory.current.length > 8) jitterHistory.current.shift();
-            }
-            setFaceStatus(
-              analysis.looking_away
-                ? "已检测人脸 · 未看镜头"
-                : analysis.nervousness > 0.5
-                  ? "已检测人脸 · 略显紧张"
-                  : "已检测人脸 · 状态正常",
-            );
-          } else {
-            setFaceStatus("未检测到人脸");
-          }
-        } catch {
-          setFaceStatus("面部分析暂时不可用");
-        }
-        onFaceAnalysis?.(analysis);
-      } else {
-        // FaceDetector 不可用：仅上报一次 face_detected:false，后续静默，不假装检测到人脸
-        if (!detectorUnavailableReportedRef.current) {
-          detectorUnavailableReportedRef.current = true;
-          setFaceStatus("摄像头已开启（浏览器不支持人脸检测 API）");
-          onFaceAnalysis?.(analysis); // face_detected: false
-        }
-      }
-    }, [cameraOn, onFaceAnalysis]);
-
-    useEffect(() => {
-      if (!cameraOn || !enabled) return;
-      const interval = setInterval(() => {
-        analyzeFace();
-      }, 3000);
-      return () => clearInterval(interval);
-    }, [cameraOn, enabled, analyzeFace]);
 
     useEffect(() => {
       return () => {
@@ -269,22 +140,3 @@ export const VideoPanel = forwardRef<VideoPanelHandle, VideoPanelProps>(
     );
   },
 );
-
-interface DetectedFace {
-  boundingBox: { x: number; y: number; width: number; height: number };
-}
-
-interface BrowserFaceDetector {
-  detect(source: HTMLVideoElement): Promise<DetectedFace[]>;
-}
-
-interface FaceDetectorOptions {
-  fastMode?: boolean;
-  maxDetectedFaces?: number;
-}
-
-declare global {
-  interface Window {
-    FaceDetector: new (options?: FaceDetectorOptions) => BrowserFaceDetector;
-  }
-}
