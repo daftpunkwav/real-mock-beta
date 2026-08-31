@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from shared.core.prompts import with_agent_output_rules
 from agent_service.models import PrepSession
 from shared.models import Resume, UserProfile
-from shared.capabilities.knowledge.company.knowledge import get_company_context
+from shared.catalogs.company import get_company_context
 from shared.capabilities.ai.agent import WorkingMemory, run_agent_loop
 from shared.capabilities.ai.agent.loop import AgentHalt
 from shared.capabilities.ai.context_manager import (

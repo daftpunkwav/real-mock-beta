@@ -17,7 +17,7 @@ from shared.models import Resume, UserProfile
 from interview_service.models import InterviewSession
 from shared.schemas import CandidateProfile
 from interview_service.schemas import InterviewConfig
-from shared.capabilities.knowledge.company.knowledge import get_company_context
+from shared.catalogs.company import get_company_context
 from interview_service.services.interview.agent_prompts import build_system_prompt
 from interview_service.services.interview.turn_output import TurnOutput
 from interview_service.services.interview.agent_text import (

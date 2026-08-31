@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from shared.models import Resume, UserProfile
-from shared.capabilities.knowledge.company.knowledge import get_company_context
+from shared.catalogs.company import get_company_context
 from shared.capabilities.integrations.github.tools import GITHUB_TOOL_DEFINITIONS, execute_github_tool
 from shared.capabilities.ai.llm.tool_args import parse_tool_arguments  # noqa: F401 — 兼容旧引用
 from shared.capabilities.knowledge.search.web import web_search

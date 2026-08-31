@@ -21,7 +21,7 @@ def test_shared_core_importable() -> None:
 
 def test_shared_capabilities_importable() -> None:
 
-    from shared.capabilities.knowledge.company.knowledge import get_all_companies
+    from shared.catalogs.company import get_all_companies
 
     assert len(get_all_companies()) >= 7
 

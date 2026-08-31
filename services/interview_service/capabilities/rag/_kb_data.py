@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from shared.capabilities.knowledge.company.knowledge import BUILTIN_COMPANIES
+from shared.catalogs.company import BUILTIN_COMPANIES
 
 logger = logging.getLogger(__name__)
 

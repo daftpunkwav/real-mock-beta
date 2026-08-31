@@ -1,14 +1,14 @@
 """面试选项静态数据（面试域；语音相关数据见 ``shared.capabilities.voice.tts.options``）。
 
-注意：本文件归属面试域（依赖 ``services.interview.workflows`` 与
-``services.company.knowledge``）；AVATARS / TTS_VOICES 已迁往
+注意：本文件归属面试域（依赖 ``interview_service.services.interview.workflows`` 与
+``shared.catalogs.company``）；AVATARS / TTS_VOICES 已迁往
 ``shared.capabilities.voice.tts.options``（语音能力层自持）。
 """
 
 from __future__ import annotations
 
 from interview_service.schemas import WorkflowTypeOption
-from shared.capabilities.knowledge.company.knowledge import get_all_companies
+from shared.catalogs.company import get_all_companies
 from interview_service.services.interview.workflows import WORKFLOWS, phase_label_map
 from shared.capabilities.voice.tts.options import AVATARS, TTS_VOICES
 

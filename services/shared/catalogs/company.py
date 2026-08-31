@@ -1,8 +1,12 @@
-"""企业面试风格知识库。"""
+"""企业面试风格目录（跨服务只读数据）。
+
+供 interview / prep 共用：风格、考察重点、样例问题。不含 DB / LLM / HTTP。
+"""
+
+from __future__ import annotations
 
 from shared.schemas import CompanyInfo
 
-# 内置企业面试模型
 BUILTIN_COMPANIES: list[dict] = [
     {
         "id": "bytedance",
@@ -96,19 +100,23 @@ BUILTIN_COMPANIES: list[dict] = [
 
 
 def get_all_companies() -> list[CompanyInfo]:
+    """全部内置公司，转为共享契约 ``CompanyInfo``。"""
     companies = []
     for c in BUILTIN_COMPANIES:
-        companies.append(CompanyInfo(
-            id=c["id"],
-            name=c["name"],
-            style=c["style"],
-            focus_areas=c["focus_areas"],
-            sample_questions=c["sample_questions"],
-        ))
+        companies.append(
+            CompanyInfo(
+                id=c["id"],
+                name=c["name"],
+                style=c["style"],
+                focus_areas=c["focus_areas"],
+                sample_questions=c["sample_questions"],
+            )
+        )
     return companies
 
 
 def get_company_by_id(company_id: str) -> dict | None:
+    """按 id 或名称查公司原始 dict。"""
     for c in BUILTIN_COMPANIES:
         if c["id"] == company_id or c["name"] == company_id:
             return c
@@ -121,10 +129,11 @@ def get_company_context(company_id: str) -> str:
     if not company:
         return "通用技术面试风格：注重基础、项目经验和技术深度。"
 
+    questions = "\n".join(f"- {q}" for q in company["sample_questions"])
     return f"""## 目标公司：{company['name']}
 面试风格：{company['style']}
 重点领域：{', '.join(company['focus_areas'])}
 典型面试流程：{company['interview_flow']}
 压力等级：{company['pressure_level']}
 参考问题风格：
-{chr(10).join(f'- {q}' for q in company['sample_questions'])}"""
+{questions}"""
