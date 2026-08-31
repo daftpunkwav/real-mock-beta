@@ -2,6 +2,9 @@
 
 - 多 A 记录遍历 + IPv6 + 端口白名单
 - DNS pin：单次解析后固定 IP 建连，缓解 DNS 重绑定 TOCTOU
+
+``_resolve_all`` 及全部策略校验函数保留在本模块（monkeypatch 铁律：测试 patch
+``shared.core.security.url._resolve_all``）；pin 三件套在 :mod:`.url_pin`。
 """
 
 from __future__ import annotations
@@ -9,11 +12,9 @@ from __future__ import annotations
 import ipaddress
 import logging
 import socket
-from dataclasses import dataclass
-from typing import Any
 from urllib.parse import urlparse
 
-import httpx
+import httpx  # noqa: F401 - 保留模块级引用：测试通过 shared.core.security.url.httpx 打补丁
 
 logger = logging.getLogger(__name__)
 
@@ -194,17 +195,6 @@ def assert_safe_http_url(
         raise UnsafeURLError(f"URL 被策略拒绝: {url!r}")
 
 
-@dataclass(frozen=True)
-class PinnedHttpTarget:
-    """SSRF 校验通过后锁定的连接目标。"""
-
-    original_url: str
-    hostname: str
-    pinned_ip: str
-    scheme: str
-    port: int | None
-
-
 def pin_safe_http_url(
     url: str,
     *,
@@ -212,7 +202,7 @@ def pin_safe_http_url(
     require_https: bool = False,
     allowed_ports: frozenset[int] | None = None,
     trusted_hosts: frozenset[str] | None = None,
-) -> PinnedHttpTarget:
+) -> "PinnedHttpTarget":
     """单次 DNS 解析 → 校验全部候选 → pin 首个安全 IP。"""
     if not url:
         raise UnsafeURLError("URL 为空")
@@ -261,79 +251,6 @@ def pin_safe_http_url(
     )
 
 
-class PinnedHostTransport(httpx.AsyncBaseTransport):
-    """将请求中的主机名改写为已 pin 的 IP，并保留 Host / SNI。"""
-
-    def __init__(
-        self,
-        hostname: str,
-        pinned_ip: str,
-        **transport_kwargs: Any,
-    ) -> None:
-        self._hostname = hostname
-        self._pinned_ip = pinned_ip
-        self._inner = httpx.AsyncHTTPTransport(**transport_kwargs)
-
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        host = request.url.host
-        if not host or host.lower() not in {
-            self._hostname.lower(),
-            self._pinned_ip.lower().strip("[]"),
-        }:
-            return await self._inner.handle_async_request(request)
-
-        headers = httpx.Headers(request.headers)
-        port = request.url.port
-        if port and port not in (80, 443):
-            headers["host"] = f"{self._hostname}:{port}"
-        else:
-            headers["host"] = self._hostname
-
-        new_url = request.url.copy_with(host=self._pinned_ip)
-        extensions = dict(request.extensions or {})
-        extensions["sni_hostname"] = self._hostname
-
-        pinned_request = httpx.Request(
-            method=request.method,
-            url=new_url,
-            headers=headers,
-            stream=request.stream,
-            extensions=extensions,
-        )
-        return await self._inner.handle_async_request(pinned_request)
-
-    async def aclose(self) -> None:
-        await self._inner.aclose()
-
-
-def make_pinned_async_client(
-    url: str,
-    *,
-    allow_local: bool = False,
-    require_https: bool = False,
-    timeout: float = 60.0,
-    allowed_ports: frozenset[int] | None = None,
-    trusted_hosts: frozenset[str] | None = None,
-) -> httpx.AsyncClient:
-    """创建对 ``url`` 主机做 DNS pin 的 :class:`httpx.AsyncClient`。"""
-    target = pin_safe_http_url(
-        url,
-        allow_local=allow_local,
-        require_https=require_https,
-        allowed_ports=allowed_ports,
-        trusted_hosts=trusted_hosts,
-    )
-    transport = PinnedHostTransport(
-        hostname=target.hostname,
-        pinned_ip=target.pinned_ip,
-    )
-    return httpx.AsyncClient(
-        transport=transport,
-        timeout=timeout,
-        follow_redirects=False,
-    )
-
-
 def is_localhost_family(host: str) -> bool:
     """判断主机是否位于私有网段（用于限流信任代理链）。"""
     if not host:
@@ -347,3 +264,11 @@ def is_localhost_family(host: str) -> bool:
             if ip in net:
                 return True
     return False
+
+
+# pin 部分拆至 url_pin.py；保持 ``shared.core.security.url.*`` 两条 import 路径均可
+from .url_pin import (  # noqa: E402
+    PinnedHostTransport,
+    PinnedHttpTarget,
+    make_pinned_async_client,
+)

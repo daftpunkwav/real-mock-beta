@@ -2,6 +2,8 @@
 
 不依赖官方 MCP 传输层，直接调用 api.github.com，语义与常见 GitHub MCP 工具对齐。
 未配置 token 时使用未认证配额（约 60 次/小时）；配置后可达 5000 次/小时。
+
+HTTP 层（常量与 ``_get`` 错误映射）拆至 :mod:`.github_http`。
 """
 
 from __future__ import annotations
@@ -9,16 +11,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import httpx
+import httpx  # noqa: F401 - 保留模块级引用：测试 patch client.httpx.AsyncClient
 
 from shared.config import get_settings
 
-logger = logging.getLogger(__name__)
+from .github_http import MAX_TEXT_CHARS, async_get
 
-GITHUB_API = "https://api.github.com"
-DEFAULT_TIMEOUT = 20.0
-# 单次响应 body 上限，防止 README/文件过大撑爆 context
-MAX_TEXT_CHARS = 12_000
+logger = logging.getLogger(__name__)
 
 
 class GitHubClient:
@@ -36,31 +35,7 @@ class GitHubClient:
             self._headers["Authorization"] = f"Bearer {self.token}"
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
-        url = f"{GITHUB_API}{path}"
-        async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-            resp = await client.get(url, headers=self._headers, params=params or {})
-            if resp.status_code == 404:
-                return {"error": "not_found", "path": path, "status": 404}
-            if resp.status_code == 403:
-                return {
-                    "error": "forbidden_or_rate_limited",
-                    "status": 403,
-                    "message": resp.text[:300],
-                }
-            if resp.status_code >= 400:
-                return {
-                    "error": "http_error",
-                    "status": resp.status_code,
-                    "message": resp.text[:300],
-                }
-            # 空 body
-            if not resp.content:
-                return {}
-            try:
-                return resp.json()
-            except Exception:
-                text = resp.text
-                return {"raw": text[:MAX_TEXT_CHARS]}
+        return await async_get(path, headers=self._headers, params=params)
 
     async def get_user(self, username: str) -> dict[str, Any]:
         """获取用户公开资料。"""
