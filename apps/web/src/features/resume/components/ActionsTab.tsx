@@ -4,7 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import type { ResumeAnalysis } from "@/types";
 import { normalizeCnPunctuation } from "@/lib/cnText";
 import { EvalRichText } from "./EvalRichText";
-import { CompanyFitBars } from "./DeepDiveCards";
+import { CompanyFitBars } from "./CompanyFitBars";
 import { EvalList } from "./EvalList";
 
 export function ActionsTab({ analysis }: { analysis: ResumeAnalysis }) {

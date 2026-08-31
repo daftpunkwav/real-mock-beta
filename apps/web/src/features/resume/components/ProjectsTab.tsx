@@ -2,7 +2,7 @@
 
 import type { ResumeAnalysis } from "@/types";
 import { normalizeCnPunctuation } from "@/lib/cnText";
-import { ProjectCards } from "./DeepDiveCards";
+import { ProjectCards } from "./ProjectCards";
 import { EvalNumberedStack } from "./EvalNumberedStack";
 import { RewriteGallery } from "./RewriteGallery";
 

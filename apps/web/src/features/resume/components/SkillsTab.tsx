@@ -3,7 +3,9 @@
 import type { ResumeAnalysis } from "@/types";
 import { normalizeCnPunctuation } from "@/lib/cnText";
 import { EvalRichText } from "./EvalRichText";
-import { CareerPanel, SectionHeatmap, SkillTrustBoard } from "./DeepDiveCards";
+import { SectionHeatmap } from "./SectionHeatmap";
+import { SkillTrustBoard } from "./SkillTrustBoard";
+import { CareerPanel } from "./CareerPanel";
 
 export function SkillsTab({ analysis }: { analysis: ResumeAnalysis }) {
   const t = normalizeCnPunctuation;
