@@ -1,6 +1,8 @@
 """简历评价 payload 规范化单测。"""
 
-from api_service.services.resume.analysis import normalize_resume_analysis_payload
+from api_service.services.resume.analysis_normalize import (
+    normalize_resume_analysis_payload,
+)
 from api_service.schemas import ResumeAnalysis
 
 
