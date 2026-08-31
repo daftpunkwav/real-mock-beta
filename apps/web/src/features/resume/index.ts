@@ -1,6 +1,7 @@
 /** 简历域 feature 层。 */
 
-export { AnalysisPanel, asAnalysis } from "./components/AnalysisPanel";
+export { AnalysisPanel } from "./components/AnalysisPanel";
+export { asAnalysis } from "./analysisFormat";
 export { AnalyzeStageProgress } from "./components/AnalyzeStageProgress";
 export { useResumeList } from "./useResumeList";
 export { ResumePageHead } from "./components/ResumePageHead";

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { apiService as api } from "@/lib/api/apiService";
 import { toast } from "@/components/Toast";
 import type { Resume } from "@/types";
-import { asAnalysis } from "./components/AnalysisPanel";
+import { asAnalysis } from "./analysisFormat";
 
 /** 简历管理页列表状态与副作用：加载、上传、深度评价、设为投递、删除。 */
 export function useResumeList() {
