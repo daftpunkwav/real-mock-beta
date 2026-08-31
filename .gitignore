@@ -90,3 +90,10 @@ _audit_*.txt
 # 本机抽查脚本
 _test_*.mjs
 
+# 项目讲解 HTML（本地手册，不入库）
+/PROJECT_INTRO.html
+/PROJECT_INTRO_REALMOCK.html
+/PROJECT_LEARNING_GUIDE.html
+/PROJECT_PERFORMANCE_REALMOCK.html
+/PROJECT_TECH_HANDBOOK.html
+
