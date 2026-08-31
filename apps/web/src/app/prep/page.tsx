@@ -1,321 +1,73 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { agentService as api } from "@/lib/api/agentService";
+import { useMemo } from "react";
+import { ContextGauge, EffortSelect, ModelSelect } from "@/components/ModelControls";
 import { PREP_QUICK_PROMPTS } from "@/config/prepPrompts";
-import type { PrepSearchGroup, PrepToolStep, ResumePickerItem } from "@/types";
 import {
-  AgentSteps,
   AskUserModal,
-  SearchResultCards,
-  ThinkAnswerMessage,
+  AssistantBubble,
+  PrepSessionList,
+  UserBubble,
+  usePrepChat,
 } from "@/features/prep";
 import {
   Send,
   BookOpen,
   Sparkles,
-  User,
-  Bot,
   FileText,
-  Lightbulb,
-  MessageSquare,
   Zap,
   ArrowDown,
 } from "lucide-react";
 
 const QUICK_PROMPTS = PREP_QUICK_PROMPTS;
-const RESTORE_KEY = "realmock_prep_session_id";
-/** 距底多少像素内视为「贴着底部」,自动跟随滚动 */
-const FOLLOW_THRESHOLD_PX = 96;
-
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  streaming?: boolean;
-  searchGroups?: PrepSearchGroup[];
-  steps?: PrepToolStep[];
-  statusText?: string;
-}
 
 export default function PrepPage() {
-  const [resumes, setResumes] = useState<ResumePickerItem[]>([]);
-  const [resumeId, setResumeId] = useState<number | null>(null);
-  const [prepSessionId, setPrepSessionId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [restoring, setRestoring] = useState(false);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [prepError, setPrepError] = useState("");
-  const [resumeLoadError, setResumeLoadError] = useState("");
-  const [tokenUsage, setTokenUsage] = useState(0);
-  const [askDialog, setAskDialog] = useState<{
-    question: string;
-    options: string[];
-  } | null>(null);
-  const [showJump, setShowJump] = useState(false);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
-  const msgSeqRef = useRef(0);
-  const followRef = useRef(true);
-  const loadingRef = useRef(false);
-  const pendingSendRef = useRef("");
-  // 流式 token 先进缓冲,按帧批量上屏,避免逐 token 触发全列表重渲染
-  const pendingTokenRef = useRef<{ id: string; text: string } | null>(null);
-  const rafRef = useRef(0);
+  const chat = usePrepChat({
+    onAskUser: () => {
+      /* ask_user 弹窗由页面统一渲染，状态在 hook 内部维护 */
+    },
+  });
+  const {
+    messages,
+    input,
+    setInput,
+    loading,
+    starting,
+    prepError,
+    prepSessionId,
+    resumes,
+    resumeId,
+    setResumeId,
+    resumeLoadError,
+    chatModels,
+    selectedModelId,
+    setSelectedModelId,
+    defaultChatProfile,
+    effort,
+    setEffort,
+    tokenUsage,
+    usage,
+    showJump,
+    chatScrollRef,
+    handleSend,
+    handleAskAnswer,
+    handleQuickPrompt,
+    handleNewSession,
+    handleScroll,
+    jumpToBottom,
+    switchSession,
+    startPrep,
+    setAskDialog,
+  } = chat;
 
-  function nextMsgId(prefix: string) {
-    msgSeqRef.current += 1;
-    return `${prefix}-${msgSeqRef.current}`;
-  }
-
-  useEffect(() => {
-    api
-      .listResumes()
-      .then((list) => {
-        setResumeLoadError("");
-        setResumes(list);
-        const active = list.find((r) => r.is_active) || list[0];
-        if (active) setResumeId(active.id);
-      })
-      .catch((e) => {
-        setResumeLoadError(e instanceof Error ? e.message : "简历列表加载失败");
-      });
-  }, []);
-
-  // 恢复上次辅导会话(刷新不丢上下文;消息不含检索卡片与执行步骤)
-  useEffect(() => {
-    const saved = Number(window.localStorage.getItem(RESTORE_KEY) || 0);
-    if (!saved) return;
-    setRestoring(true);
-    api
-      .prepMessages(saved)
-      .then((list) => {
-        const restored: ChatMessage[] = (Array.isArray(list) ? list : [])
-          .filter((m) => (m.role === "user" || m.role === "assistant") && m.content)
-          .map((m) => ({
-            id: nextMsgId(m.role === "user" ? "u" : "a"),
-            role: m.role === "user" ? "user" : "assistant",
-            content: String(m.content),
-          }));
-        if (restored.length === 0) throw new Error("empty session");
-        setPrepSessionId(saved);
-        setMessages(restored);
-      })
-      .catch(() => window.localStorage.removeItem(RESTORE_KEY))
-      .finally(() => setRestoring(false));
-  }, []);
-
+  // 简历列表与场景模型数据在 hook 内加载；页面层只负责展示与事件转发
   const selectedResume = useMemo(
     () => resumes.find((r) => r.id === resumeId) ?? null,
     [resumes, resumeId],
   );
 
-  /* ── 滚动:默认贴底跟随;用户上滑后以用户为准,提供回底按钮 ── */
-  const handleScroll = useCallback(() => {
-    const el = chatScrollRef.current;
-    if (!el) return;
-    const atBottom =
-      el.scrollHeight - el.scrollTop - el.clientHeight < FOLLOW_THRESHOLD_PX;
-    followRef.current = atBottom;
-    setShowJump(!atBottom);
-  }, []);
-
-  useEffect(() => {
-    if (!followRef.current) return;
-    const el = chatScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
-
-  const jumpToBottom = useCallback(() => {
-    followRef.current = true;
-    setShowJump(false);
-    const el = chatScrollRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, []);
-
-  /* ── token 批量上屏 ── */
-  const flushPendingToken = useCallback(() => {
-    rafRef.current = 0;
-    const p = pendingTokenRef.current;
-    if (!p) return;
-    pendingTokenRef.current = null;
-    setMessages((m) =>
-      m.map((msg) =>
-        msg.id === p.id ? { ...msg, content: msg.content + p.text } : msg,
-      ),
-    );
-  }, []);
-
-  const queueToken = useCallback(
-    (id: string, text: string) => {
-      const p = pendingTokenRef.current;
-      if (p && p.id === id) {
-        p.text += text;
-      } else {
-        if (p) flushPendingToken();
-        pendingTokenRef.current = { id, text };
-      }
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(flushPendingToken);
-      }
-    },
-    [flushPendingToken],
-  );
-
-  useEffect(
-    () => () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    },
-    [],
-  );
-
-  const patchMessage = useCallback((id: string, patch: Partial<ChatMessage>) => {
-    setMessages((m) => m.map((msg) => (msg.id === id ? { ...msg, ...patch } : msg)));
-  }, []);
-
-  const startPrep = async () => {
-    setStarting(true);
-    setPrepError("");
-    try {
-      const { id } = await api.createPrepSession({ resume_id: resumeId ?? undefined });
-      setPrepSessionId(id);
-      window.localStorage.setItem(RESTORE_KEY, String(id));
-      setMessages([
-        {
-          id: nextMsgId("a"),
-          role: "assistant",
-          content: "你好!我是你的面试准备教练。告诉我你的目标岗位,或让我帮你分析简历、出题练习。",
-        },
-      ]);
-      return id;
-    } catch (e) {
-      setPrepError(e instanceof Error ? e.message : "创建辅导会话失败");
-      return null;
-    } finally {
-      setStarting(false);
-    }
-  };
-
-  const sendMessage = async (
-    text: string,
-    sessionId?: number,
-    opts?: { skipUserMessage?: boolean },
-  ) => {
-    const sid = sessionId ?? prepSessionId;
-    if (!text.trim() || !sid || loadingRef.current) return;
-
-    const userMsg = text.trim();
-    const assistantId = nextMsgId("a");
-    setInput("");
-    loadingRef.current = true;
-    setLoading(true);
-    followRef.current = true;
-    setShowJump(false);
-    if (!opts?.skipUserMessage) {
-      setMessages((m) => [
-        ...m,
-        { id: nextMsgId("u"), role: "user", content: userMsg },
-      ]);
-    }
-    setMessages((m) => [
-      ...m,
-      { id: assistantId, role: "assistant", content: "", streaming: true },
-    ]);
-
-    try {
-      const result = await api.prepMessageStream(sid, userMsg, {
-        onToken: (token) => queueToken(assistantId, token),
-        onSearchResults: (groups) => {
-          setMessages((m) =>
-            m.map((msg) =>
-              msg.id === assistantId
-                ? {
-                    ...msg,
-                    searchGroups: [...(msg.searchGroups ?? []), ...groups],
-                  }
-                : msg,
-            ),
-          );
-        },
-        onStatus: (text) => {
-          // 空串 = 正文开始,清除状态行
-          patchMessage(assistantId, { statusText: text });
-        },
-        onToolStep: (step) => {
-          setMessages((m) =>
-            m.map((msg) =>
-              msg.id === assistantId
-                ? { ...msg, steps: [...(msg.steps ?? []), step] }
-                : msg,
-            ),
-          );
-        },
-        onAskUser: (question, options) => {
-          flushPendingToken();
-          patchMessage(assistantId, { statusText: "" });
-          setAskDialog({ question, options });
-        },
-      });
-      flushPendingToken();
-      setTokenUsage(result.token_usage);
-      patchMessage(assistantId, { streaming: false, statusText: "" });
-    } catch (e) {
-      flushPendingToken();
-      setMessages((m) =>
-        m.map((msg) =>
-          msg.id === assistantId
-            ? {
-                ...msg,
-                streaming: false,
-                statusText: "",
-                content: msg.content || `错误:${e instanceof Error ? e.message : "失败"}`,
-              }
-            : msg,
-        ),
-      );
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-      const pending = pendingSendRef.current;
-      pendingSendRef.current = "";
-      if (pending) {
-        // 弹窗回答在流结束前排队的场景:用户消息已乐观上屏,跳过重复追加
-        setTimeout(() => sendMessage(pending, undefined, { skipUserMessage: true }), 50);
-      }
-    }
-  };
-
-  const handleSend = () => sendMessage(input);
-
-  const handleAskAnswer = (text: string) => {
-    setAskDialog(null);
-    if (loadingRef.current) {
-      // 流未结束:选择先乐观上屏为用户消息,流结束后自动发送
-      setMessages((m) => [
-        ...m,
-        { id: nextMsgId("u"), role: "user", content: text.trim() },
-      ]);
-      pendingSendRef.current = text;
-      return;
-    }
-    sendMessage(text);
-  };
-
-  const handleQuickPrompt = async (prompt: string) => {
-    if (restoring) return; // 会话恢复中,避免误创建新会话
-    if (!prepSessionId) {
-      const id = await startPrep();
-      if (!id) return;
-      await sendMessage(prompt, id);
-      return;
-    }
-    sendMessage(prompt);
-  };
-
   return (
-    <div className="page-shell !max-w-6xl flex h-full min-h-0 flex-col overflow-hidden !pb-4 anim-rise">
+    <div className="page-shell !max-w-[1600px] flex h-full min-h-0 flex-col overflow-hidden !pb-4 anim-rise">
       <div className="page-header !mb-4 shrink-0">
         <div className="flex items-start gap-3">
           <span className="icon-badge icon-badge-brand">
@@ -392,13 +144,6 @@ export default function PrepPage() {
             </div>
           ) : (
             <>
-              <div className="mb-2 flex shrink-0 items-center justify-between px-1 text-[11px] text-ink-subtle">
-                <span className="chip chip-green !text-[10px]">
-                  <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
-                  辅导中 · {messages.length} 条
-                </span>
-                <span className="font-mono num-tabular">Token ≈ {tokenUsage || 0}</span>
-              </div>
               <div className="relative min-h-0 flex-1">
                 <div
                   ref={chatScrollRef}
@@ -409,17 +154,9 @@ export default function PrepPage() {
                     m.role === "assistant" ? (
                       <AssistantBubble key={m.id} msg={m} />
                     ) : (
-                      <div key={m.id} className="flex flex-row-reverse gap-2.5">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-white">
-                          <User size={14} />
-                        </span>
-                        <div className="min-w-0 max-w-[88%] rounded-md rounded-br-sm bg-[var(--primary)] px-3.5 py-2.5 text-[13px] leading-relaxed text-white">
-                          {m.content}
-                        </div>
-                      </div>
+                      <UserBubble key={m.id} content={m.content} />
                     ),
                   )}
-                  <div ref={endRef} />
                 </div>
                 {showJump && (
                   <button
@@ -432,29 +169,68 @@ export default function PrepPage() {
                   </button>
                 )}
               </div>
-              <div className="mt-3 flex shrink-0 gap-2">
-                <input
-                  className="field-input flex-1"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                  placeholder="问我任何面试相关问题…"
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={loading}
-                  className="btn-primary !h-9 !w-12 shrink-0 !px-0"
-                  aria-label="发送"
-                >
-                  {loading ? (
-                    <span className="block h-3.5 w-3.5 anim-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
-                    <Send size={14} />
-                  )}
-                </button>
-              </div>
+              {(() => {
+                const selectedModel =
+                  chatModels.find((m) => m.id === selectedModelId) ??
+                  (selectedModelId === null ? defaultChatProfile : null);
+                const win = selectedModel?.context_window || 0;
+                // 分项:按角色本地估算(与后端 len/1.5 一致);总量取后端统计与本地估算的较大值
+                const est = (role: string) =>
+                  messages
+                    .filter((m) => m.role === role)
+                    .reduce((s, m) => s + m.content.length, 0) / 1.5;
+                const userEst = est("user");
+                const assistantEst = est("assistant");
+                const used = Math.max(tokenUsage || 0, Math.round(userEst + assistantEst));
+                const systemEst = Math.max(0, used - userEst - assistantEst);
+                return (
+                  <div className="mt-3 flex shrink-0 items-center gap-2">
+                    <input
+                      className="field-input flex-1"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+                      placeholder={loading ? "生成中,输入将排队发送…" : "问我任何面试相关问题…"}
+                    />
+                    <ContextGauge
+                      used={used}
+                      window={win}
+                      usage={usage}
+                      breakdown={[
+                        { label: "消息", value: userEst, color: "var(--primary)" },
+                        { label: "回复", value: assistantEst, color: "#8b5cf6" },
+                        { label: "系统与工具", value: systemEst, color: "#94a3b8" },
+                      ]}
+                    />
+                    <ModelSelect
+                      models={chatModels}
+                      value={selectedModelId}
+                      onChange={setSelectedModelId}
+                      disabled={loading}
+                      ariaLabel="选择模型"
+                      defaultProfile={defaultChatProfile}
+                    />
+                    <EffortSelect
+                      model={selectedModel}
+                      value={effort}
+                      onChange={setEffort}
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSend}
+                      className="btn-primary !h-9 !w-12 shrink-0 !px-0"
+                      aria-label="发送"
+                    >
+                      {loading ? (
+                        <span className="block h-3.5 w-3.5 anim-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <Send size={14} />
+                      )}
+                    </button>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
@@ -482,6 +258,17 @@ export default function PrepPage() {
           </div>
 
           <div className="surface-card p-4">
+            <PrepSessionList
+              sessions={chat.sessions}
+              currentId={prepSessionId}
+              disabled={loading}
+              creating={starting}
+              onSelect={switchSession}
+              onNew={handleNewSession}
+            />
+          </div>
+
+          <div className="surface-card p-4">
             <h2 className="mb-3 flex items-center gap-2 text-[13px] font-semibold tracking-tight text-ink">
               <Zap size={14} className="text-[var(--warning)]" />
               快捷提问
@@ -500,45 +287,13 @@ export default function PrepPage() {
               ))}
             </div>
           </div>
-
-          <div className="surface-card p-4">
-            <h2 className="mb-3 flex items-center gap-2 text-[13px] font-semibold tracking-tight text-ink">
-              <MessageSquare size={14} className="text-[var(--primary)]" />
-              会话状态
-            </h2>
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="kpi-card !p-3">
-                <p className="kpi-value !text-xl">
-                  {prepSessionId ? messages.length : 0}
-                </p>
-                <p className="kpi-label mt-1">消息数</p>
-              </div>
-              <div className="kpi-card !p-3">
-                <p className="kpi-value !text-xl">{tokenUsage || "—"}</p>
-                <p className="kpi-label mt-1">Token</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="surface-card p-4">
-            <h2 className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold tracking-tight text-ink">
-              <Lightbulb size={14} className="text-[var(--primary)]" />
-              使用提示
-            </h2>
-            <ul className="space-y-2 text-[11px] leading-relaxed text-ink-subtle">
-              <li>· 教练需要确认方向时会弹出选择框,点击选项即可回答</li>
-              <li>· 检索来源与执行过程默认折叠,可展开查看</li>
-              <li>· 描述目标公司与岗位,获得针对性模拟题</li>
-              <li>· 输出时向上滑动可自由阅读,点右下角按钮回到底部</li>
-            </ul>
-          </div>
         </div>
       </div>
 
-      {askDialog && (
+      {chat.askDialog && (
         <AskUserModal
-          question={askDialog.question}
-          options={askDialog.options}
+          question={chat.askDialog.question}
+          options={chat.askDialog.options}
           onAnswer={handleAskAnswer}
           onClose={() => setAskDialog(null)}
         />
@@ -546,32 +301,3 @@ export default function PrepPage() {
     </div>
   );
 }
-
-/**
- * 助手消息气泡(memo 化):流式 token 每帧刷新时,只有 content 变化的
- * 那条消息重渲染,历史消息整块跳过,避免长回复时全列表 Markdown 重解析。
- */
-const AssistantBubble = memo(function AssistantBubble({ msg }: { msg: ChatMessage }) {
-  return (
-    <div className="flex gap-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-ink)]">
-        <Bot size={14} />
-      </span>
-      <div className="min-w-0 max-w-[88%] rounded-md rounded-bl-sm border border-surface-border bg-surface-alt px-3.5 py-2.5 text-[13px] leading-relaxed text-ink">
-        <div className="space-y-2">
-          {msg.streaming && msg.statusText ? (
-            <p className="flex items-center gap-1.5 text-[11px] text-ink-muted">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--primary)]" />
-              {msg.statusText}
-            </p>
-          ) : null}
-          {msg.steps && msg.steps.length > 0 ? <AgentSteps steps={msg.steps} /> : null}
-          {msg.searchGroups && msg.searchGroups.length > 0 ? (
-            <SearchResultCards groups={msg.searchGroups} />
-          ) : null}
-          <ThinkAnswerMessage content={msg.content} streaming={!!msg.streaming} />
-        </div>
-      </div>
-    </div>
-  );
-});

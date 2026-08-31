@@ -9,33 +9,41 @@ import { cn } from "@/lib/utils";
 interface ThinkAnswerMessageProps {
   /** 原始流式/完整内容(可含 think 标签) */
   content: string;
+  /** 后端 reasoning 通道的思考内容(事件流/历史恢复),与内联 think 合并展示 */
+  reasoning?: string;
   streaming?: boolean;
   className?: string;
 }
 
 /**
  * 准备页助手气泡:
- * - 思考过程默认折叠,可展开
+ * - 思考过程默认折叠,可展开(内联 think 标签 + 后端 reasoning 事件合并)
  * - 正式回答走 StreamingReveal 流式渲染
  * - 剥离误流出的 tool JSON
  * memo 化:消息列表流式刷新时,content 未变的实例跳过重解析与重渲染
  */
 export const ThinkAnswerMessage = memo(function ThinkAnswerMessage({
   content,
+  reasoning,
   streaming = false,
   className,
 }: ThinkAnswerMessageProps) {
   const [expanded, setExpanded] = useState(false);
+  const reasoningText = (reasoning ?? "").trim();
   const { thinking, answer, inThinking, hasThinking } = useMemo(() => {
     const split = splitThinkAnswer(content);
+    const merged = [reasoningText, split.thinking].filter(Boolean).join("\n\n");
     return {
-      ...split,
+      thinking: stripToolCallJson(merged),
       answer: stripToolCallJson(split.answer),
-      thinking: stripToolCallJson(split.thinking),
+      inThinking: split.inThinking,
+      hasThinking: split.hasThinking || !!reasoningText,
     };
-  }, [content]);
+  }, [content, reasoningText]);
 
   const showThinking = hasThinking || inThinking || thinking.length > 0;
+  // 思考仍在推进:流式且尚无正式回答(工具轮思考事件或流内 think 未闭合)
+  const thinkingActive = showThinking && streaming && !answer;
   // 仍在思考且尚无正式回答时,给用户可见反馈
   const thinkingOnly = showThinking && !answer && (streaming || inThinking);
 
@@ -58,7 +66,7 @@ export const ThinkAnswerMessage = memo(function ThinkAnswerMessage({
             />
             <Brain size={12} className="shrink-0 text-[var(--primary)]" />
             <span className="font-medium text-ink-muted">
-              {inThinking && streaming ? "思考中…" : "思考过程"}
+              {thinkingActive ? "思考中…" : "思考过程"}
             </span>
             {!expanded && thinking && (
               <span className="line-clamp-1 min-w-0 flex-1 truncate text-ink-subtle">
@@ -66,7 +74,7 @@ export const ThinkAnswerMessage = memo(function ThinkAnswerMessage({
                 {thinking.length > 48 ? "…" : ""}
               </span>
             )}
-            {inThinking && streaming && (
+            {thinkingActive && (
               <span className="ml-auto h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--primary)]" />
             )}
           </button>
@@ -74,7 +82,7 @@ export const ThinkAnswerMessage = memo(function ThinkAnswerMessage({
             <div className="border-t border-surface-border px-3 pb-2.5 pt-0">
               <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-ink-subtle">
                 {thinking || (streaming ? "…" : "（无内容）")}
-                {inThinking && streaming && (
+                {thinkingActive && (
                   <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-ink-subtle align-middle" />
                 )}
               </pre>

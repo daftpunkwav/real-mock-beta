@@ -109,6 +109,72 @@ export interface VoiceCatalog {
   speak: VoiceProviderOption[];
 }
 
+/* ── 模型条目体系（能力声明制） ─────────────────────────── */
+
+/** 中立能力位:一个条目声明自己能做什么,可被多个任务绑定复用 */
+export interface ModelCapabilities {
+  chat: boolean;
+  vision: boolean;
+  audio_input: boolean;
+  audio_output: boolean;
+  reasoning: boolean;
+}
+
+/** 模型条目(供应商下的一个模型 + 能力声明 + 参数) */
+export interface ModelProfile {
+  id: number;
+  provider_id: number;
+  provider_name: string;
+  model: string;
+  display_name: string;
+  label: string;
+  context_window: number;
+  max_output: number;
+  capabilities: ModelCapabilities;
+  extras: Record<string, unknown>;
+  enabled: boolean;
+}
+
+export interface ProviderWithModels {
+  id: number;
+  name: string;
+  api_base: string;
+  protocol: LLMProtocol;
+  enabled: boolean;
+  has_api_key: boolean;
+  models: ModelProfile[];
+}
+
+export interface ModelProfileWrite {
+  model: string;
+  display_name?: string;
+  context_window?: number;
+  max_output?: number;
+  capabilities?: Partial<ModelCapabilities>;
+  extras?: Record<string, unknown>;
+  enabled?: boolean;
+}
+
+export interface ProviderWrite {
+  name?: string;
+  api_base?: string;
+  protocol?: LLMProtocol;
+  api_key?: string;
+  enabled?: boolean;
+}
+
+/** 任务绑定:chat / stt / tts 各自的默认处理器 */
+export interface TaskBindingInfo {
+  task: "chat" | "stt" | "tts";
+  profile: ModelProfile | null;
+  fallback: { handler: string; mode: string };
+}
+
+export type TaskBindings = Record<"chat" | "stt" | "tts", TaskBindingInfo>;
+
+/** 思考强度(仅 cap_reasoning 条目生效) */
+export type ReasoningEffort = "low" | "medium" | "high" | "max";
+
 export interface LLMTestResponse {
   success: boolean;
   message: string;
