@@ -1,501 +1,517 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiService as api } from "@/lib/api/apiService";
-import type {
-  LLMTestResponse,
-  StageConfig,
-  StageConfigs,
-  StageFallbackConfig,
-  StageModelCapabilities,
-} from "@/types";
+/**
+ * 模型与处理器设置(能力声明制)。
+ *
+ * 三层数据:
+ * - 供应商:api_base / protocol / API Key(凭证归属级);
+ * - 模型条目:模型名 + 中立能力位(对话/视觉/语音输入/语音输出/思考强度)
+ *   + 上下文窗口 + 最大输出——一个条目可同时被多个任务复用;
+ * - 任务绑定:chat(思考)/ stt(语音输入)/ tts(语音输出)各自的默认条目
+ *   与语音降级策略,即各场景的「默认处理器」。
+ */
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Save,
-  Zap,
-  CheckCircle,
-  XCircle,
-  Settings2,
-  Brain,
-  Mic,
-  Volume2,
-  Eye,
-  EyeOff,
-  KeyRound,
+  Check,
+  ChevronRight,
   Cpu,
-  ArrowRight,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Save,
+  Trash2,
+  X,
 } from "lucide-react";
-import { LoadError } from "@/components/LoadError";
-import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { apiService } from "@/lib/api/apiService";
 import { toast } from "@/components/Toast";
+import type {
+  LLMProtocol,
+  ModelProfile,
+  ProviderWithModels,
+  TaskBindings,
+} from "@/types";
+import { LoadError } from "@/components/LoadError";
 
-type StageKey = "recognize" | "reason" | "speak";
-
-const KEEP = "keep";
-/** 每次测试后的按钮冷却（毫秒）：防连点触发过多真实 API 调用 */
-const TEST_COOLDOWN_MS = 5_000;
-
-const EMPTY_STAGE = (stage: StageKey): StageConfig => ({
-  stage,
-  provider: "",
-  api_base: "",
-  protocol: "openai_chat",
-  model: "",
-  max_tokens: 4096,
-  context_window: 128000,
-  capabilities: {
-    supports_vision: false,
-    supports_audio_input: false,
-    supports_audio_output: false,
-    supports_video_input: false,
-  },
-  fallback: { handler: "", mode: "" },
-  extras: {},
-  has_api_key: false,
-});
-
-function hydrateStage(stage: StageKey, incoming: StageConfig): StageConfig {
-  const base = EMPTY_STAGE(stage);
-  const config = {
-    ...base,
-    ...incoming,
-    capabilities: { ...base.capabilities, ...incoming.capabilities },
-    fallback: { ...base.fallback, ...incoming.fallback },
-    extras: incoming.extras || {},
-    api_key: "",
-  };
-  const isUnconfigured = !config.provider && !config.api_base && !config.model;
-  if (isUnconfigured && stage === "recognize") {
-    config.capabilities.supports_audio_input = true;
-  }
-  if (isUnconfigured && stage === "reason") {
-    config.capabilities.supports_audio_output = true;
-  }
-  return config;
-}
-
-const STAGE_META: Record<
-  StageKey,
-  { icon: typeof Mic; title: string; hint: string; tone: string }
-> = {
-  recognize: { icon: Mic, title: "语音识别处理器", hint: "听麦 → 文字", tone: "brand" },
-  reason: { icon: Brain, title: "面试思考处理器", hint: "必须是文本 LLM", tone: "warning" },
-  speak: { icon: Volume2, title: "语音输出处理器", hint: "可降级为仅字幕", tone: "success" },
-};
-
-const PROTOCOL_OPTIONS: { value: StageConfig["protocol"]; label: string }[] = [
-  { value: "openai_chat", label: "Chat Completions (/chat/completions)" },
+const PROTOCOL_OPTIONS: { value: LLMProtocol; label: string }[] = [
+  { value: "openai_chat", label: "OpenAI Chat Completions" },
   { value: "anthropic_messages", label: "Anthropic Messages (/v1/messages)" },
-  { value: "openai_responses", label: "OpenAI Responses (/responses)" },
+  { value: "openai_responses", label: "OpenAI Responses" },
 ];
 
+const CAP_OPTIONS: { key: keyof ModelProfile["capabilities"]; label: string }[] = [
+  { key: "chat", label: "对话/思考" },
+  { key: "vision", label: "视觉输入" },
+  { key: "audio_input", label: "语音输入" },
+  { key: "audio_output", label: "语音输出" },
+  { key: "reasoning", label: "思考强度" },
+];
+
+const TASK_META: {
+  task: "chat" | "stt" | "tts";
+  label: string;
+  hint: string;
+  capKey: keyof ModelProfile["capabilities"];
+}[] = [
+  { task: "chat", label: "思考(chat)", hint: "面试教练 / 模拟面试对话 / 简历评价的默认模型", capKey: "chat" },
+  { task: "stt", label: "语音输入(stt)", hint: "面试语音识别;失败时按降级策略回退", capKey: "audio_input" },
+  { task: "tts", label: "语音输出(tts)", hint: "面试官播报;失败时按降级策略回退", capKey: "audio_output" },
+];
+
+/** 把条目列表按任务能力分桶,供绑定下拉用 */
+function modelsForTask(models: ModelProfile[], capKey: keyof ModelProfile["capabilities"]) {
+  return models.filter((m) => m.capabilities?.[capKey]);
+}
+
+function formatWindow(n: number) {
+  if (!n) return "—";
+  return n >= 1000 ? `${Math.round(n / 1000)}K` : String(n);
+}
+
+interface ModelDraft {
+  model: string;
+  display_name: string;
+  context_window: string;
+  max_output: string;
+  capabilities: ModelProfile["capabilities"];
+  extras_text: string;
+}
+
+const EMPTY_DRAFT: ModelDraft = {
+  model: "",
+  display_name: "",
+  context_window: "128000",
+  max_output: "4096",
+  capabilities: { chat: true, vision: false, audio_input: false, audio_output: false, reasoning: false },
+  extras_text: "",
+};
+
 export default function SettingsPage() {
-  const [configs, setConfigs] = useState<StageConfigs | null>(null);
+  const [providers, setProviders] = useState<ProviderWithModels[]>([]);
+  const [bindings, setBindings] = useState<TaskBindings | null>(null);
+  const [selectedProviderId, setSelectedProviderId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [saving, setSaving] = useState<StageKey | null>(null);
-  const [testing, setTesting] = useState<StageKey | null>(null);
-  const [testResults, setTestResults] = useState<Partial<Record<StageKey, LLMTestResponse>>>({});
-  const [messages, setMessages] = useState<Partial<Record<StageKey, string>>>({});
-  const [showKey, setShowKey] = useState<Partial<Record<StageKey, boolean>>>({});
-  const [cooldownUntil, setCooldownUntil] = useState<Partial<Record<StageKey, number>>>({});
-  const [, tick] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [testingId, setTestingId] = useState<number | null>(null);
 
-  // 存在未过期的冷却时低频刷新，让按钮恢复
-  const hasActiveCooldown = Object.values(cooldownUntil).some((t) => (t || 0) > Date.now());
-  useEffect(() => {
-    if (!hasActiveCooldown) return;
-    const id = window.setInterval(() => tick((n) => n + 1), 500);
-    return () => window.clearInterval(id);
-  }, [hasActiveCooldown]);
+  const [newProviderName, setNewProviderName] = useState("");
+  const [editingModelId, setEditingModelId] = useState<number | null>(null);
+  const [draft, setDraft] = useState<ModelDraft>(EMPTY_DRAFT);
+  const [addingModel, setAddingModel] = useState(false);
 
-  const isCooling = (stage: StageKey) => (cooldownUntil[stage] || 0) > Date.now();
+  const selectedProvider = useMemo(
+    () => providers.find((p) => p.id === selectedProviderId) ?? null,
+    [providers, selectedProviderId],
+  );
+  const allModels = useMemo(() => providers.flatMap((p) => p.models), [providers]);
 
-  /** 失败 toast 的简短文案：超长或含 HTML（如网关 404 页面）时引导看详情区 */
-  const briefError = (m: string) => {
-    const one = (m || "").replace(/\s+/g, " ").trim();
-    if (!one || one.length > 80 || /<html|<body/i.test(one)) return "详情见测试结果区";
-    return one;
-  };
-
-  const scrollToStage = (stage: StageKey) => {
-    const el = document.getElementById(`stage-${stage}`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-    // 高亮提示
-    el.classList.add("ring-google");
-    window.setTimeout(() => el.classList.remove("ring-google"), 1600);
-  };
-
-  const loadSettings = () => {
+  const reload = useCallback(async () => {
     setLoading(true);
     setLoadError("");
-    api
-      .getStageConfigs()
-      .then((s) => {
-        setConfigs({
-          recognize: hydrateStage("recognize", s.recognize),
-          reason: hydrateStage("reason", s.reason),
-          speak: hydrateStage("speak", s.speak),
-          updated_at: s.updated_at,
-        });
-      })
-      .catch((e) => setLoadError(e instanceof Error ? e.message : "加载失败"))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadSettings();
+    try {
+      const [provRes, bindRes] = await Promise.all([
+        apiService.listProviders(),
+        apiService.getBindings().catch(() => null),
+      ]);
+      const list = Array.isArray(provRes?.providers) ? provRes.providers : [];
+      setProviders(list);
+      if (bindRes) setBindings(bindRes);
+      setSelectedProviderId((cur) =>
+        cur && list.some((p) => p.id === cur) ? cur : (list[0]?.id ?? null),
+      );
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "加载失败");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const updateStage = (stage: StageKey, patch: Partial<StageConfig>) => {
-    setConfigs((prev) => {
-      if (!prev) return prev;
-      return { ...prev, [stage]: { ...prev[stage], ...patch } };
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const openModelEdit = (m: ModelProfile) => {
+    setEditingModelId(m.id);
+    setAddingModel(false);
+    setDraft({
+      model: m.model,
+      display_name: m.display_name || "",
+      context_window: String(m.context_window || ""),
+      max_output: String(m.max_output || ""),
+      capabilities: { ...m.capabilities },
+      extras_text: m.extras && Object.keys(m.extras).length ? JSON.stringify(m.extras, null, 2) : "",
     });
   };
 
-  const updateCapabilities = (
-    stage: StageKey,
-    patch: Partial<StageModelCapabilities>
-  ) => {
-    setConfigs((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        [stage]: {
-          ...prev[stage],
-          capabilities: { ...prev[stage].capabilities, ...patch },
-        },
-      };
-    });
-  };
-
-  const updateFallback = (
-    stage: StageKey,
-    patch: Partial<StageFallbackConfig>
-  ) => {
-    setConfigs((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        [stage]: {
-          ...prev[stage],
-          fallback: { ...prev[stage].fallback, ...patch },
-        },
-      };
-    });
-  };
-
-  const handleSave = async (stage: StageKey) => {
-    if (!configs) return;
-    setSaving(stage);
-    setMessages((m) => ({ ...m, [stage]: "" }));
-    try {
-      const payload = configs[stage];
-      const updated = await api.updateStageConfig(stage, {
-        provider: payload.provider,
-        api_base: payload.api_base,
-        api_key: payload.api_key || KEEP,
-        protocol: payload.protocol,
-        model: payload.model,
-        max_tokens: payload.max_tokens,
-        context_window: payload.context_window,
-        capabilities: payload.capabilities,
-        fallback: payload.fallback,
-        extras: payload.extras,
-      });
-      setConfigs((prev) =>
-        prev
-          ? {
-              ...prev,
-              [stage]: { ...updated, api_key: "" },
-            }
-          : prev
-      );
-      setMessages((m) => ({ ...m, [stage]: "已保存" }));
-      setTimeout(() => setMessages((m) => ({ ...m, [stage]: "" })), 2000);
-    } catch (e) {
-      setMessages((m) => ({
-        ...m,
-        [stage]: e instanceof Error ? e.message : "保存失败",
-      }));
-    } finally {
-      setSaving(null);
+  const draftFromForm = () => {
+    let extras: Record<string, unknown> = {};
+    if (draft.extras_text.trim()) {
+      try {
+        extras = JSON.parse(draft.extras_text);
+      } catch {
+        toast.error("高级参数不是合法 JSON");
+        return null;
+      }
     }
+    return {
+      model: draft.model.trim(),
+      display_name: draft.display_name.trim(),
+      context_window: Number(draft.context_window) || 0,
+      max_output: Number(draft.max_output) || 4096,
+      capabilities: draft.capabilities,
+      extras,
+    };
   };
 
-  const handleTest = async (stage: StageKey) => {
-    if (testing || isCooling(stage)) return;
-    setTesting(stage);
-    setMessages((m) => ({ ...m, [stage]: "" }));
+  const saveModel = async (providerId: number) => {
+    const body = draftFromForm();
+    if (!body) return;
+    if (!body.model) {
+      toast.error("模型名不能为空");
+      return;
+    }
+    setSaving(true);
     try {
-      const result = await api.testPipelineStage(stage);
-      setTestResults((prev) => ({ ...prev, [stage]: result }));
-      if (result.success) {
-        const latency =
-          typeof result.latency_ms === "number" ? ` · ${result.latency_ms} ms` : "";
-        toast.success(`${STAGE_META[stage].title}测试成功${latency}`);
+      if (editingModelId) {
+        await apiService.updateModel(editingModelId, body);
+        toast.success("模型已更新");
       } else {
-        toast.error(
-          `${STAGE_META[stage].title}测试失败：${briefError(result.message)}`,
-        );
+        await apiService.createModel(providerId, body);
+        toast.success("模型已添加");
       }
-      if (result.audio_base64 && stage === "speak") {
-        try {
-          const bin = atob(result.audio_base64);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const isWav = bytes.length >= 4 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
-          const blob = new Blob([bytes], { type: isWav ? "audio/wav" : "audio/mpeg" });
-          const url = URL.createObjectURL(blob);
-          const audio = new Audio(url);
-          const release = () => URL.revokeObjectURL(url);
-          audio.addEventListener("ended", release, { once: true });
-          audio.addEventListener("error", release, { once: true });
-          void audio.play().catch(release);
-        } catch {
-          /* 试听失败不影响测试结果展示 */
-        }
-      }
+      setEditingModelId(null);
+      setAddingModel(false);
+      setDraft(EMPTY_DRAFT);
+      await reload();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "测试失败";
-      setTestResults((prev) => ({
-        ...prev,
-        [stage]: {
-          success: false,
-          message,
-        },
-      }));
-      toast.error(`${STAGE_META[stage].title}测试失败：${briefError(message)}`);
+      toast.error(e instanceof Error ? e.message : "保存失败");
     } finally {
-      // 无论成败都进入冷却，防止频繁点击触发过多真实 API 调用
-      setCooldownUntil((prev) => ({ ...prev, [stage]: Date.now() + TEST_COOLDOWN_MS }));
-      setTesting(null);
+      setSaving(false);
     }
   };
+
+  const deleteModel = async (id: number) => {
+    try {
+      await apiService.deleteModel(id);
+      toast.success("已删除");
+      await reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "删除失败");
+    }
+  };
+
+  const testModel = async (id: number) => {
+    setTestingId(id);
+    try {
+      const res = await apiService.testModel(id);
+      if (res.success) toast.success(res.message || "测试通过");
+      else toast.warning(res.message || "测试未通过");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "测试失败");
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const saveBinding = async (task: "chat" | "stt" | "tts", profileId: number | null) => {
+    if (!profileId) return;
+    try {
+      const res = await apiService.updateBinding(task, { profile_id: profileId });
+      setBindings(res);
+      toast.success("默认处理器已更新");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败");
+    }
+  };
+
+  const bindingSelect = (task: "chat" | "stt" | "tts", capKey: keyof ModelProfile["capabilities"]) => {
+    const binding = bindings?.[task];
+    const options = modelsForTask(allModels, capKey);
+    const currentId = binding?.profile?.id ?? null;
+    return (
+      <select
+        className="field-select !h-8 !py-0 text-[12px]"
+        value={currentId ?? ""}
+        onChange={(e) => {
+          const id = e.target.value ? Number(e.target.value) : null;
+          if (id) saveBinding(task, id);
+        }}
+        disabled={!options.length}
+        aria-label={`${task} 默认模型`}
+      >
+        <option value="">{options.length ? "未设置" : "无可选模型"}</option>
+        {options.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}（{m.provider_name}）
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="page-shell-tight anim-rise">
+        <div className="surface-card flex items-center justify-center p-10 text-sm text-ink-muted">
+          <RefreshCw size={16} className="mr-2 animate-spin" /> 加载中…
+        </div>
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <div className="page-shell-tight anim-rise">
+        <LoadError message={loadError} onRetry={reload} />
+      </div>
+    );
+  }
 
   return (
-    <div className="page-shell !max-w-6xl anim-rise">
-      <div className="page-header">
-        <div className="flex items-start gap-3">
-          <span className="icon-badge">
-            <Settings2 size={18} strokeWidth={1.75} />
-          </span>
-          <div>
-            <p className="page-eyebrow">Pipeline</p>
-            <h1 className="page-title">三处理器设置</h1>
-            <p className="page-desc">
-              语音识别 → 面试思考 → 语音输出,各自独立指派;密钥本地加密。
-            </p>
-          </div>
+    <div className="page-shell anim-rise">
+      <div className="page-header !mb-4">
+        <div>
+          <p className="page-eyebrow">BYOK</p>
+          <h1 className="page-title">模型与处理器</h1>
+          <p className="page-desc">
+            管理供应商与模型条目(按能力声明),为思考 / 语音输入 / 语音输出指定默认处理器。
+          </p>
         </div>
       </div>
 
-      {/* Pipeline Overview · 可点击跳转 */}
-      <div className="surface-card mb-6 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-surface-border bg-surface-alt px-4 py-2.5">
-          <div className="flex items-center gap-2">
-            <Cpu size={13} className="text-ink-muted" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
-              Pipeline Overview
-            </span>
-          </div>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">
-            点击跳转
-          </span>
-        </div>
-        <div className="grid grid-cols-1 divide-y divide-surface-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          {(Object.keys(STAGE_META) as StageKey[]).map((stage, idx) => {
-            const meta = STAGE_META[stage];
-            const configured = !!configs?.[stage]?.provider;
-            return (
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
+        {/* 左列:供应商列表 */}
+        <div className="surface-card !p-3">
+          <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+            供应商
+          </p>
+          <div className="space-y-1">
+            {providers.length === 0 && (
+              <p className="px-1 text-[12px] text-ink-subtle">暂无供应商,先添加一个</p>
+            )}
+            {providers.map((p) => (
               <button
-                key={stage}
+                key={p.id}
                 type="button"
-                onClick={() => scrollToStage(stage)}
-                className="group relative flex items-center gap-3 px-5 py-4 text-left transition-colors duration-base ease-google hover:bg-[var(--info-soft)]"
+                onClick={() => setSelectedProviderId(p.id)}
+                className={`flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left text-[13px] transition-colors ${
+                  p.id === selectedProviderId
+                    ? "border-[var(--primary)] bg-[var(--info-soft)] text-ink"
+                    : "border-transparent text-ink-muted hover:bg-surface-muted"
+                }`}
               >
-                <span className="icon-badge icon-badge-muted transition-colors group-hover:icon-badge-brand">
-                  <meta.icon size={15} strokeWidth={1.75} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] font-semibold text-ink-subtle">
-                      {String(idx + 1).padStart(2, "0")}
-                    </span>
-                    <p className="truncate text-[13px] font-medium text-ink">{meta.title}</p>
-                  </div>
-                  <p className="mt-0.5 truncate text-[11px] text-ink-subtle">{meta.hint}</p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={configured ? "chip chip-green" : "chip chip-gray"}>
-                    {configured ? "已配置" : "未配置"}
-                  </span>
-                  <ArrowRight
-                    size={13}
-                    className="text-ink-subtle transition-transform duration-base group-hover:translate-x-0.5 group-hover:text-[var(--primary)]"
-                  />
-                </div>
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.enabled ? "bg-[var(--success)]" : "bg-ink-subtle"}`}
+                />
+                <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                <span className="shrink-0 text-[10px] text-ink-subtle">{p.models.length}</span>
+                <ChevronRight size={13} className="shrink-0 text-ink-subtle" />
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-ink-muted">
-          <span className="block h-4 w-4 anim-spin rounded-full border-2 border-current border-t-transparent" />
-          加载设置…
-        </div>
-      ) : loadError ? (
-        <LoadError message={loadError} onRetry={loadSettings} />
-      ) : configs ? (
-        <div className="space-y-5">
-          <div className="alert alert-info">
-            <KeyRound size={14} className="mt-0.5 shrink-0" />
-            <span className="text-[13px] leading-relaxed">
-              管道顺序:语音识别 → 面试思考(文本 LLM)→ 语音输出;各阶段凭证相互独立保存与测试。
-            </span>
+            ))}
           </div>
 
-          {(Object.keys(STAGE_META) as StageKey[]).map((stage) => (
-            <div key={stage} id={`stage-${stage}`} className="rounded-lg transition-shadow duration-slow">
-              <StageSection
-                stage={stage}
-                config={configs[stage]}
-                testing={testing === stage}
-                saving={saving === stage}
-                cooling={isCooling(stage)}
-                message={messages[stage] || ""}
-                showKey={showKey[stage] || false}
-                testResult={testResults[stage]}
-                onUpdate={(patch) => updateStage(stage, patch)}
-                onUpdateCapabilities={(patch) => updateCapabilities(stage, patch)}
-                onUpdateFallback={(patch) => updateFallback(stage, patch)}
-                onToggleKey={() =>
-                  setShowKey((prev) => ({ ...prev, [stage]: !prev[stage] }))
-                }
-                onSave={() => handleSave(stage)}
-                onTest={() => handleTest(stage)}
+          <div className="mt-3 border-t border-surface-border pt-3">
+            <label className="mb-1 block text-[11px] text-ink-muted">新增供应商</label>
+            <div className="flex gap-1.5">
+              <input
+                className="field-input !h-8 flex-1 text-[12px]"
+                placeholder="名称,如 DeepSeek"
+                value={newProviderName}
+                onChange={(e) => setNewProviderName(e.target.value)}
               />
+              <button
+                type="button"
+                className="btn-primary !h-8 !w-8 shrink-0 !p-0"
+                aria-label="添加供应商"
+                disabled={!newProviderName.trim()}
+                onClick={async () => {
+                  try {
+                    await apiService.createProvider({ name: newProviderName.trim() });
+                    setNewProviderName("");
+                    await reload();
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "创建失败");
+                  }
+                }}
+              >
+                <Plus size={14} />
+              </button>
             </div>
-          ))}
+          </div>
         </div>
-      ) : null}
+
+        {/* 右列:供应商编辑 + 模型条目 */}
+        <div className="min-w-0 space-y-4">
+          {selectedProvider ? (
+            <ProviderCard provider={selectedProvider} onChanged={reload} />
+          ) : (
+            <div className="surface-card p-6 text-center text-[13px] text-ink-muted">
+              从左侧选择或新增一个供应商
+            </div>
+          )}
+
+          {selectedProvider && (
+            <div className="surface-card !p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                  <Cpu size={14} className="text-[var(--primary)]" />
+                  模型条目（{selectedProvider.models.length}）
+                </h2>
+                <button
+                  type="button"
+                  className="flex items-center gap-1 rounded-md border border-surface-border px-2 py-1 text-[11px] text-ink-muted transition-colors hover:border-[var(--primary)] hover:text-ink"
+                  onClick={() => {
+                    setAddingModel(true);
+                    setEditingModelId(null);
+                    setDraft(EMPTY_DRAFT);
+                  }}
+                >
+                  <Plus size={12} /> 添加模型
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {selectedProvider.models.length === 0 && !addingModel && (
+                  <p className="text-[12px] text-ink-subtle">
+                    还没有模型条目;条目按「能力」声明,可同时服务多个任务
+                  </p>
+                )}
+                {selectedProvider.models.map((m) =>
+                  editingModelId === m.id ? (
+                    <ModelForm
+                      key={m.id}
+                      draft={draft}
+                      setDraft={setDraft}
+                      onCancel={() => {
+                        setEditingModelId(null);
+                        setDraft(EMPTY_DRAFT);
+                      }}
+                      onSave={() => saveModel(selectedProvider.id)}
+                      saving={saving}
+                    />
+                  ) : (
+                    <ModelRow
+                      key={m.id}
+                      model={m}
+                      testing={testingId === m.id}
+                      onEdit={() => openModelEdit(m)}
+                      onDelete={() => deleteModel(m.id)}
+                      onTest={() => testModel(m.id)}
+                    />
+                  ),
+                )}
+                {addingModel && (
+                  <ModelForm
+                    draft={draft}
+                    setDraft={setDraft}
+                    onCancel={() => setAddingModel(false)}
+                    onSave={() => saveModel(selectedProvider.id)}
+                    saving={saving}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 任务绑定 */}
+          <div className="surface-card !p-4">
+            <h2 className="mb-1 text-[13px] font-semibold text-ink">默认处理器</h2>
+            <p className="mb-3 text-[11px] text-ink-subtle">
+              各场景未手动选择模型时使用的默认条目;语音任务的降级策略在其失败时生效。
+            </p>
+            <div className="space-y-3">
+              {TASK_META.map(({ task, label, hint, capKey }) => (
+                <div key={task} className="flex flex-wrap items-center gap-2">
+                  <span className="w-32 shrink-0 text-[12px] font-medium text-ink">{label}</span>
+                  {bindingSelect(task, capKey)}
+                  <span className="min-w-0 flex-1 basis-48 truncate text-[11px] text-ink-subtle" title={hint}>
+                    {hint}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function StageSection({
-  stage,
-  config,
-  testing,
-  saving,
-  cooling,
-  message,
-  showKey,
-  testResult,
-  onUpdate,
-  onUpdateCapabilities,
-  onUpdateFallback,
-  onToggleKey,
-  onSave,
-  onTest,
+/** 供应商编辑卡:名称 / Base URL / 协议 / Key / 启用 */
+function ProviderCard({
+  provider,
+  onChanged,
 }: {
-  stage: StageKey;
-  config: StageConfig;
-  testing: boolean;
-  saving: boolean;
-  cooling: boolean;
-  message: string;
-  showKey: boolean;
-  testResult?: LLMTestResponse;
-  onUpdate: (patch: Partial<StageConfig>) => void;
-  onUpdateCapabilities: (patch: Partial<StageModelCapabilities>) => void;
-  onUpdateFallback: (patch: Partial<StageFallbackConfig>) => void;
-  onToggleKey: () => void;
-  onSave: () => void;
-  onTest: () => void;
+  provider: ProviderWithModels;
+  onChanged: () => Promise<void>;
 }) {
-  const meta = STAGE_META[stage];
-  const Icon = meta.icon;
+  const [name, setName] = useState(provider.name);
+  const [apiBase, setApiBase] = useState(provider.api_base);
+  const [protocol, setProtocol] = useState<LLMProtocol>(provider.protocol);
+  const [apiKey, setApiKey] = useState("");
+  const [enabled, setEnabled] = useState(provider.enabled);
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const isRecognize = stage === "recognize";
-  const isReason = stage === "reason";
-  const isSpeak = stage === "speak";
+  useEffect(() => {
+    setName(provider.name);
+    setApiBase(provider.api_base);
+    setProtocol(provider.protocol);
+    setEnabled(provider.enabled);
+    setApiKey("");
+  }, [provider.id, provider.name, provider.api_base, provider.protocol, provider.enabled]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await apiService.updateProvider(provider.id, {
+        name,
+        api_base: apiBase,
+        protocol,
+        enabled,
+        api_key: apiKey || undefined,
+      });
+      toast.success("供应商已保存");
+      await onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    try {
+      await apiService.deleteProvider(provider.id);
+      toast.success("供应商已删除");
+      await onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "删除失败");
+    }
+  };
 
   return (
-    <section className="surface-card overflow-hidden">
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-surface-border bg-surface-alt px-5 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <span className="icon-badge icon-badge-brand">
-            <Icon size={15} strokeWidth={1.75} />
-          </span>
-          <div>
-            <h2 className="text-[14px] font-semibold tracking-tight text-ink">{meta.title}</h2>
-            {meta.hint && (
-              <p className="mt-0.5 text-[11px] text-ink-subtle">{meta.hint}</p>
-            )}
-          </div>
+    <div className="surface-card !p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-[11px] text-ink-muted">名称</label>
+          <input className="field-input !h-9" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <div className="flex items-center gap-2">
-          {message && (
-            <span
-              className={`text-[12px] font-medium ${
-                message.includes("失败") ? "text-[var(--danger-ink)]" : "text-[var(--success-ink)]"
-              }`}
-            >
-              {message}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={onTest}
-            disabled={testing || cooling}
-            title={cooling ? "冷却中，防止频繁调用 API" : undefined}
-            className="btn-secondary"
-          >
-            {testing ? (
-              <span className="block h-3.5 w-3.5 anim-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Zap size={13} />
-            )}
-            测试
-          </button>
-          <button type="button" onClick={onSave} disabled={saving} className="btn-primary">
-            {saving ? (
-              <span className="block h-3.5 w-3.5 anim-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Save size={13} />
-            )}
-            保存
-          </button>
+        <div>
+          <label className="mb-1 block text-[11px] text-ink-muted">Base URL</label>
+          <input
+            className="field-input !h-9"
+            value={apiBase}
+            placeholder="https://…"
+            onChange={(e) => setApiBase(e.target.value)}
+          />
         </div>
-      </header>
-
-      <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
-        <Field
-          label="供应商名称"
-          value={config.provider}
-          onChange={(v) => onUpdate({ provider: v })}
-          placeholder="例如:小米 MiMo"
-          className="sm:col-span-2"
-        />
-        <Field
-          label="Base URL"
-          value={config.api_base}
-          onChange={(v) => onUpdate({ api_base: v })}
-          className="sm:col-span-2"
-        />
-
-        <div className="sm:col-span-2">
-          <label className="field-label">API 格式</label>
+        <div>
+          <label className="mb-1 block text-[11px] text-ink-muted">API 格式</label>
           <select
-            className="field-select"
-            value={config.protocol}
-            onChange={(e) =>
-              onUpdate({ protocol: e.target.value as StageConfig["protocol"] })
-            }
+            className="field-select !h-9"
+            value={protocol}
+            onChange={(e) => setProtocol(e.target.value as LLMProtocol)}
           >
             {PROTOCOL_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -504,209 +520,207 @@ function StageSection({
             ))}
           </select>
         </div>
-
-        <div className="sm:col-span-2">
-          <label className="field-label">API Key</label>
-          <div className="relative">
+        <div>
+          <label className="mb-1 block text-[11px] text-ink-muted">
+            API Key{provider.has_api_key ? "（已设置,留空保持）" : ""}
+          </label>
+          <div className="flex gap-1.5">
             <input
-              className="field-input pr-10 font-mono text-[13px]"
+              className="field-input !h-9 flex-1"
               type={showKey ? "text" : "password"}
-              value={config.api_key || ""}
-              onChange={(e) => onUpdate({ api_key: e.target.value })}
-              placeholder={config.has_api_key ? "已配置(留空保持)" : "输入 API Key"}
+              value={apiKey}
+              placeholder={provider.has_api_key ? "••••••••" : "sk-…"}
+              onChange={(e) => setApiKey(e.target.value)}
             />
             <button
               type="button"
-              onClick={onToggleKey}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
-              aria-label={showKey ? "隐藏密钥" : "显示密钥"}
+              className="shrink-0 text-[11px] text-ink-subtle hover:text-ink"
+              onClick={() => setShowKey((v) => !v)}
             >
-              {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showKey ? "隐藏" : "显示"}
             </button>
           </div>
-          <p className="field-hint">密钥仅保存在本地,从不离开你的设备。</p>
         </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <label className="flex items-center gap-1.5 text-[12px] text-ink-muted">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          启用
+        </label>
+        <div className="flex-1" />
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded-md border border-surface-border px-2.5 py-1.5 text-[12px] text-ink-muted transition-colors hover:border-[var(--danger)] hover:text-[var(--danger)]"
+          onClick={remove}
+        >
+          <Trash2 size={13} /> 删除
+        </button>
+        <button type="button" className="btn-primary !h-8" onClick={save} disabled={saving}>
+          <Save size={13} /> {saving ? "保存中…" : "保存供应商"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
-        <Field
-          label="模型名称"
-          value={config.model}
-          onChange={(v) => onUpdate({ model: v })}
-          className="sm:col-span-2"
-        />
+/** 模型条目行:label + 能力徽章 + 操作 */
+function ModelRow({
+  model,
+  testing,
+  onEdit,
+  onDelete,
+  onTest,
+}: {
+  model: ModelProfile;
+  testing: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onTest: () => void;
+}) {
+  const caps = CAP_OPTIONS.filter(({ key }) => model.capabilities?.[key]).map(({ label }) => label);
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-surface-border px-3 py-2">
+      <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+        {model.label}
+        <span className="ml-2 text-[11px] text-ink-subtle">{model.provider_name}</span>
+      </span>
+      <span className="shrink-0 rounded bg-[var(--info-soft)] px-1.5 py-0.5 text-[10px] text-[var(--info-ink)]">
+        {formatWindow(model.context_window)}
+      </span>
+      {caps.map((c) => (
+        <span key={c} className="hidden shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-[10px] text-ink-muted sm:inline">
+          {c}
+        </span>
+      ))}
+      <button
+        type="button"
+        className="shrink-0 rounded p-1 text-ink-subtle transition-colors hover:bg-surface-muted hover:text-ink"
+        onClick={onTest}
+        aria-label="测试"
+      >
+        {testing ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
+      </button>
+      <button
+        type="button"
+        className="shrink-0 rounded p-1 text-ink-subtle transition-colors hover:bg-surface-muted hover:text-ink"
+        onClick={onEdit}
+        aria-label="编辑"
+      >
+        <Pencil size={13} />
+      </button>
+      <button
+        type="button"
+        className="shrink-0 rounded p-1 text-ink-subtle transition-colors hover:bg-surface-muted hover:text-[var(--danger)]"
+        onClick={onDelete}
+        aria-label="删除"
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
+  );
+}
 
-        <Field
-          label="上下文窗口"
-          value={String(config.context_window)}
-          onChange={(v) => onUpdate({ context_window: Number(v) || 0 })}
-          type="number"
-        />
-        <Field
-          label="最大输出"
-          value={String(config.max_tokens)}
-          onChange={(v) => onUpdate({ max_tokens: Number(v) || 0 })}
-          type="number"
-        />
-        {isSpeak && (
-          <>
-            <div>
-              <label className="field-label">播报模式</label>
-              <select
-                className="field-select"
-                value={String(config.extras.speech_speak_mode || "tts_from_text")}
+/** 模型条目表单(新增/编辑) */
+function ModelForm({
+  draft,
+  setDraft,
+  onSave,
+  onCancel,
+  saving,
+}: {
+  draft: ModelDraft;
+  setDraft: (d: ModelDraft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-[var(--primary)]/40 bg-[var(--info-soft)]/40 p-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-[11px] text-ink-muted">模型名(发往 API)</label>
+          <input
+            className="field-input !h-9"
+            value={draft.model}
+            placeholder="如 deepseek-chat"
+            onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-ink-muted">显示名(可选)</label>
+          <input
+            className="field-input !h-9"
+            value={draft.display_name}
+            onChange={(e) => setDraft({ ...draft, display_name: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-ink-muted">上下文窗口(tokens)</label>
+          <input
+            className="field-input !h-9"
+            type="number"
+            min={0}
+            value={draft.context_window}
+            onChange={(e) => setDraft({ ...draft, context_window: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-ink-muted">最大输出(tokens)</label>
+          <input
+            className="field-input !h-9"
+            type="number"
+            min={1}
+            value={draft.max_output}
+            onChange={(e) => setDraft({ ...draft, max_output: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="mt-2.5">
+        <p className="mb-1 text-[11px] text-ink-muted">能力(可多选;同一模型可服务多个任务)</p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {CAP_OPTIONS.map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-1.5 text-[12px] text-ink-muted">
+              <input
+                type="checkbox"
+                checked={draft.capabilities[key]}
                 onChange={(e) =>
-                  onUpdate({
-                    extras: { ...config.extras, speech_speak_mode: e.target.value },
+                  setDraft({
+                    ...draft,
+                    capabilities: { ...draft.capabilities, [key]: e.target.checked },
                   })
                 }
-              >
-                <option value="tts_from_text">文本转语音</option>
-                <option value="text_only">仅字幕</option>
-              </select>
-            </div>
-            <Field
-              label="音色 / Voice ID"
-              value={String(
-                config.extras.tts_voice
-                  || (config.provider === "edge"
-                    ? "zh-CN-XiaoxiaoNeural"
-                    : "mimo_default")
-              )}
-              onChange={(v) =>
-                onUpdate({ extras: { ...config.extras, tts_voice: v } })
-              }
-              placeholder="mimo_default"
-            />
-          </>
-        )}
-      </div>
-
-      <div className="mx-5 mb-5 rounded-md border border-surface-border bg-surface-alt p-4">
-        <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-          模型能力
-        </h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <CapabilityToggle
-            label="图片输入"
-            checked={config.capabilities.supports_vision}
-            onChange={(v) => onUpdateCapabilities({ supports_vision: v })}
-          />
-          <CapabilityToggle
-            label="视频输入"
-            checked={config.capabilities.supports_video_input}
-            onChange={(v) => onUpdateCapabilities({ supports_video_input: v })}
-          />
-          <CapabilityToggle
-            label="语音输入"
-            checked={config.capabilities.supports_audio_input}
-            onChange={(v) => onUpdateCapabilities({ supports_audio_input: v })}
-          />
-          <CapabilityToggle
-            label="语音输出"
-            checked={config.capabilities.supports_audio_output}
-            onChange={(v) => onUpdateCapabilities({ supports_audio_output: v })}
-          />
+              />
+              {label}
+            </label>
+          ))}
         </div>
       </div>
 
-      {!isReason && (
-        <div className="mx-5 mb-5 rounded-md border border-dashed border-surface-border p-4">
-          <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-            降级处理
-          </h3>
-          <p className="mb-3 text-[12px] text-ink-muted">
-            主模型失败时继续面试:识别默认回退本地 Whisper,播报默认回退 Edge TTS。
-          </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field
-              label="降级处理者"
-              value={config.fallback.handler}
-              onChange={(v) => onUpdateFallback({ handler: v })}
-              placeholder={isRecognize ? "local" : "edge"}
-            />
-            <Field
-              label="降级模式"
-              value={config.fallback.mode}
-              onChange={(v) => onUpdateFallback({ mode: v })}
-              placeholder={isRecognize ? "transcribe" : "tts_from_text"}
-            />
-          </div>
-        </div>
-      )}
+      <details className="mt-2.5">
+        <summary className="cursor-pointer text-[11px] text-ink-subtle hover:text-ink-muted">
+          高级参数(语音凭证等 JSON)
+        </summary>
+        <textarea
+          className="field-input mt-1.5 min-h-16 w-full font-mono text-[11px]"
+          value={draft.extras_text}
+          onChange={(e) => setDraft({ ...draft, extras_text: e.target.value })}
+          spellCheck={false}
+        />
+      </details>
 
-      {testResult && (
-        <div className={`alert mx-5 mb-5 ${testResult.success ? "alert-success" : "alert-error"}`}>
-          {testResult.success ? (
-            <CheckCircle size={14} className="mt-0.5 shrink-0" />
-          ) : (
-            <XCircle size={14} className="mt-0.5 shrink-0" />
-          )}
-          <span className="break-words text-[13px] leading-relaxed">{testResult.message}</span>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function CapabilityToggle({
-  label,
-  checked,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <label
-      className={`flex items-center gap-2 rounded-md border border-surface-border bg-surface-card px-3 py-2 text-[13px] ${
-        checked ? "border-[var(--primary)] bg-[var(--info-soft)] text-[var(--info-ink)]" : "text-ink-muted"
-      } ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-[var(--primary)]"}`}
-    >
-      <input
-        type="checkbox"
-        className="h-3.5 w-3.5 rounded border-surface-border text-[var(--primary)] focus:ring-[var(--primary)]"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span className="font-medium">{label}</span>
-      <span
-        className={`ml-auto inline-flex h-1.5 w-1.5 rounded-full ${
-          checked ? "bg-[var(--primary)]" : "bg-[var(--muted-foreground)] opacity-40"
-        }`}
-        aria-hidden
-      />
-    </label>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-  className = "",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  placeholder?: string;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <label className="field-label">{label}</label>
-      <input
-        className="field-input font-mono text-[13px]"
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
+      <div className="mt-3 flex justify-end gap-2">
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded-md border border-surface-border px-2.5 py-1.5 text-[12px] text-ink-muted hover:text-ink"
+          onClick={onCancel}
+        >
+          <X size={13} /> 取消
+        </button>
+        <button type="button" className="btn-primary !h-8" onClick={onSave} disabled={saving}>
+          <Save size={13} /> {saving ? "保存中…" : "保存模型"}
+        </button>
+      </div>
     </div>
   );
 }

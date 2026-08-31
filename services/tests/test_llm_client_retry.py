@@ -120,3 +120,55 @@ async def test_chat_allows_loopback_in_dev(monkeypatch: pytest.MonkeyPatch) -> N
         ac.return_value.__aexit__.return_value = False
         text = await client.chat([{"role": "user", "content": "hi"}])
     assert text == "ok"
+
+
+# ── 流式工具轮组装器（chat_message_stream 的事件 → message 装配）──────────
+
+
+def test_openai_round_assembler_joins_fragments() -> None:
+    """tool_calls 的 id/name/arguments 分片按 index 拼接，组装与非流式同构 message。"""
+    from shared.capabilities.ai.llm.client.unified_client import _OpenAIRoundAssembler
+
+    a = _OpenAIRoundAssembler()
+    assert a.feed({"choices": [{"delta": {"reasoning_content": "思考"}}]}) == "思考"
+    a.feed({"choices": [{"delta": {"content": "正文"}}]})
+    a.feed({
+        "choices": [{
+            "delta": {
+                "tool_calls": [
+                    {"index": 0, "id": "c1", "function": {"name": "web_search", "arguments": '{"query": "面'}}
+                ]
+            }
+        }]
+    })
+    a.feed({"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": '经"}'}}]}}]})
+    msg = a.message()
+    assert msg["content"] == "正文"
+    assert msg["tool_calls"] == [
+        {"id": "c1", "type": "function", "function": {"name": "web_search", "arguments": '{"query": "面经"}'}}
+    ]
+
+
+def test_anthropic_round_assembler_thinking_and_tool_use() -> None:
+    """thinking_delta 即时回传；text 与 tool_use（partial_json 分片）缓冲组装。"""
+    from shared.capabilities.ai.llm.client.unified_client import _AnthropicRoundAssembler
+
+    a = _AnthropicRoundAssembler()
+    a.feed({"type": "content_block_start", "index": 0, "content_block": {"type": "thinking"}})
+    assert a.feed({
+        "type": "content_block_delta", "index": 0,
+        "delta": {"type": "thinking_delta", "thinking": "想一下"},
+    }) == "想一下"
+    a.feed({"type": "content_block_start", "index": 1, "content_block": {"type": "text"}})
+    a.feed({"type": "content_block_delta", "index": 1, "delta": {"type": "text_delta", "text": "你好"}})
+    a.feed({
+        "type": "content_block_start", "index": 2,
+        "content_block": {"type": "tool_use", "id": "t1", "name": "lookup"},
+    })
+    a.feed({"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": '{"q": '}})
+    a.feed({"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": '"x"}'}})
+    msg = a.message()
+    assert msg["content"] == "你好"
+    assert msg["tool_calls"] == [
+        {"id": "t1", "type": "function", "function": {"name": "lookup", "arguments": '{"q": "x"}'}}
+    ]

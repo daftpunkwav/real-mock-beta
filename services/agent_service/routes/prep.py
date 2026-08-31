@@ -10,6 +10,7 @@ import logging
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from agent_service.agents.prep.agent import PrepAgent
@@ -64,6 +65,59 @@ def list_resume_picker(db: Session = Depends(get_db)):
     ]
 
 
+@router.get(
+    "/sessions",
+    dependencies=[Depends(require_local_peer)],
+)
+def list_prep_sessions(db: Session = Depends(get_db)):
+    """辅导会话列表（前端「对话记录」按简历分组展示）。
+
+    仅本机可访问；只返回摘要（首条提问 + 消息数 + 归属简历），
+    不含消息正文与能力令牌——打开具体会话仍走原 token 校验。
+    """
+    rows = (
+        db.query(PrepSession)
+        .order_by(func.coalesce(PrepSession.updated_at, PrepSession.created_at).desc())
+        .all()
+    )
+    names = {r.id: r.filename for r in db.query(Resume).all()}
+    items: list[dict] = []
+    for s in rows:
+        try:
+            msgs = json.loads(s.messages or "[]")
+        except json.JSONDecodeError:
+            msgs = []
+        summary = next(
+            (
+                str(m.get("content") or "").strip()
+                for m in msgs
+                if m.get("role") == "user" and m.get("content")
+            ),
+            "",
+        )
+        items.append(
+            {
+                "id": s.id,
+                "resume_id": s.resume_id,
+                "resume_filename": names.get(s.resume_id) if s.resume_id else None,
+                "summary": summary[:48],
+                "message_count": sum(
+                    1
+                    for m in msgs
+                    if m.get("role") in ("user", "assistant") and m.get("content")
+                ),
+                "status": getattr(s, "status", "") or "active",
+                "token_usage": s.token_usage or 0,
+                "prompt_tokens": s.prompt_tokens or 0,
+                "completion_tokens": s.completion_tokens or 0,
+                "cached_tokens": s.cached_tokens or 0,
+                "created_at": s.created_at,
+                "updated_at": getattr(s, "updated_at", None) or s.created_at,
+            }
+        )
+    return items
+
+
 class PrepCreateRequest(BaseModel):
     resume_id: int | None = None
     target_role: str = ""
@@ -72,6 +126,18 @@ class PrepCreateRequest(BaseModel):
 
 class PrepMessageRequest(BaseModel):
     content: str = Field(..., max_length=MAX_USER_TEXT_CHARS)
+    # 场景级覆盖：所选模型条目与思考强度（缺省用默认 chat 绑定、不发思考参数）
+    model_profile_id: int | None = None
+    reasoning_effort: str | None = Field(default=None, pattern="^(low|medium|high|max)$")
+
+
+def _build_prep_llm(db: Session, body: PrepMessageRequest) -> LLMClient:
+    """按请求覆盖（可选）构建思考客户端。"""
+    return LLMClient.from_db(
+        db,
+        profile_id=body.model_profile_id,
+        reasoning_effort=body.reasoning_effort,
+    )
 
 
 @router.post(
@@ -140,7 +206,7 @@ async def prep_message(
     assert_session_token(session, access, detail=_PREP_FORBIDDEN)
     if getattr(session, "status", None) == SessionStatus.COMPLETED.value:
         raise_error("A3002")
-    llm = LLMClient.from_db(db)
+    llm = _build_prep_llm(db, body)
     agent = PrepAgent(session, llm)
     reply = await agent.chat(body.content, db)
     return {"reply": reply, "token_usage": session.token_usage}
@@ -169,7 +235,7 @@ async def prep_message_stream(
     assert_session_token(session, access, detail=_PREP_FORBIDDEN)
     if getattr(session, "status", None) == SessionStatus.COMPLETED.value:
         raise_error("A3002")
-    llm = LLMClient.from_db(db)
+    llm = _build_prep_llm(db, body)
     agent = PrepAgent(session, llm)
 
     async def event_stream():

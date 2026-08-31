@@ -24,6 +24,7 @@ from shared.core.session_auth import (
     set_session_cookie,
 )
 from shared.database import get_db
+from interview_service.ai import session_llm
 from interview_service.models import InterviewSession
 from interview_service.schemas import (
     ChatMessage,
@@ -100,6 +101,11 @@ def create_session(
         status=SessionStatus.PENDING.value,
         current_phase="identity_check",
         access_token=token,
+        ai_overrides=(
+            json.dumps(config.ai_overrides.model_dump(exclude_none=True), ensure_ascii=False)
+            if config.ai_overrides
+            else "{}"
+        ),
     )
     db.add(session)
     db.commit()
@@ -195,7 +201,7 @@ async def start_interview(
     if session.status not in (SessionStatus.PENDING.value, SessionStatus.ACTIVE.value):
         raise_error("A2002")
 
-    llm = LLMClient.from_db(db)
+    llm = session_llm(db, session)
     if not llm.api_key:
         raise_error("A0006")
 
@@ -235,7 +241,7 @@ async def send_message(
     if session.status == SessionStatus.COMPLETED.value:
         raise_error("A2002")
 
-    llm = LLMClient.from_db(db)
+    llm = session_llm(db, session)
     if not llm.api_key:
         raise_error("A0006")
 
@@ -300,7 +306,7 @@ async def finish_interview(
         return {"session_id": session_id, "status": "already_completed"}
 
     # 口头收尾可能已把 status 标 completed 但 report 仍空：补生成
-    llm = LLMClient.from_db(db)
+    llm = session_llm(db, session)
     try:
         await generate_and_persist_report(session, llm, db)
     except Exception as e:

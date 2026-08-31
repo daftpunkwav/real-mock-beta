@@ -5,6 +5,9 @@
 - 更新 ``api_base`` 时校验 URL 格式（http(s)，prod 强制 https；SSRF 网段校验在运行时执行）；
 - 密钥入库前 AES-256-GCM 加密；
 - 识别凭证与思考 Key 分离，禁止静默混用。
+
+模型条目体系（供应商 / 模型 / 任务绑定）路由见 ``api_service.routes.models``，
+DB 读写见 ``api_service.services.model_registry``。
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from shared.config import get_settings
-from shared.core.constants import DEFAULT_LLM_PROTOCOL, DEFAULT_LLM_RATE_LIMIT_PER_MINUTE, PipelineStage
+from shared.core.constants import DEFAULT_LLM_RATE_LIMIT_PER_MINUTE, PipelineStage
 from shared.core.errors import ApiBusinessError, get_spec, raise_error
 from shared.core.local_only import require_local_peer
 from shared.core.ratelimit import rate_limit_dep
@@ -34,12 +37,14 @@ from shared.schemas import (
 )
 from shared.capabilities.voice.config.catalog import catalog_payload, find_provider
 from shared.services.pipeline_config import (
-    get_stage_config_for_runtime,
     get_stage_config_map,
+    get_stage_config_for_runtime,
     stage_to_response,
     update_stage_config,
 )
 from api_service.services.stage_tests import test_recognize, test_reason, test_speak
+
+router = APIRouter(dependencies=[Depends(require_local_peer)])
 
 
 async def _timed(stage_test) -> dict:
@@ -48,8 +53,6 @@ async def _timed(stage_test) -> dict:
     result = await stage_test
     result["latency_ms"] = int((time.perf_counter() - start) * 1000)
     return result
-
-router = APIRouter(dependencies=[Depends(require_local_peer)])
 
 
 def _safe_base(url: str, *, label: str) -> None:
@@ -120,7 +123,7 @@ def get_llm_settings(db: Session = Depends(get_db)):
         max_tokens=reason.get("max_tokens", 4096),
         context_window=reason.get("context_window", 128000),
         provider=reason.get("provider") or "",
-        protocol=reason.get("protocol") or DEFAULT_LLM_PROTOCOL,
+        protocol=reason.get("protocol") or "openai_chat",
         reasoning_effort="medium",
         supports_vision=reason.get("capabilities", {}).get("supports_vision", True),
         supports_audio=reason.get("capabilities", {}).get("supports_audio_output", False),

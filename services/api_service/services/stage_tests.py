@@ -43,8 +43,8 @@ def load_fixture() -> tuple[bytes, str]:
     return _AUDIO_PATH.read_bytes(), expected
 
 
-async def test_recognize(db: Session) -> dict:
-    cfg = get_stage_config_for_runtime(db, "recognize")
+async def test_recognize(db: Session, *, profile_id: int | None = None) -> dict:
+    cfg = get_stage_config_for_runtime(db, "recognize", profile_id=profile_id)
     provider = cfg.get("provider") or (
         "custom" if cfg.get("api_base") and cfg.get("api_key") else "local"
     )
@@ -108,8 +108,8 @@ async def test_recognize(db: Session) -> dict:
     }
 
 
-async def test_reason(db: Session) -> dict:
-    cfg = get_stage_config_for_runtime(db, "reason")
+async def test_reason(db: Session, *, profile_id: int | None = None) -> dict:
+    cfg = get_stage_config_for_runtime(db, "reason", profile_id=profile_id)
     provider = cfg.get("provider") or ""
 
     meta = find_provider("reasoning", provider)
@@ -148,8 +148,8 @@ async def test_reason(db: Session) -> dict:
         return {"success": False, "message": f"思考测试失败: {e}"}
 
 
-async def test_speak(db: Session) -> dict:
-    cfg = get_stage_config_for_runtime(db, "speak")
+async def test_speak(db: Session, *, profile_id: int | None = None) -> dict:
+    cfg = get_stage_config_for_runtime(db, "speak", profile_id=profile_id)
     provider = cfg.get("provider") or (
         "custom" if cfg.get("api_base") and cfg.get("api_key") else "edge"
     )

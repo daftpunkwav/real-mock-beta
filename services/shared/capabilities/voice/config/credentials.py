@@ -36,12 +36,17 @@ def load_settings_row(db: Session) -> LLMSettings | None:
     return db.query(LLMSettings).filter(LLMSettings.id == 1).first()
 
 
-def build_stt_credentials(row: LLMSettings | None, db: Session | None = None) -> SttCredentials:
+def build_stt_credentials(
+    row: LLMSettings | None,
+    db: Session | None = None,
+    *,
+    profile_id: int | None = None,
+) -> SttCredentials:
     """构建独立识别凭证；新配置优先，绝不回落思考 Key。"""
     if db is not None:
         from shared.services.pipeline_config import get_stage_config_for_runtime
 
-        cfg = get_stage_config_for_runtime(db, "recognize")
+        cfg = get_stage_config_for_runtime(db, "recognize", profile_id=profile_id)
         extras = cfg.get("extras") or {}
         provider = cfg.get("provider") or (
             "custom" if cfg.get("api_base") and cfg.get("api_key") else "local"
@@ -88,12 +93,17 @@ def build_stt_credentials(row: LLMSettings | None, db: Session | None = None) ->
     )
 
 
-def build_tts_credentials(row: LLMSettings | None, db: Session | None = None) -> TtsCredentials:
+def build_tts_credentials(
+    row: LLMSettings | None,
+    db: Session | None = None,
+    *,
+    profile_id: int | None = None,
+) -> TtsCredentials:
     """构建独立播报凭证；新配置优先。"""
     if db is not None:
         from shared.services.pipeline_config import get_stage_config_for_runtime
 
-        cfg = get_stage_config_for_runtime(db, "speak")
+        cfg = get_stage_config_for_runtime(db, "speak", profile_id=profile_id)
         extras = cfg.get("extras") or {}
         handler = cfg.get("provider") or (
             "custom" if cfg.get("api_base") and cfg.get("api_key") else "edge"

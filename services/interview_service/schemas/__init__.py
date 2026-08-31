@@ -23,6 +23,15 @@ class ResumePickerItem(BaseModel):
 
 # ── 面试配置 ──────────────────────────────────────────
 
+
+class AiOverrides(BaseModel):
+    """模拟面试的处理器选择：思考 / 语音输入 / 语音输出 + 思考强度。"""
+
+    chat_profile_id: int | None = None
+    stt_profile_id: int | None = None
+    tts_profile_id: int | None = None
+    reasoning_effort: Literal["low", "medium", "high", "max"] | None = None
+
 class InterviewConfig(BaseModel):
     role: str = Field(..., max_length=MAX_CONFIG_STR_CHARS)
     level: str = Field(..., max_length=MAX_CONFIG_STR_CHARS)
@@ -34,6 +43,8 @@ class InterviewConfig(BaseModel):
     resume_id: int | None = None
     avatar_id: str = Field(default="professional_male", max_length=MAX_CONFIG_STR_CHARS)
     scene_id: str = Field(default="meeting_room", max_length=MAX_CONFIG_STR_CHARS)
+    # 场景级 AI 覆盖：三个任务各自的模型条目 + 思考强度（缺省回落任务绑定）
+    ai_overrides: "AiOverrides | None" = None
 
 
 class InterviewSessionResponse(BaseModel):

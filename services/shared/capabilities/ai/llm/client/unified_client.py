@@ -11,13 +11,138 @@ import httpx
 
 from shared.config import get_settings
 from shared.core.constants import DEFAULT_LLM_PROTOCOL, LLMProtocol
+from shared.core.prompts import strip_emojis
 from shared.core.security import UnsafeURLError, is_safe_http_url, make_pinned_async_client, redact_api_key
 from shared.core.secrets import LegacySecretFormatError, decrypt_secret
 from shared.capabilities.ai.llm.stream_filters import StreamSanitizer
+from shared.capabilities.ai.llm.usage import UsageAccumulator
 
 from .base import _is_local_allowed, _require_https
 
 logger = logging.getLogger(__name__)
+
+# 思考强度 → Anthropic extended thinking 预算（tokens）
+_ANTHROPIC_THINKING_BUDGET = {
+    "low": 4096,
+    "medium": 8192,
+    "high": 16384,
+    "max": 32768,
+}
+
+
+class _StreamOptionsUnsupported(Exception):
+    """流式端点显式拒绝 ``stream_options``（请求体 400/422 且错误信息点名该字段）。"""
+
+
+class _OpenAIRoundAssembler:
+    """openai_chat 流式增量 → (reasoning 增量, 组装完整 message)。
+
+    reasoning 即时回传；正文与 tool_calls（id/name/arguments 分片按 index
+    拼接）缓冲到流结束，组装出与非流式 ``chat_message`` 同构的 message。
+    """
+
+    def __init__(self) -> None:
+        self._content: list[str] = []
+        self._calls: dict[int, dict[str, Any]] = {}
+
+    def feed(self, event: dict[str, Any]) -> str:
+        choices = event.get("choices") or []
+        if not choices:
+            return ""
+        delta = choices[0].get("delta") or {}
+        if not isinstance(delta, dict):
+            return ""
+        reasoning = ""
+        rc = delta.get("reasoning_content") or delta.get("reasoning") or ""
+        if isinstance(rc, str) and rc:
+            reasoning = rc
+        content = delta.get("content")
+        if isinstance(content, str) and content:
+            self._content.append(content)
+        for tc in delta.get("tool_calls") or []:
+            if not isinstance(tc, dict):
+                continue
+            idx = int(tc.get("index") or 0)
+            slot = self._calls.setdefault(
+                idx, {"id": "", "function": {"name": "", "arguments": ""}}
+            )
+            if tc.get("id"):
+                slot["id"] = str(tc["id"])
+            fn = tc.get("function") or {}
+            if fn.get("name"):
+                slot["function"]["name"] += str(fn["name"])
+            if fn.get("arguments"):
+                slot["function"]["arguments"] += str(fn["arguments"])
+        return reasoning
+
+    def message(self) -> dict[str, Any]:
+        tool_calls = [
+            {
+                "id": self._calls[idx]["id"] or f"call_{idx}",
+                "type": "function",
+                "function": self._calls[idx]["function"],
+            }
+            for idx in sorted(self._calls)
+        ]
+        message: dict[str, Any] = {"role": "assistant", "content": "".join(self._content) or None}
+        if tool_calls:
+            message["tool_calls"] = tool_calls
+        return message
+
+
+class _AnthropicRoundAssembler:
+    """anthropic_messages 流事件 → (reasoning 增量, 组装完整 message)。
+
+    thinking_delta 即时回传；text_delta 与 tool_use（input_json_delta 分片
+    拼接）缓冲到流结束组装。签名块（signature_delta）不透出。
+    """
+
+    def __init__(self) -> None:
+        self._text: list[str] = []
+        self._blocks: dict[int, dict[str, str]] = {}
+
+    def feed(self, event: dict[str, Any]) -> str:
+        etype = event.get("type")
+        if etype == "content_block_start":
+            block = event.get("content_block") or {}
+            if block.get("type") == "tool_use":
+                idx = int(event.get("index") or 0)
+                self._blocks[idx] = {
+                    "id": str(block.get("id") or ""),
+                    "name": str(block.get("name") or ""),
+                    "args": "",
+                }
+            return ""
+        if etype != "content_block_delta":
+            return ""
+        idx = int(event.get("index") or 0)
+        delta = event.get("delta") or {}
+        dtype = delta.get("type")
+        if dtype == "thinking_delta":
+            return str(delta.get("thinking") or "")
+        if dtype == "text_delta":
+            self._text.append(str(delta.get("text") or ""))
+        elif dtype == "input_json_delta":
+            if idx in self._blocks:
+                self._blocks[idx]["args"] += str(delta.get("partial_json") or "")
+        return ""
+
+    def message(self) -> dict[str, Any]:
+        tool_calls = [
+            {
+                "id": self._blocks[idx]["id"] or f"call_{idx}",
+                "type": "function",
+                "function": {
+                    "name": self._blocks[idx]["name"],
+                    "arguments": self._blocks[idx]["args"] or "{}",
+                },
+            }
+            for idx in sorted(self._blocks)
+        ]
+        message: dict[str, Any] = {"role": "assistant", "content": "".join(self._text) or None}
+        if tool_calls:
+            message["tool_calls"] = tool_calls
+        return message
 
 
 def _headers(api_key: str, protocol: str) -> dict[str, str]:
@@ -218,12 +343,18 @@ class UnifiedLLMClient:
         model: str,
         protocol: str = DEFAULT_LLM_PROTOCOL,
         max_tokens: int = 4096,
+        reasoning_effort: str | None = None,
+        usage_sink: UsageAccumulator | None = None,
     ):
         self.api_base = api_base.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.protocol = protocol
         self.max_tokens = max_tokens
+        self.reasoning_effort = reasoning_effort or None
+        # 用量累计：缺省自建（独立使用），由 LLMClient 委派时共享同一 sink
+        self.usage = usage_sink if usage_sink is not None else UsageAccumulator()
+        self._stream_usage_disabled = False
 
     @classmethod
     def from_stage_config(cls, config: dict[str, Any]) -> "UnifiedLLMClient":
@@ -277,6 +408,11 @@ class UnifiedLLMClient:
                 payload["tools"] = anthropic_tools
             if tool_choice is not None:
                 payload["tool_choice"] = _anthropic_tool_choice(tool_choice)
+            if self.reasoning_effort:
+                # 思考强度 → extended thinking 预算；预算不得超过 max_tokens
+                budget = _ANTHROPIC_THINKING_BUDGET.get(self.reasoning_effort, 8192)
+                payload["max_tokens"] = max(self.max_tokens, budget + 1024)
+                payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
             return url, payload
 
         if self.protocol == LLMProtocol.OPENAI_RESPONSES:
@@ -294,6 +430,8 @@ class UnifiedLLMClient:
                 payload["instructions"] = system_text
             if response_format:
                 payload["text"] = {"format": response_format}
+            if self.reasoning_effort:
+                payload["reasoning"] = {"effort": "high" if self.reasoning_effort == "max" else self.reasoning_effort}
             responses_tools = _responses_tools(tools)
             if responses_tools:
                 payload["tools"] = responses_tools
@@ -316,6 +454,8 @@ class UnifiedLLMClient:
             payload["tools"] = tools
         if tool_choice is not None:
             payload["tool_choice"] = tool_choice
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = "high" if self.reasoning_effort == "max" else self.reasoning_effort
         return url, payload
 
     @staticmethod
@@ -392,6 +532,30 @@ class UnifiedLLMClient:
             return choices[0].get("message", {}).get("tool_calls") or []
         return calls
 
+    @staticmethod
+    def _extract_reasoning(data: dict[str, Any], protocol: str) -> str:
+        """提取思考过程文本（无则空串）。
+
+        - anthropic_messages：content 里的 ``thinking`` 块拼接；
+        - openai_chat：message 的 ``reasoning_content`` / ``reasoning``；
+        - openai_responses：reasoning item 只含摘要且多数网关不回传，不提取。
+        """
+        if protocol == LLMProtocol.ANTHROPIC_MESSAGES:
+            content = data.get("content", [])
+            if isinstance(content, list):
+                return "".join(
+                    str(item.get("thinking") or "")
+                    for item in content
+                    if isinstance(item, dict) and item.get("type") == "thinking"
+                )
+            return ""
+        msg = (data.get("choices") or [{}])[0].get("message", {}) if data.get("choices") else {}
+        for key in ("reasoning_content", "reasoning"):
+            val = msg.get(key)
+            if isinstance(val, str) and val.strip():
+                return val
+        return ""
+
     async def chat(
         self,
         messages: list[dict[str, Any]],
@@ -421,6 +585,7 @@ class UnifiedLLMClient:
                     redact_api_key(self.api_key),
                 )
                 raise
+        self.usage.record_response(data, self.protocol)
         return self._extract_text(data, self.protocol)
 
     async def test_connection(self) -> tuple[bool, str]:
@@ -475,11 +640,87 @@ class UnifiedLLMClient:
             )
             resp.raise_for_status()
             data = resp.json()
-        return {
+        self.usage.record_response(data, self.protocol)
+        result: dict[str, Any] = {
             "role": "assistant",
             "content": self._extract_text(data, self.protocol),
             "tool_calls": self._extract_tool_calls(data, self.protocol),
         }
+        # 思考过程仅随 message 回传供展示，不写入消息序列
+        reasoning = self._extract_reasoning(data, self.protocol)
+        if reasoning.strip():
+            result["reasoning"] = strip_emojis(reasoning)
+        return result
+
+    async def chat_message_stream(
+        self,
+        messages: list[dict[str, Any]],
+        system: str | None = None,
+        temperature: float = 0.7,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """流式执行一轮工具循环调用：思考增量实时产出，正文/工具调用缓冲组装。
+
+        产出 ``{"type": "reasoning", "text": ...}`` 增量事件，最后产出
+        ``{"type": "message", "message": {...}}``（与非流式 ``chat_message``
+        同构；reasoning 已实时下发，不再重复携带）。openai_responses 协议
+        不支持时抛 :class:`NotImplementedError`，调用方回落非流式。
+        """
+        if self.protocol == LLMProtocol.OPENAI_RESPONSES:
+            raise NotImplementedError("responses 协议不支持流式工具轮")
+        self._safe_check()
+        url, payload = self._build_url_and_payload(
+            messages, system=system, stream=True, temperature=temperature, tools=tools
+        )
+        if self.protocol == LLMProtocol.OPENAI_CHAT and not self._stream_usage_disabled:
+            payload["stream_options"] = {"include_usage": True}
+        try:
+            async for event in self._stream_round_events(url, payload):
+                yield event
+            return
+        except _StreamOptionsUnsupported:
+            self._stream_usage_disabled = True
+            logger.info(
+                "LLM 流式端点拒绝 stream_options，后续不再携带: model=%s", self.model
+            )
+            payload.pop("stream_options", None)
+            async for event in self._stream_round_events(url, payload):
+                yield event
+
+    async def _stream_round_events(
+        self, url: str, payload: dict[str, Any]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """执行一次流式请求：reasoning 增量即时产出，结束时产出组装好的 message。"""
+        if self.protocol == LLMProtocol.ANTHROPIC_MESSAGES:
+            assembler: Any = _AnthropicRoundAssembler()
+        else:
+            assembler = _OpenAIRoundAssembler()
+        async with make_pinned_async_client(
+            self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=180.0
+        ) as client:
+            async with client.stream(
+                "POST", url, headers=_headers(self.api_key, self.protocol), json=payload
+            ) as resp:
+                if resp.status_code in (400, 422) and "stream_options" in payload:
+                    body = (await resp.aread()).decode("utf-8", "ignore")
+                    if "stream_options" in body:
+                        raise _StreamOptionsUnsupported(body[:120])
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    raw = line[5:].strip()
+                    if raw == "[DONE]":
+                        break
+                    try:
+                        event = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    self.usage.record_stream_event(event, self.protocol)
+                    reasoning = strip_emojis(assembler.feed(event))
+                    if reasoning:
+                        yield {"type": "reasoning", "text": reasoning}
+        yield {"type": "message", "message": assembler.message()}
 
     async def chat_stream(
         self,
@@ -501,6 +742,25 @@ class UnifiedLLMClient:
             temperature=temperature,
             tools=tools,
         )
+        if self.protocol == LLMProtocol.OPENAI_CHAT and not self._stream_usage_disabled:
+            # 请求供应商回传 usage（最后一个 chunk）；被拒时按响应降级
+            payload["stream_options"] = {"include_usage": True}
+        try:
+            async for piece in self._stream_payload(url, payload):
+                yield piece
+        except _StreamOptionsUnsupported:
+            self._stream_usage_disabled = True
+            logger.info(
+                "LLM 流式端点拒绝 stream_options，后续不再携带: model=%s", self.model
+            )
+            payload.pop("stream_options", None)
+            async for piece in self._stream_payload(url, payload):
+                yield piece
+
+    async def _stream_payload(
+        self, url: str, payload: dict[str, Any]
+    ) -> AsyncIterator[str]:
+        """执行一次流式请求并产出净化后的文本增量（含 usage 采集）。"""
         sanitizer = StreamSanitizer()
         async with make_pinned_async_client(
             self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=180.0
@@ -508,6 +768,10 @@ class UnifiedLLMClient:
             async with client.stream(
                 "POST", url, headers=_headers(self.api_key, self.protocol), json=payload
             ) as resp:
+                if resp.status_code in (400, 422) and "stream_options" in payload:
+                    body = (await resp.aread()).decode("utf-8", "ignore")
+                    if "stream_options" in body:
+                        raise _StreamOptionsUnsupported(body[:120])
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
                     if not line.startswith("data:"):
@@ -519,6 +783,7 @@ class UnifiedLLMClient:
                         event = json.loads(raw)
                     except json.JSONDecodeError:
                         continue
+                    self.usage.record_stream_event(event, self.protocol)
                     token = ""
                     reasoning = ""
                     if self.protocol == LLMProtocol.ANTHROPIC_MESSAGES:

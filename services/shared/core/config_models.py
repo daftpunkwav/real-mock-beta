@@ -46,6 +46,61 @@ class StageConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
+class LlmProvider(Base):
+    """BYOK 供应商：API 凭证与协议归属级，模型条目继承其凭证。"""
+
+    __tablename__ = "llm_providers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    api_base: Mapped[str] = mapped_column(String(500), default="")
+    protocol: Mapped[str] = mapped_column(String(50), default=DEFAULT_LLM_PROTOCOL)
+    api_key: Mapped[str] = mapped_column(String(500), default="")  # enc: AES-GCM
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class ModelProfile(Base):
+    """模型条目：能力声明制。
+
+    一个条目以中立能力位声明自己能做什么（对话/视觉/语音输入/语音输出/
+    思考强度），可同时被多个任务绑定复用，避免同一模型按用途重复录入。
+    """
+
+    __tablename__ = "model_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(200), default="")
+    context_window: Mapped[int] = mapped_column(Integer, default=128000)
+    max_output: Mapped[int] = mapped_column(Integer, default=4096)
+    # 中立能力位
+    cap_chat: Mapped[bool] = mapped_column(Boolean, default=False)
+    cap_vision: Mapped[bool] = mapped_column(Boolean, default=False)
+    cap_audio_in: Mapped[bool] = mapped_column(Boolean, default=False)
+    cap_audio_out: Mapped[bool] = mapped_column(Boolean, default=False)
+    cap_reasoning: Mapped[bool] = mapped_column(Boolean, default=False)
+    extras: Mapped[str] = mapped_column(Text, default="{}")  # JSON；语音凭证等
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class TaskBinding(Base):
+    """任务绑定：chat / stt / tts 各自的默认模型条目与（语音）降级策略。"""
+
+    __tablename__ = "task_bindings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    task: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    profile_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    fallback_handler: Mapped[str] = mapped_column(String(100), default="")
+    fallback_mode: Mapped[str] = mapped_column(String(30), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
 class LLMSettings(Base):
     """BYOK LLM 配置（保留做兼容读；新逻辑优先使用 stage_configs）。"""
 
@@ -86,4 +141,4 @@ class LLMSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
-__all__ = ["LLMSettings", "StageConfig"]
+__all__ = ["LLMSettings", "StageConfig", "LlmProvider", "ModelProfile", "TaskBinding"]

@@ -86,10 +86,15 @@ MIGRATIONS: dict[str, list[str]] = {
         "ALTER TABLE interview_sessions ADD COLUMN scene_id VARCHAR(50) DEFAULT 'meeting_room'",
         "ALTER TABLE interview_sessions ADD COLUMN token_usage INTEGER DEFAULT 0",
         "ALTER TABLE interview_sessions ADD COLUMN access_token VARCHAR(64) DEFAULT ''",
+        "ALTER TABLE interview_sessions ADD COLUMN ai_overrides TEXT DEFAULT '{}'",
     ],
     "prep_sessions": [
         "ALTER TABLE prep_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'active'",
         "ALTER TABLE prep_sessions ADD COLUMN access_token VARCHAR(64) DEFAULT ''",
+        "ALTER TABLE prep_sessions ADD COLUMN updated_at DATETIME DEFAULT NULL",
+        "ALTER TABLE prep_sessions ADD COLUMN prompt_tokens INTEGER DEFAULT 0",
+        "ALTER TABLE prep_sessions ADD COLUMN completion_tokens INTEGER DEFAULT 0",
+        "ALTER TABLE prep_sessions ADD COLUMN cached_tokens INTEGER DEFAULT 0",
     ],
 }
 

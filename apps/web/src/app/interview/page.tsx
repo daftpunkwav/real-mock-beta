@@ -3,8 +3,17 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { interviewService as api } from "@/lib/api/interviewService";
+import { apiService } from "@/lib/api/apiService";
 import { toast } from "@/components/Toast";
-import type { Options, ResumePickerItem, InterviewConfig } from "@/types";
+import { EffortSelect, ModelSelect } from "@/components/ModelControls";
+import type {
+  ModelProfile,
+  ReasoningEffort,
+  Options,
+  ResumePickerItem,
+  InterviewConfig,
+  TaskBindings,
+} from "@/types";
 import {
   Play,
   Sparkles,
@@ -37,6 +46,15 @@ export default function InterviewSetupPage() {
     scene_id: "meeting_room",
   });
 
+  const [chatModels, setChatModels] = useState<ModelProfile[]>([]);
+  const [sttModels, setSttModels] = useState<ModelProfile[]>([]);
+  const [ttsModels, setTtsModels] = useState<ModelProfile[]>([]);
+  const [chatModelId, setChatModelId] = useState<number | null>(null);
+  const [sttModelId, setSttModelId] = useState<number | null>(null);
+  const [ttsModelId, setTtsModelId] = useState<number | null>(null);
+  const [effort, setEffort] = useState<ReasoningEffort>("medium");
+  const [defaultBindings, setDefaultBindings] = useState<TaskBindings | null>(null);
+
   const loadData = () => {
     setLoading(true);
     setLoadError("");
@@ -55,6 +73,25 @@ export default function InterviewSetupPage() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // 处理器选择数据:按能力位分桶(缺省回落各任务的默认绑定)
+  useEffect(() => {
+    apiService
+      .listModelOptions()
+      .then((res) => {
+        const list = Array.isArray(res?.models) ? res.models : [];
+        setChatModels(list.filter((m) => m.capabilities?.chat));
+        setSttModels(list.filter((m) => m.capabilities?.audio_input));
+        setTtsModels(list.filter((m) => m.capabilities?.audio_output));
+      })
+      .catch(() => {
+        /* 选择器数据加载失败不阻塞主流程 */
+      });
+    apiService
+      .getBindings()
+      .then(setDefaultBindings)
+      .catch(() => {});
   }, []);
 
   const selectedCompany = useMemo(
@@ -98,7 +135,12 @@ export default function InterviewSetupPage() {
   const handleStart = async () => {
     setCreating(true);
     try {
-      const session = await api.createSession(config);
+      const session = await api.createSessionWithAI(config, {
+        chat_profile_id: chatModelId,
+        stt_profile_id: sttModelId,
+        tts_profile_id: ttsModelId,
+        reasoning_effort: effort,
+      });
       router.push(`/interview/${session.id}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "创建失败");
@@ -285,6 +327,38 @@ export default function InterviewSetupPage() {
                     </p>
                   </div>
                 )}
+
+                {/* AI 处理器与思考强度(缺省回落系统默认绑定) */}
+                <div className="rounded-lg border border-surface-border p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink">
+                    <Mic size={13} className="text-[var(--primary)]" />
+                    处理器与思考强度
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-[11px] text-ink-muted">思考模型</label>
+                      <ModelSelect models={chatModels} value={chatModelId} onChange={setChatModelId} disabled={creating} ariaLabel="思考模型" className="!w-full" defaultProfile={defaultBindings?.chat?.profile ?? null} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] text-ink-muted">思考强度</label>
+                      <EffortSelect
+                        model={chatModels.find((m) => m.id === chatModelId) ?? null}
+                        value={effort}
+                        onChange={setEffort}
+                        disabled={creating}
+                        forceVisible
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] text-ink-muted">语音输入（识别）</label>
+                      <ModelSelect models={sttModels} value={sttModelId} onChange={setSttModelId} disabled={creating} ariaLabel="语音输入模型" className="!w-full" defaultProfile={defaultBindings?.stt?.profile ?? null} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] text-ink-muted">语音输出（播报）</label>
+                      <ModelSelect models={ttsModels} value={ttsModelId} onChange={setTtsModelId} disabled={creating} ariaLabel="语音输出模型" className="!w-full" defaultProfile={defaultBindings?.tts?.profile ?? null} />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

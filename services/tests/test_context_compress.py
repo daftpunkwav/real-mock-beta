@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
+from shared.capabilities.ai.agent.working_memory import WorkingMemory
 from shared.capabilities.ai.context_manager import (
+    compact_with_summary,
     compress_messages,
     estimate_messages_tokens,
     estimate_tokens,
@@ -92,3 +96,135 @@ def test_estimate_messages_tokens_skips_empty_content() -> None:
     # 空 / None content 不应抛异常
     total = estimate_messages_tokens(msgs)
     assert total >= 0
+
+# ── 旧工具对折叠 ────────────────────────────────────────────────
+
+
+def _turn_with_tools(user_text: str, tool_result: str, answer: str) -> list[dict]:
+    """构造一轮「用户 → 工具调用 → 工具结果 → 回答」的消息。"""
+    return [
+        {"role": "user", "content": user_text},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {"id": "c1", "type": "function", "function": {"name": "web_search", "arguments": "{}"}}
+            ],
+        },
+        {"role": "tool", "tool_call_id": "c1", "content": tool_result},
+        {"role": "assistant", "content": answer},
+    ]
+
+
+def test_compress_prunes_stale_tool_pairs() -> None:
+    """最近用户消息之前的工具调用对应被折叠,最后一轮保持配对完整。"""
+    big = "观察" * 2000  # 单条工具结果很大
+    msgs = (
+        [{"role": "system", "content": "规则"}]
+        + _turn_with_tools("旧问题", big, "旧回答" + "补" * 1000)
+        + [{"role": "user", "content": "最新问题"}]
+    )
+    out = compress_messages(msgs, max_tokens=10000)  # 触发阈值但不产生省略
+    roles = [m["role"] for m in out]
+    assert "tool" not in roles, "旧工具结果应被折叠"
+    assert not any(m.get("tool_calls") for m in out), "旧 tool_calls 结构应被移除"
+    assert any(m["role"] == "assistant" and m.get("content", "").startswith("旧回答") for m in out)
+    # 最新一轮(当前工具对)如果在场必须原样保留——此处最后是 user,不涉及
+
+
+def test_compress_keeps_current_turn_tool_pairs() -> None:
+    """当前轮(最后一条 user 之后)的 tool_calls/tool 配对不可破坏。"""
+    big = "内容" * 3000
+    msgs = (
+        [{"role": "system", "content": "规则"}]
+        + [{"role": "user", "content": "旧问题" + big}]
+        + [{"role": "assistant", "content": "旧回答" + big}]
+        + _turn_with_tools("最新问题", "工具结果", "最新回答")
+    )
+    out = compress_messages(msgs, max_tokens=500, keep_recent=20)
+    tail_user = max(i for i, m in enumerate(out) if m["role"] == "user")
+    current = out[tail_user:]
+    assert any(m.get("role") == "tool" for m in current), "当前轮 tool 结果必须保留"
+    assert any(m.get("tool_calls") for m in current), "当前轮 tool_calls 必须保留"
+
+
+# ── LLM 纪要式压缩 ──────────────────────────────────────────────
+
+
+class _SummarizerLLM:
+    """可编程的压缩用 LLM:chat 返回固定纪要,或抛错;记录调用。"""
+
+    def __init__(self, reply: str = "", error: Exception | None = None):
+        self.reply = reply
+        self.error = error
+        self.chat_calls: list[list[dict]] = []
+
+    async def chat(self, messages, temperature=0.7, **kwargs):
+        del temperature, kwargs
+        self.chat_calls.append(messages)
+        if self.error is not None:
+            raise self.error
+        return self.reply
+
+
+def _big_history(turns: int = 12) -> list[dict]:
+    msgs: list[dict] = [{"role": "system", "content": "规则"}]
+    for i in range(turns):
+        msgs.append({"role": "user", "content": f"问题{i}：" + "背景" * 300})
+        msgs.append({"role": "assistant", "content": f"回答{i}：" + "结论" * 300})
+    return msgs
+
+
+@pytest.mark.asyncio
+async def test_compact_with_summary_under_threshold_skips_llm() -> None:
+    llm = _SummarizerLLM(reply="纪要")
+    msgs = [{"role": "user", "content": "短问题"}]
+    out = await compact_with_summary(msgs, 100000, llm=llm)
+    assert out == msgs
+    assert llm.chat_calls == []
+
+
+@pytest.mark.asyncio
+async def test_compact_with_summary_generates_structured_summary() -> None:
+    llm = _SummarizerLLM(reply="会话目标：分析简历\n待办：模拟追问")
+    mem = WorkingMemory()
+    out = await compact_with_summary(_big_history(), 500, memory=mem, llm=llm, keep_recent=4)
+    summaries = [
+        m for m in out
+        if m["role"] == "system" and str(m.get("content", "")).startswith("[会话纪要]")
+    ]
+    assert len(summaries) == 1
+    assert "会话目标" in summaries[0]["content"]
+    # 被省略的早期对话不再以原样存在;最近窗口保留
+    assert not any(m["role"] == "user" and str(m.get("content", "")).startswith("问题0") for m in out)
+    assert any(m["role"] == "user" and str(m.get("content", "")).startswith("问题11") for m in out)
+    assert mem.notes, "被省略对话应同时吸收进工作记忆"
+    assert llm.chat_calls, "超阈值时必须调用 LLM 生成纪要"
+
+
+@pytest.mark.asyncio
+async def test_compact_with_summary_falls_back_to_digest_on_llm_failure() -> None:
+    llm = _SummarizerLLM(error=RuntimeError("llm down"))
+    out = await compact_with_summary(_big_history(), 500, llm=llm, keep_recent=4)
+    digests = [
+        m for m in out
+        if m["role"] == "system" and str(m.get("content", "")).startswith("[上下文压缩]")
+    ]
+    assert digests, "LLM 失败必须回退规则摘要"
+
+
+@pytest.mark.asyncio
+async def test_compact_with_summary_supersedes_previous_summary() -> None:
+    old = _big_history()
+    old.insert(1, {"role": "system", "content": "[会话纪要] 旧纪要内容"})
+    llm = _SummarizerLLM(reply="新纪要")
+    out = await compact_with_summary(old, 500, llm=llm, keep_recent=4)
+    summaries = [
+        m for m in out
+        if m["role"] == "system" and str(m.get("content", "")).startswith("[会话纪要]")
+    ]
+    assert len(summaries) == 1
+    assert "旧纪要内容" not in summaries[0]["content"]
+    # 上一份纪要应作为增量更新输入传给 LLM
+    prompt = llm.chat_calls[0][0]["content"]
+    assert "旧纪要内容" in prompt

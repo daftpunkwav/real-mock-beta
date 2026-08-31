@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from shared.config import get_settings
 from shared.core.constants import DEFAULT_LLM_PROTOCOL
+from shared.core.prompts import strip_emojis
 from shared.core.security import (
     UnsafeURLError,
     is_safe_http_url,
@@ -32,6 +33,7 @@ from shared.models import LLMSettings
 
 from .base import _extract_message_text, _is_local_allowed, _require_https, _retry_request
 from ..stream_filters import StreamSanitizer
+from ..usage import UsageAccumulator
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,8 @@ class LLMClient:
         max_tokens: int = 4096,
         protocol: str = DEFAULT_LLM_PROTOCOL,
         reasoning_effort: str | None = None,
+        context_window: int = 0,
+        usage_sink: UsageAccumulator | None = None,
     ):
         self.api_base = api_base.rstrip("/")
         self.api_key = api_key
@@ -54,15 +58,32 @@ class LLMClient:
         self.max_tokens = max_tokens
         self.protocol = protocol
         self.reasoning_effort = reasoning_effort
+        # 模型条目声明的上下文窗口；0 = 未知（调用方自行回落）
+        self.context_window = max(0, int(context_window or 0))
+        # 用量累计：客户端实例生命周期 = 一次业务请求，读 usage 即本轮总用量
+        self.usage = usage_sink if usage_sink is not None else UsageAccumulator()
+        # 供应商拒绝 stream_options 时置 False，后续流式请求不再携带
+        self._stream_usage_disabled = False
 
     @classmethod
-    def from_db(cls, db: Session) -> "LLMClient":
-        """优先从 stage_configs 读取 reason 阶段配置；否则兼容旧 LLMSettings 与环境变量。"""
+    def from_db(
+        cls,
+        db: Session,
+        *,
+        profile_id: int | None = None,
+        reasoning_effort: str | None = None,
+    ) -> "LLMClient":
+        """从模型条目体系（默认任务绑定或场景级 ``profile_id`` 覆盖）构建。
+
+        ``reasoning_effort`` 仅当所选条目声明 ``reasoning_capable`` 时生效；
+        未覆盖时走默认 chat 绑定，再兼容旧 stage_configs / LLMSettings / 环境变量。
+        """
         from shared.services.pipeline_config import get_stage_config_for_runtime
 
         settings = get_settings()
-        cfg = get_stage_config_for_runtime(db, "reason")
+        cfg = get_stage_config_for_runtime(db, "reason", profile_id=profile_id)
         cfg_api_key = cfg.get("api_key") or ""
+        profile_explicit = profile_id is not None and cfg.get("profile_id") == profile_id
 
         if cfg.get("api_base") and cfg_api_key:
             api_base = cfg["api_base"]
@@ -70,8 +91,22 @@ class LLMClient:
             model = cfg.get("model") or ""
             max_tokens = cfg.get("max_tokens") or settings.llm_max_tokens
             protocol = cfg.get("protocol") or DEFAULT_LLM_PROTOCOL
-            reasoning = None
+            # 思考强度：条目声明支持才下发（旧 stage_configs 回落路径恒不声明）
+            reasoning = (
+                reasoning_effort
+                if reasoning_effort and cfg.get("reasoning_capable")
+                else None
+            )
         else:
+            if profile_explicit:
+                # 场景显式指定的条目缺少凭证：不静默回落，保留条目信息让请求报错
+                return cls(
+                    api_base=cfg.get("api_base") or "",
+                    api_key="",
+                    model=cfg.get("model") or "",
+                    max_tokens=cfg.get("max_tokens") or settings.llm_max_tokens,
+                    protocol=cfg.get("protocol") or DEFAULT_LLM_PROTOCOL,
+                )
             # 兼容旧 LLMSettings / 环境变量
             row = db.query(LLMSettings).filter(LLMSettings.id == 1).first()
             api_base = (row.api_base if row and row.api_base else None) or settings.llm_api_base
@@ -96,6 +131,7 @@ class LLMClient:
             max_tokens=max_tokens,
             protocol=protocol or DEFAULT_LLM_PROTOCOL,
             reasoning_effort=reasoning,
+            context_window=cfg.get("context_window") or 0,
         )
 
     def _headers(self) -> dict[str, str]:
@@ -125,7 +161,9 @@ class LLMClient:
         if tools:
             payload["tools"] = tools
         if self.reasoning_effort:
-            payload["reasoning_effort"] = self.reasoning_effort
+            payload["reasoning_effort"] = (
+                "high" if self.reasoning_effort == "max" else self.reasoning_effort
+            )
         return payload
 
     async def chat(
@@ -146,6 +184,8 @@ class LLMClient:
                 model=self.model,
                 protocol=self.protocol,
                 max_tokens=self.max_tokens,
+                reasoning_effort=self.reasoning_effort,
+                usage_sink=self.usage,
             ).chat(
                 messages,
                 temperature=temperature,
@@ -183,6 +223,7 @@ class LLMClient:
                 raise
 
         msg = data["choices"][0]["message"]
+        self.usage.record_response(data, self.protocol)
         return _extract_message_text(msg)
 
     async def chat_message(
@@ -203,6 +244,8 @@ class LLMClient:
                 model=self.model,
                 protocol=self.protocol,
                 max_tokens=self.max_tokens,
+                reasoning_effort=self.reasoning_effort,
+                usage_sink=self.usage,
             ).chat_message(
                 messages,
                 temperature=temperature,
@@ -242,13 +285,116 @@ class LLMClient:
                 raise
 
         msg = data["choices"][0]["message"]
+        self.usage.record_response(data, self.protocol)
         result: dict[str, Any] = {
             "role": msg.get("role") or "assistant",
             "content": msg.get("content"),
         }
         if msg.get("tool_calls"):
             result["tool_calls"] = msg["tool_calls"]
+        # 思考过程（reasoning_content）仅随 message 回传供展示，不写入消息序列
+        reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
+        if isinstance(reasoning, str) and reasoning.strip():
+            result["reasoning"] = strip_emojis(reasoning)
         return result
+
+    async def chat_message_stream(
+        self,
+        messages: list[dict[str, Any]],
+        temperature: float = 0.7,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """流式一轮工具循环调用：reasoning 增量即时产出，正文/工具调用缓冲组装。
+
+        产出 ``{"type": "reasoning", "text": ...}`` 增量事件，最后产出
+        ``{"type": "message", "message": {...}}``（与非流式 ``chat_message``
+        同构）。供 Agent 循环使用：思考过程实时可见，避免非流式长思考期间
+        连接静默。429/5xx/连接错误在未产出增量前指数退避重试。
+        """
+        if self.protocol != DEFAULT_LLM_PROTOCOL:
+            from .unified_client import UnifiedLLMClient
+
+            async for event in UnifiedLLMClient(
+                api_base=self.api_base,
+                api_key=self.api_key,
+                model=self.model,
+                protocol=self.protocol,
+                max_tokens=self.max_tokens,
+                reasoning_effort=self.reasoning_effort,
+                usage_sink=self.usage,
+            ).chat_message_stream(messages, temperature=temperature, tools=tools):
+                yield event
+            return
+        if not is_safe_http_url(self.api_base, allow_local=_is_local_allowed(), require_https=_require_https()):
+            raise UnsafeURLError(f"LLM api_base 不安全: {self.api_base}")
+        from .unified_client import _OpenAIRoundAssembler
+
+        url = f"{self.api_base}/chat/completions"
+        payload = self._build_payload(messages, temperature, stream=True, tools=tools)
+        if not self._stream_usage_disabled:
+            payload["stream_options"] = {"include_usage": True}
+        headers = self._headers()
+
+        max_retries = 3
+        backoff = 0.5
+        async with make_pinned_async_client(
+            self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=180.0
+        ) as client:
+            for attempt in range(max_retries + 1):
+                assembler = _OpenAIRoundAssembler()
+                emitted = False
+                try:
+                    async with client.stream(
+                        "POST", url, headers=headers, json=payload
+                    ) as resp:
+                        if resp.status_code in (400, 422) and "stream_options" in payload:
+                            body = (await resp.aread()).decode("utf-8", "ignore")
+                            if "stream_options" in body:
+                                self._stream_usage_disabled = True
+                                logger.info(
+                                    "LLM 流式端点拒绝 stream_options，后续不再携带: model=%s",
+                                    self.model,
+                                )
+                                payload.pop("stream_options", None)
+                                if attempt < max_retries:
+                                    continue
+                        resp.raise_for_status()
+                        if resp.status_code == 429 or resp.status_code >= 500:
+                            if attempt < max_retries:
+                                import asyncio
+
+                                await asyncio.sleep(backoff * (2**attempt))
+                                continue
+                            resp.raise_for_status()
+                        resp.raise_for_status()
+                        async for line in resp.aiter_lines():
+                            if not line.startswith("data: "):
+                                continue
+                            data_str = line[6:].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                            except json.JSONDecodeError:
+                                continue
+                            self.usage.record_stream_event(chunk, self.protocol)
+                            reasoning = assembler.feed(chunk)
+                            if reasoning:
+                                emitted = True
+                                yield {"type": "reasoning", "text": reasoning}
+                        yield {"type": "message", "message": assembler.message()}
+                        return
+                except (
+                    httpx.ConnectError,
+                    httpx.ReadTimeout,
+                    httpx.WriteError,
+                    httpx.RemoteProtocolError,
+                ):
+                    if emitted or attempt >= max_retries:
+                        raise
+                    import asyncio
+
+                    await asyncio.sleep(backoff * (2**attempt))
 
     async def chat_stream(
         self,
@@ -266,6 +412,8 @@ class LLMClient:
                 model=self.model,
                 protocol=self.protocol,
                 max_tokens=self.max_tokens,
+                reasoning_effort=self.reasoning_effort,
+                usage_sink=self.usage,
             ).chat_stream(messages, tools=tools):
                 yield token
             return
@@ -273,6 +421,9 @@ class LLMClient:
             raise UnsafeURLError(f"LLM api_base 不安全: {self.api_base}")
         url = f"{self.api_base}/chat/completions"
         payload = self._build_payload(messages, temperature, stream=True, tools=tools)
+        if not self._stream_usage_disabled:
+            # 请求供应商回传 usage（最后一个 chunk）；被拒时按响应降级
+            payload["stream_options"] = {"include_usage": True}
         headers = self._headers()
 
         max_retries = 3
@@ -290,6 +441,19 @@ class LLMClient:
                     async with client.stream(
                         "POST", url, headers=headers, json=payload
                     ) as resp:
+                        if resp.status_code in (400, 422) and "stream_options" in payload:
+                            # 供应商不支持 stream_options：可见降级（记日志）后去掉重试
+                            body = (await resp.aread()).decode("utf-8", "ignore")
+                            if "stream_options" in body:
+                                self._stream_usage_disabled = True
+                                logger.info(
+                                    "LLM 流式端点拒绝 stream_options，后续不再携带: model=%s",
+                                    self.model,
+                                )
+                                payload.pop("stream_options", None)
+                                if attempt < max_retries:
+                                    continue
+                        resp.raise_for_status()
                         if resp.status_code == 429 or resp.status_code >= 500:
                             last_exc = httpx.HTTPStatusError(
                                 f"transient {resp.status_code}",
@@ -310,6 +474,7 @@ class LLMClient:
                                 break
                             try:
                                 chunk = json.loads(data_str)
+                                self.usage.record_stream_event(chunk, self.protocol)
                                 delta = chunk["choices"][0].get("delta", {})
                                 if not isinstance(delta, dict):
                                     continue

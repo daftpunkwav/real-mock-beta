@@ -45,6 +45,9 @@ class InterviewSession(Base):
     token_usage: Mapped[int] = mapped_column(Integer, default=0)
     # 能力令牌：创建时下发，可变操作必验；勿写入 list/get 响应
     access_token: Mapped[str] = mapped_column(String(64), default="")
+    # 场景级 AI 覆盖（JSON）：chat/stt/tts 的 model_profile_id + reasoning_effort；
+    # 缺省字段回落任务绑定（默认处理器）。缺列时启动迁移会补齐
+    ai_overrides: Mapped[str] = mapped_column(Text, default="{}")
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)

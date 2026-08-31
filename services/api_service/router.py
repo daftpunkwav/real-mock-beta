@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from api_service.routes import profile, resume, settings
+from api_service.routes import models, profile, resume, settings
 
 service_router = APIRouter()
 service_router.include_router(profile.router, prefix="/profile", tags=["profile"])
 service_router.include_router(resume.router, prefix="/resume", tags=["resume"])
 service_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+service_router.include_router(models.router, prefix="/settings", tags=["settings"])

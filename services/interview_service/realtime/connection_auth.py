@@ -10,16 +10,12 @@ from sqlalchemy.orm import Session
 from shared.config import get_settings
 from shared.core.constants import SessionStatus
 from shared.core.session_auth import tokens_match
+from interview_service.ai import session_llm, session_stt_credentials, session_tts_credentials
 from interview_service.models import InterviewSession, LLMSettings
 from interview_service.realtime.events import TurnState
 from interview_service.realtime.session_registry import claim_session_connection
 from interview_service.services.interview.session_state import InterviewSessionState
 from interview_service.services.interview.runner import InterviewRunner
-from shared.capabilities.ai.llm.client import LLMClient
-from shared.capabilities.voice.config.credentials import (
-    build_stt_credentials,
-    build_tts_credentials,
-)
 from shared.capabilities.voice.stt import warmup_whisper
 from shared.capabilities.voice.stt.cloud import is_local_stt_model
 from shared.capabilities.voice.tts.voice_resolve import VoiceProsody, resolve_prosody
@@ -78,7 +74,7 @@ class ConnectionAuthMixin:
         Returns:
             True 表示装配完成；失败时已发送 error 并关闭，返回 False。
         """
-        self.ctx.llm = LLMClient.from_db(db)
+        self.ctx.llm = session_llm(db, session)
         if not self.ctx.llm.api_key:
             await self._fail_and_close("请先配置面试思考处理器的 API Key")
             return False
@@ -96,8 +92,8 @@ class ConnectionAuthMixin:
 
         row = db.query(LLMSettings).filter(LLMSettings.id == 1).first()
         # 必须先从 DB/stage 构建凭证，再取音色；否则会用 dataclass 默认值覆盖用户配置
-        self.ctx.stt_creds = build_stt_credentials(row, db=db)
-        self.ctx.tts_creds = build_tts_credentials(row, db=db)
+        self.ctx.stt_creds = session_stt_credentials(db, session, row=row)
+        self.ctx.tts_creds = session_tts_credentials(db, session, row=row)
         settings_voice = self.ctx.tts_creds.voice or settings.tts_voice
         if row:
             self.ctx.tts_voice = settings_voice

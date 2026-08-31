@@ -14,7 +14,13 @@ from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.database import Base
-from shared.core.config_models import LLMSettings, StageConfig  # noqa: F401  # re-export
+from shared.core.config_models import (  # noqa: F401  # re-export
+    LLMSettings,
+    LlmProvider,
+    ModelProfile,
+    StageConfig,
+    TaskBinding,
+)
 
 
 def _utcnow() -> datetime:
@@ -95,4 +101,4 @@ class UserProfile(Base):
         self.tech_domains = json.dumps(domains, ensure_ascii=False)
 
 
-__all__ = ["LLMSettings", "Resume", "StageConfig", "UserProfile"]
+__all__ = ["LLMSettings", "LlmProvider", "ModelProfile", "Resume", "StageConfig", "TaskBinding", "UserProfile"]
