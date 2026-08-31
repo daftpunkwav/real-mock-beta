@@ -5,20 +5,14 @@ import { useRouter } from "next/navigation";
 import type { ChatMessage, ClientEvent, FaceAnalysis } from "@/types";
 import { useAudioRecorder } from "@/features/media/useAudioRecorder";
 import { useTTSPlayer } from "@/features/media/useTTSPlayer";
-import { toast } from "@/components/Toast";
 import { useInterviewWS } from "./useInterviewWS";
 import { useInterviewRoomBootstrap } from "./useInterviewRoomBootstrap";
-import { isLikelyEchoOfAssistant } from "../echo";
+import { useInterviewRoomEvents } from "./useInterviewRoomEvents";
+import { useInterviewRoomActions, type RecorderBridge } from "./useInterviewRoomActions";
+import { useInterviewRoomSilenceTimer } from "./useInterviewRoomSilenceTimer";
 import type { VideoPanelHandle } from "../components/VideoPanel";
 
-export const TURN_LABELS: Record<string, string> = {
-  AI_SPEAKING: "面试官发言中",
-  USER_SPEAKING: "请你回答",
-  PROCESSING: "思考中",
-  IDLE: "待命",
-};
-
-/** 面试房间运行时：话轮、WS、录音、TTS、提纲。页面只负责组装。 */
+/** 面试房间运行时：bootstrap/WS/TTS/recorder 接线 + 事件与动作组合。页面只负责组装。 */
 export function useInterviewRoom(sessionId: number) {
   const router = useRouter();
   const {
@@ -33,6 +27,7 @@ export function useInterviewRoom(sessionId: number) {
     lastAssistantContent,
     historySessionId,
   } = useInterviewRoomBootstrap(sessionId);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingText, setStreamingText] = useState("");
   const [currentPhase, setCurrentPhase] = useState("");
@@ -48,11 +43,12 @@ export function useInterviewRoom(sessionId: number) {
   const [hintLoading, setHintLoading] = useState(false);
   const [lastQuestion, setLastQuestion] = useState("");
   const [finishingUi, setFinishingUi] = useState(false);
+  const [lastSources, setLastSources] = useState<string[]>([]);
+
   const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<VideoPanelHandle>(null);
   const faceRef = useRef<FaceAnalysis>({});
   const partialTextRef = useRef("");
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bumpSilenceTimerRef = useRef<() => void>(() => {});
   const turnStateRef = useRef<string>("IDLE");
   const bargeLockRef = useRef(false);
@@ -70,21 +66,13 @@ export function useInterviewRoom(sessionId: number) {
   const lastPlaybackDoneGenRef = useRef<number | null>(null);
   /** 服务端下发的预计作答毫秒数（turn 协议 wait_seconds；0=未提供用默认） */
   const waitMsRef = useRef(0);
-  const [lastSources, setLastSources] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const showOutlineRef = useRef(showOutline);
   const sendRef = useRef<(p: ClientEvent) => boolean>(() => false);
 
-  const {
-    connected,
-    everConnected,
-    turnState,
-    connectionState,
-    reconnectAttempt,
-    send,
-    on,
-    retryNow,
-  } = useInterviewWS(sessionIdValid ? sessionId : 0);
+  const { connected, everConnected, turnState, connectionState, reconnectAttempt, send, on, retryNow } =
+    useInterviewWS(sessionIdValid ? sessionId : 0);
+
   const {
     playBase64Mp3,
     setOnSpeakingChange,
@@ -135,10 +123,8 @@ export function useInterviewRoom(sessionId: number) {
 
   useEffect(() => {
     showOutlineRef.current = showOutline;
-  }, [showOutline]);
-  useEffect(() => {
     sendRef.current = send;
-  }, [send]);
+  }, [showOutline, send]);
 
   useEffect(() => {
     return () => {
@@ -155,114 +141,12 @@ export function useInterviewRoom(sessionId: number) {
       const g = playbackGenRef.current;
       if (lastPlaybackDoneGenRef.current === g) return;
       lastPlaybackDoneGenRef.current = g;
-      sendRef.current({
-        type: "tts_playback_done",
-        generation: g,
-      });
+      sendRef.current({ type: "tts_playback_done", generation: g });
     });
   }, [setOnSpeakingChange, setOnAudioLevel, setOnPlaybackBlocked, setOnPlaybackDone]);
 
-  const submitUserMessageRef = useRef<(text: string, pcm?: string, sampleRate?: number) => void>(() => {});
-
-  const submitUserMessage = useCallback((text: string, pcmBase64 = "", sampleRate = 16000) => {
-    const trimmed = text.trim();
-    if (!trimmed && !pcmBase64) return;
-    const imageBase64 = videoRef.current?.captureFrame() ?? undefined;
-    const payload = {
-      text: trimmed,
-      face_analysis: faceRef.current,
-      image_base64: imageBase64,
-    };
-    if (pcmBase64) {
-      const sr = Number.isFinite(sampleRate) && sampleRate >= 8000 && sampleRate <= 96000
-        ? Math.round(sampleRate)
-        : 16000;
-      send({ type: "user_turn_end", pcm: pcmBase64, sample_rate: sr, ...payload });
-    } else {
-      send({ type: "user_text", ...payload });
-    }
-    partialTextRef.current = "";
-  }, [send]);
-
-  useEffect(() => {
-    submitUserMessageRef.current = submitUserMessage;
-  }, [submitUserMessage]);
-
-  const onSilenceStable = useCallback((pcm: string, partial: string, sampleRate = 16000) => {
-    if (turnStateRef.current !== "USER_SPEAKING") return;
-    const cleaned = (partial || "").trim();
-    if (cleaned && isLikelyEchoOfAssistant(cleaned, lastAssistantTextRef.current)) {
-      console.warn("丢弃疑似回采的 STT 文本");
-      return;
-    }
-    partialTextRef.current = partial;
-    submitUserMessageRef.current(partial, pcm, sampleRate);
-  }, []);
-
-  const onPartialStable = useCallback((text: string) => {
-    if (turnStateRef.current !== "USER_SPEAKING") return;
-    if (isLikelyEchoOfAssistant(text, lastAssistantTextRef.current)) return;
-    partialTextRef.current = text;
-    const now = Date.now();
-    if (now - sttThrottleRef.current >= 500) {
-      sttThrottleRef.current = now;
-      sendRef.current({ type: "stt_text", text });
-    }
-    bumpSilenceTimerRef.current();
-  }, []);
-
-  const onSpeechActivity = useCallback(() => {
-    if (turnStateRef.current !== "USER_SPEAKING") return;
-    bumpSilenceTimerRef.current();
-  }, []);
-
-  const onBargeCandidate = useCallback(() => {
-    if (turnStateRef.current !== "AI_SPEAKING" || bargeLockRef.current) return;
-    if (Date.now() - aiSpeakStartedAtRef.current < 900) return;
-    bargeLockRef.current = true;
-    expectedPlaybackGenRef.current =
-      Math.max(expectedPlaybackGenRef.current, playbackGenRef.current) + 1;
-    playbackGenRef.current = expectedPlaybackGenRef.current;
-    localBargeStopRef.current = true;
-    lastPlaybackDoneGenRef.current = null;
-    stopTTS();
-    seedCaptureFromRingRef.current();
-    sendRef.current({ type: "barge_in" });
-    window.setTimeout(() => {
-      bargeLockRef.current = false;
-    }, 2500);
-  }, [stopTTS]);
-
-  const clearHintTimeout = useCallback(() => {
-    if (hintTimeoutRef.current) {
-      clearTimeout(hintTimeoutRef.current);
-      hintTimeoutRef.current = null;
-    }
-  }, []);
-
-  const requestHint = useCallback((question: string) => {
-    if (!showOutlineRef.current || !question.trim()) return;
-    setHintLoading(true);
-    setReferenceHint("");
-    setLastQuestion(question);
-    clearHintTimeout();
-    hintTimeoutRef.current = setTimeout(() => {
-      setHintLoading(false);
-      setReferenceHint((prev) =>
-        prev.trim()
-          ? prev
-          : "生成较慢或已超时。可先按 STAR：情境 → 任务 → 行动 → 结果（尽量量化）自行组织。",
-      );
-    }, 25_000);
-    sendRef.current({ type: "request_hint", question });
-  }, [clearHintTimeout]);
-
-  useEffect(() => () => clearHintTimeout(), [clearHintTimeout]);
-
   const micEnabled =
-    connected &&
-    (turnState === "USER_SPEAKING" || turnState === "AI_SPEAKING") &&
-    !finishingUi;
+    connected && (turnState === "USER_SPEAKING" || turnState === "AI_SPEAKING") && !finishingUi;
   const captureEnabled = turnState === "USER_SPEAKING" && !finishingUi;
   const canInput = turnState === "USER_SPEAKING" && !finishingUi;
 
@@ -273,258 +157,96 @@ export function useInterviewRoom(sessionId: number) {
     }
   }, [turnState]);
 
-  useEffect(() => {
-    const clear = () => {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
-    };
-    bumpSilenceTimerRef.current = () => {
-      if (!micEnabled || Date.now() < sttFailUntil) return;
-      clear();
-      silenceTimerRef.current = setTimeout(() => {
-        sendRef.current({ type: "silence_timeout" });
-      }, waitMsRef.current || silenceNudgeMs);
-    };
-    if (!micEnabled || Date.now() < sttFailUntil) {
-      clear();
-      return;
-    }
-    const graceMs = Math.min(12_000, Math.max(4_000, Math.floor(silenceNudgeMs * 0.45)));
-    silenceTimerRef.current = setTimeout(() => {
-      bumpSilenceTimerRef.current();
-    }, graceMs);
-    return clear;
-  }, [micEnabled, sttFailUntil, silenceNudgeMs]);
+  useInterviewRoomSilenceTimer({ micEnabled, sttFailUntil, silenceNudgeMs, waitMsRef, sendRef, bumpSilenceTimerRef });
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText]);
 
-  useEffect(() => {
-    const finishOnceAndNavigate = async () => {
-      if (navigatingRef.current) return;
-      navigatingRef.current = true;
-      finishingRef.current = true;
-      setFinishingUi(true);
-      stopTTS();
-      sendRef.current({
-        type: "tts_playback_done",
-        generation: playbackGenRef.current,
-      });
-      if (reportNavTimerRef.current) clearTimeout(reportNavTimerRef.current);
-      router.push(`/report/${sessionId}`);
-    };
+  const { requestHint } = useInterviewRoomEvents({
+    setStreamingText,
+    setMessages,
+    setCurrentPhase,
+    setEmotion,
+    setTokenUsage,
+    setAudioBlocked,
+    setHintLoading,
+    setReferenceHint,
+    setLastQuestion,
+    setFinishingUi,
+    setSttFailUntil,
+    setLastSources,
+    playbackGenRef,
+    expectedPlaybackGenRef,
+    lastPlaybackDoneGenRef,
+    localBargeStopRef,
+    waitMsRef,
+    lastAssistantTextRef,
+    hintTimeoutRef,
+    reportNavTimerRef,
+    finishingRef,
+    navigatingRef,
+    bumpSilenceTimerRef,
+    sendRef,
+    showOutlineRef,
+    on,
+    playBase64Mp3,
+    stopTTS,
+    router,
+    sessionId,
+  });
 
-    on("assistant_token", (msg) => setStreamingText((prev) => prev + msg.token));
-    on("assistant_done", (msg) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: msg.content }]);
-      setStreamingText("");
-      setCurrentPhase(msg.phase);
-      setEmotion(msg.emotion || "neutral");
-      setTokenUsage((t) => t + msg.content.length);
-      lastAssistantTextRef.current = msg.content || "";
-      setLastSources(Array.isArray(msg.sources) ? msg.sources : []);
-      if (typeof msg.playback_generation === "number") {
-        playbackGenRef.current = msg.playback_generation;
-        expectedPlaybackGenRef.current = Math.max(
-          expectedPlaybackGenRef.current,
-          msg.playback_generation,
-        );
-      }
-      // 服务端预计作答时长 → 静默计时器按题型个性化，替代固定间隔
-      if (typeof msg.wait_seconds === "number" && msg.wait_seconds > 0) {
-        waitMsRef.current = Math.min(120, Math.max(15, msg.wait_seconds)) * 1000;
-        bumpSilenceTimerRef.current();
-      }
-      if (!msg.is_complete) {
-        requestHint(msg.content);
-      }
-      if (msg.is_complete) {
-        void finishOnceAndNavigate();
-      }
-    });
-    on("stt_final", (msg) => {
-      if (msg.text) setMessages((prev) => [...prev, { role: "user", content: msg.text }]);
-    });
-    on("tts_audio", (msg) => {
-      const gen = msg.playback_generation;
-      if (typeof gen === "number") {
-        if (gen < expectedPlaybackGenRef.current) {
-          return;
-        }
-        playbackGenRef.current = gen;
-        expectedPlaybackGenRef.current = Math.max(expectedPlaybackGenRef.current, gen);
-      }
-      playBase64Mp3(msg.data);
-    });
-    on("tts_failed", (msg) => {
-      setAudioBlocked(true);
-      toast.error(msg.message || "语音播放失败");
-      setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${msg.message}` }]);
-      sendRef.current({
-        type: "tts_playback_done",
-        generation: playbackGenRef.current,
-      });
-    });
-    on("tts_interrupted", (msg) => {
-      if (typeof msg.playback_generation === "number") {
-        expectedPlaybackGenRef.current = Math.max(
-          expectedPlaybackGenRef.current,
-          msg.playback_generation,
-        );
-        playbackGenRef.current = expectedPlaybackGenRef.current;
-      }
-      if (localBargeStopRef.current) {
-        localBargeStopRef.current = false;
-        stopTTS({ silent: true });
-      } else {
-        expectedPlaybackGenRef.current =
-          Math.max(expectedPlaybackGenRef.current, playbackGenRef.current) + 1;
-        playbackGenRef.current = expectedPlaybackGenRef.current;
-        lastPlaybackDoneGenRef.current = null;
-        stopTTS();
-      }
-      const n = msg.candidate_interrupts;
-      toast.info(
-        typeof n === "number"
-          ? `已打断发言（累计 ${n} 次，会影响礼貌评分）`
-          : "已打断面试官发言",
-      );
-    });
-    on("silence_nudge", (msg) => {
-      // LLM 拟真追问按面试官正常发言展示（不再加提示性前缀）
-      setMessages((prev) => [...prev, { role: "assistant", content: msg.content }]);
-      lastAssistantTextRef.current = msg.content || "";
-    });
-    on("reference_hint_loading", () => setHintLoading(true));
-    on("reference_hint", (msg) => {
-      const cleaned = msg.content
-        .replace(/<think>[\s\S]*?<\/think>/gi, "")
-        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-        .trim();
-      clearHintTimeout();
-      setReferenceHint(cleaned);
-      setLastQuestion(msg.question || "");
-      setHintLoading(false);
-    });
-    on("phase_changed", (msg) => {
-      if (msg.phase) setCurrentPhase(msg.phase);
-    });
-    on("interview_complete", () => {
-      void finishOnceAndNavigate();
-    });
-    on("info", (msg) => {
-      if (msg.message) toast.info(String(msg.message));
-    });
-    on("error", (msg) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${msg.message}` }]);
-      if (msg.message.includes("收尾") || msg.message.includes("结束面试")) {
-        finishingRef.current = false;
-        setFinishingUi(false);
-      }
-      if (msg.message.includes("未能识别") || msg.message.includes("语音合成失败")) {
-        setSttFailUntil(Date.now() + 18_000);
-        if (msg.message.includes("语音合成") || msg.message.includes("合成失败")) {
-          setAudioBlocked(true);
-        }
-        if (msg.message.includes("未能识别")) {
-          toast.error("识别失败：可改用下方文字输入继续作答");
-        }
-      }
-    });
-  }, [on, playBase64Mp3, router, sessionId, requestHint, stopTTS, clearHintTimeout]);
+  const recorderRef = useRef<RecorderBridge>({ flush: () => {}, isRecording: false, partialText: "", micError: "" });
+
+  const actions = useInterviewRoomActions({
+    setInputText,
+    setAudioBlocked,
+    setShowOutline,
+    setFinishingUi,
+    turnStateRef,
+    bargeLockRef,
+    aiSpeakStartedAtRef,
+    lastAssistantTextRef,
+    partialTextRef,
+    sttThrottleRef,
+    finishingRef,
+    navigatingRef,
+    playbackGenRef,
+    expectedPlaybackGenRef,
+    localBargeStopRef,
+    lastPlaybackDoneGenRef,
+    showOutlineRef,
+    videoRef,
+    faceRef,
+    seedCaptureFromRingRef,
+    bumpSilenceTimerRef,
+    sendRef,
+    recorderRef,
+    send,
+    stopTTS,
+    unlockAudio,
+    flushHeldQueue,
+    retryLastFailed,
+    requestHint,
+    micEnabled,
+    turnState,
+    canInput,
+    inputText,
+    referenceHint,
+    lastQuestion,
+  });
 
   const { flush, clearCaptureBuffers, seedCaptureFromRing, isRecording, partialText, micError } =
-    useAudioRecorder(
-      micEnabled,
-      onSilenceStable,
-      onPartialStable,
-      onSpeechActivity,
-      onBargeCandidate,
-      captureEnabled,
-    );
+    useAudioRecorder(micEnabled, actions.onSilenceStable, actions.onPartialStable, actions.onSpeechActivity, actions.onBargeCandidate, captureEnabled);
+
+  recorderRef.current = { flush, isRecording, partialText, micError };
 
   useEffect(() => {
     clearCaptureBuffersRef.current = clearCaptureBuffers;
-  }, [clearCaptureBuffers]);
-
-  useEffect(() => {
     seedCaptureFromRingRef.current = seedCaptureFromRing;
-  }, [seedCaptureFromRing]);
-
-  const handleFaceAnalysis = useCallback((analysis: FaceAnalysis) => {
-    faceRef.current = analysis;
-    send({ type: "vision_update", face_analysis: analysis });
-  }, [send]);
+  }, [clearCaptureBuffers, seedCaptureFromRing]);
 
   const canSend = canInput && (Boolean(inputText.trim()) || isRecording);
-
-  const handleEnableAudio = async () => {
-    const ok = await unlockAudio();
-    if (ok) {
-      setAudioBlocked(false);
-      toast.success("声音已启用");
-      if (!flushHeldQueue()) {
-        retryLastFailed();
-      }
-    } else {
-      toast.error("无法启用声音，请检查浏览器权限");
-    }
-  };
-
-  const handleSend = () => {
-    if (!canInput) return;
-    if (inputText.trim()) {
-      submitUserMessage(inputText.trim());
-      setInputText("");
-    } else if (isRecording) {
-      flush();
-    }
-  };
-
-  const handleFinish = () => {
-    if (finishingRef.current || navigatingRef.current) return;
-    finishingRef.current = true;
-    setFinishingUi(true);
-    stopTTS();
-    send({
-      type: "tts_playback_done",
-      generation: playbackGenRef.current,
-    });
-    const ok = send({ type: "request_finish" });
-    if (!ok) {
-      finishingRef.current = false;
-      setFinishingUi(false);
-      toast.error("连接已断开，无法结束面试，请重试");
-      return;
-    }
-    toast.success("面试官正在做收尾评价…");
-  };
-
-  const handleOutlineChange = (checked: boolean) => {
-    setShowOutline(checked);
-    showOutlineRef.current = checked;
-    // 关闭仅隐藏，保留已生成的参考答案；重新打开时直接展示缓存
-    if (!checked) return;
-    if (!referenceHint && lastQuestion) requestHint(lastQuestion);
-  };
-
-  const voiceStatus = micError
-    ? `错误：${micError}`
-    : !micEnabled
-      ? "等待你的回合"
-      : turnState === "AI_SPEAKING"
-        ? partialText
-          ? `可打断 · 识别「${partialText}」`
-          : "面试官发言中 · 开口即可打断（影响礼貌分）"
-        : partialText
-          ? `识别中「${partialText}」`
-          : isRecording
-            ? "正在聆听，说完停顿约 1 秒自动发送；也可点发送"
-            : "麦克风启动中…";
-
   const goSetup = useCallback(() => {
     router.push("/interview");
   }, [router]);
@@ -551,21 +273,21 @@ export function useInterviewRoom(sessionId: number) {
     setInputText,
     canInput,
     canSend,
-    handleSend,
-    handleFinish,
+    handleSend: actions.handleSend,
+    handleFinish: actions.handleFinish,
     finishingUi,
     videoRef,
     isRecording,
-    voiceStatus,
-    handleFaceAnalysis,
+    voiceStatus: actions.buildVoiceStatus(),
+    handleFaceAnalysis: actions.handleFaceAnalysis,
     emotion,
     aiSpeaking,
     audioLevel,
     audioUnlocked,
     audioBlocked,
-    handleEnableAudio,
+    handleEnableAudio: actions.handleEnableAudio,
     showOutline,
-    handleOutlineChange,
+    handleOutlineChange: actions.handleOutlineChange,
     lastQuestion,
     requestHint,
     hintLoading,
