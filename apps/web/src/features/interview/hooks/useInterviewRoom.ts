@@ -1,194 +1,88 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { ChatMessage, ClientEvent, FaceAnalysis } from "@/types";
-import { useAudioRecorder } from "@/features/media/useAudioRecorder";
-import { useTTSPlayer } from "@/features/media/useTTSPlayer";
 import { useInterviewWS } from "./useInterviewWS";
 import { useInterviewRoomBootstrap } from "./useInterviewRoomBootstrap";
+import { useInterviewRoomState } from "./useInterviewRoomState";
+import { useInterviewRoomTtsBinding } from "./useInterviewRoomTtsBinding";
 import { useInterviewRoomEvents } from "./useInterviewRoomEvents";
 import { useInterviewRoomActions, type RecorderBridge } from "./useInterviewRoomActions";
 import { useInterviewRoomSilenceTimer } from "./useInterviewRoomSilenceTimer";
-import type { VideoPanelHandle } from "../components/VideoPanel";
+import { useInterviewRoomRecorderBridge } from "./useInterviewRoomRecorderBridge";
 
-/** 面试房间运行时：bootstrap/WS/TTS/recorder 接线 + 事件与动作组合。页面只负责组装。 */
+/**
+ * 面试房间运行时组装：bootstrap/WS/state/TTS 绑定/events/actions/recorder 组合后 return 模型。
+ * 状态与 ref 在 useInterviewRoomState；页面只消费本 hook 的模型。
+ */
 export function useInterviewRoom(sessionId: number) {
   const router = useRouter();
-  const {
-    sessionIdValid,
-    tokenMissing,
-    sessionMeta,
-    historyMessages,
-    restoredPhase,
-    sessionStatus,
-    silenceNudgeMs,
-    phaseLabels,
-    lastAssistantContent,
-    historySessionId,
-  } = useInterviewRoomBootstrap(sessionId);
-
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [streamingText, setStreamingText] = useState("");
-  const [currentPhase, setCurrentPhase] = useState("");
-  const [emotion, setEmotion] = useState("neutral");
-  const [aiSpeaking, setAiSpeaking] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [audioBlocked, setAudioBlocked] = useState(false);
-  const [sttFailUntil, setSttFailUntil] = useState(0);
-  const [showOutline, setShowOutline] = useState(true);
-  const [tokenUsage, setTokenUsage] = useState(0);
-  const [inputText, setInputText] = useState("");
-  const [referenceHint, setReferenceHint] = useState("");
-  const [hintLoading, setHintLoading] = useState(false);
-  const [lastQuestion, setLastQuestion] = useState("");
-  const [finishingUi, setFinishingUi] = useState(false);
-  const [lastSources, setLastSources] = useState<string[]>([]);
-
-  const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const videoRef = useRef<VideoPanelHandle>(null);
-  const faceRef = useRef<FaceAnalysis>({});
-  const partialTextRef = useRef("");
-  const bumpSilenceTimerRef = useRef<() => void>(() => {});
-  const turnStateRef = useRef<string>("IDLE");
-  const bargeLockRef = useRef(false);
-  const aiSpeakStartedAtRef = useRef(0);
-  const lastAssistantTextRef = useRef("");
-  const clearCaptureBuffersRef = useRef<() => void>(() => {});
-  const seedCaptureFromRingRef = useRef<() => void>(() => {});
-  const sttThrottleRef = useRef(0);
-  const reportNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const finishingRef = useRef(false);
-  const navigatingRef = useRef(false);
-  const playbackGenRef = useRef(0);
-  const expectedPlaybackGenRef = useRef(0);
-  const localBargeStopRef = useRef(false);
-  const lastPlaybackDoneGenRef = useRef<number | null>(null);
-  /** 服务端下发的预计作答毫秒数（turn 协议 wait_seconds；0=未提供用默认） */
-  const waitMsRef = useRef(0);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const showOutlineRef = useRef(showOutline);
-  const sendRef = useRef<(p: ClientEvent) => boolean>(() => false);
+  const bootstrap = useInterviewRoomBootstrap(sessionId);
 
   const { connected, everConnected, turnState, connectionState, reconnectAttempt, send, on, retryNow } =
-    useInterviewWS(sessionIdValid ? sessionId : 0);
+    useInterviewWS(bootstrap.sessionIdValid ? sessionId : 0);
 
-  const {
-    playBase64Mp3,
-    setOnSpeakingChange,
-    setOnAudioLevel,
-    setOnPlaybackBlocked,
-    setOnPlaybackDone,
-    unlockAudio,
-    retryLastFailed,
-    flushHeldQueue,
-    stop: stopTTS,
-    audioUnlocked,
-  } = useTTSPlayer();
+  const { state: st, set: setSt, refs: rf } = useInterviewRoomState({
+    sessionId,
+    historySessionId: bootstrap.historySessionId,
+    historyMessages: bootstrap.historyMessages,
+    restoredPhase: bootstrap.restoredPhase,
+    lastAssistantContent: bootstrap.lastAssistantContent,
+    turnState,
+    send,
+  });
 
-  useEffect(() => {
-    setStreamingText("");
-    setFinishingUi(false);
-    setTokenUsage(0);
-    setInputText("");
-    setReferenceHint("");
-    setHintLoading(false);
-    setLastQuestion("");
-    setLastSources([]);
-    setMessages([]);
-    setCurrentPhase("");
-    finishingRef.current = false;
-    navigatingRef.current = false;
-    playbackGenRef.current = 0;
-    expectedPlaybackGenRef.current = 0;
-    lastPlaybackDoneGenRef.current = null;
-    lastAssistantTextRef.current = "";
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (historySessionId !== sessionId) return;
-    if (historyMessages.length > 0) {
-      setMessages(historyMessages);
-      const chars = historyMessages
-        .filter((m) => m.role === "assistant")
-        .reduce((n, m) => n + m.content.length, 0);
-      setTokenUsage(chars);
-    }
-    if (restoredPhase) setCurrentPhase(restoredPhase);
-    if (lastAssistantContent) {
-      lastAssistantTextRef.current = lastAssistantContent;
-      setLastQuestion(lastAssistantContent);
-    }
-  }, [historySessionId, sessionId, historyMessages, restoredPhase, lastAssistantContent]);
-
-  useEffect(() => {
-    showOutlineRef.current = showOutline;
-    sendRef.current = send;
-  }, [showOutline, send]);
-
-  useEffect(() => {
-    return () => {
-      if (reportNavTimerRef.current) clearTimeout(reportNavTimerRef.current);
-      stopTTS();
-    };
-  }, [stopTTS]);
-
-  useEffect(() => {
-    setOnSpeakingChange(setAiSpeaking);
-    setOnAudioLevel(setAudioLevel);
-    setOnPlaybackBlocked(setAudioBlocked);
-    setOnPlaybackDone(() => {
-      const g = playbackGenRef.current;
-      if (lastPlaybackDoneGenRef.current === g) return;
-      lastPlaybackDoneGenRef.current = g;
-      sendRef.current({ type: "tts_playback_done", generation: g });
+  const { playBase64Mp3, unlockAudio, flushHeldQueue, retryLastFailed, stopTTS, audioUnlocked } =
+    useInterviewRoomTtsBinding({
+      playbackGenRef: rf.playbackGenRef,
+      lastPlaybackDoneGenRef: rf.lastPlaybackDoneGenRef,
+      sendRef: rf.sendRef,
+      reportNavTimerRef: rf.reportNavTimerRef,
+      setAiSpeaking: setSt.setAiSpeaking,
+      setAudioLevel: setSt.setAudioLevel,
+      setAudioBlocked: setSt.setAudioBlocked,
     });
-  }, [setOnSpeakingChange, setOnAudioLevel, setOnPlaybackBlocked, setOnPlaybackDone]);
 
   const micEnabled =
-    connected && (turnState === "USER_SPEAKING" || turnState === "AI_SPEAKING") && !finishingUi;
-  const captureEnabled = turnState === "USER_SPEAKING" && !finishingUi;
-  const canInput = turnState === "USER_SPEAKING" && !finishingUi;
+    connected && (turnState === "USER_SPEAKING" || turnState === "AI_SPEAKING") && !st.finishingUi;
+  const captureEnabled = turnState === "USER_SPEAKING" && !st.finishingUi;
+  const canInput = turnState === "USER_SPEAKING" && !st.finishingUi;
 
-  useEffect(() => {
-    turnStateRef.current = turnState;
-    if (turnState === "AI_SPEAKING") {
-      aiSpeakStartedAtRef.current = Date.now();
-    }
-  }, [turnState]);
-
-  useInterviewRoomSilenceTimer({ micEnabled, sttFailUntil, silenceNudgeMs, waitMsRef, sendRef, bumpSilenceTimerRef });
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingText]);
+  useInterviewRoomSilenceTimer({
+    micEnabled,
+    sttFailUntil: st.sttFailUntil,
+    silenceNudgeMs: bootstrap.silenceNudgeMs,
+    waitMsRef: rf.waitMsRef,
+    sendRef: rf.sendRef,
+    bumpSilenceTimerRef: rf.bumpSilenceTimerRef,
+  });
 
   const { requestHint } = useInterviewRoomEvents({
-    setStreamingText,
-    setMessages,
-    setCurrentPhase,
-    setEmotion,
-    setTokenUsage,
-    setAudioBlocked,
-    setHintLoading,
-    setReferenceHint,
-    setLastQuestion,
-    setFinishingUi,
-    setSttFailUntil,
-    setLastSources,
-    playbackGenRef,
-    expectedPlaybackGenRef,
-    lastPlaybackDoneGenRef,
-    localBargeStopRef,
-    waitMsRef,
-    lastAssistantTextRef,
-    hintTimeoutRef,
-    reportNavTimerRef,
-    finishingRef,
-    navigatingRef,
-    bumpSilenceTimerRef,
-    sendRef,
-    showOutlineRef,
+    setStreamingText: setSt.setStreamingText,
+    setMessages: setSt.setMessages,
+    setCurrentPhase: setSt.setCurrentPhase,
+    setEmotion: setSt.setEmotion,
+    setTokenUsage: setSt.setTokenUsage,
+    setAudioBlocked: setSt.setAudioBlocked,
+    setHintLoading: setSt.setHintLoading,
+    setReferenceHint: setSt.setReferenceHint,
+    setLastQuestion: setSt.setLastQuestion,
+    setFinishingUi: setSt.setFinishingUi,
+    setSttFailUntil: setSt.setSttFailUntil,
+    setLastSources: setSt.setLastSources,
+    playbackGenRef: rf.playbackGenRef,
+    expectedPlaybackGenRef: rf.expectedPlaybackGenRef,
+    lastPlaybackDoneGenRef: rf.lastPlaybackDoneGenRef,
+    localBargeStopRef: rf.localBargeStopRef,
+    waitMsRef: rf.waitMsRef,
+    lastAssistantTextRef: rf.lastAssistantTextRef,
+    hintTimeoutRef: rf.hintTimeoutRef,
+    reportNavTimerRef: rf.reportNavTimerRef,
+    finishingRef: rf.finishingRef,
+    navigatingRef: rf.navigatingRef,
+    bumpSilenceTimerRef: rf.bumpSilenceTimerRef,
+    sendRef: rf.sendRef,
+    showOutlineRef: rf.showOutlineRef,
     on,
     playBase64Mp3,
     stopTTS,
@@ -199,28 +93,28 @@ export function useInterviewRoom(sessionId: number) {
   const recorderRef = useRef<RecorderBridge>({ flush: () => {}, isRecording: false, partialText: "", micError: "" });
 
   const actions = useInterviewRoomActions({
-    setInputText,
-    setAudioBlocked,
-    setShowOutline,
-    setFinishingUi,
-    turnStateRef,
-    bargeLockRef,
-    aiSpeakStartedAtRef,
-    lastAssistantTextRef,
-    partialTextRef,
-    sttThrottleRef,
-    finishingRef,
-    navigatingRef,
-    playbackGenRef,
-    expectedPlaybackGenRef,
-    localBargeStopRef,
-    lastPlaybackDoneGenRef,
-    showOutlineRef,
-    videoRef,
-    faceRef,
-    seedCaptureFromRingRef,
-    bumpSilenceTimerRef,
-    sendRef,
+    setInputText: setSt.setInputText,
+    setAudioBlocked: setSt.setAudioBlocked,
+    setShowOutline: setSt.setShowOutline,
+    setFinishingUi: setSt.setFinishingUi,
+    turnStateRef: rf.turnStateRef,
+    bargeLockRef: rf.bargeLockRef,
+    aiSpeakStartedAtRef: rf.aiSpeakStartedAtRef,
+    lastAssistantTextRef: rf.lastAssistantTextRef,
+    partialTextRef: rf.partialTextRef,
+    sttThrottleRef: rf.sttThrottleRef,
+    finishingRef: rf.finishingRef,
+    navigatingRef: rf.navigatingRef,
+    playbackGenRef: rf.playbackGenRef,
+    expectedPlaybackGenRef: rf.expectedPlaybackGenRef,
+    localBargeStopRef: rf.localBargeStopRef,
+    lastPlaybackDoneGenRef: rf.lastPlaybackDoneGenRef,
+    showOutlineRef: rf.showOutlineRef,
+    videoRef: rf.videoRef,
+    faceRef: rf.faceRef,
+    seedCaptureFromRingRef: rf.seedCaptureFromRingRef,
+    bumpSilenceTimerRef: rf.bumpSilenceTimerRef,
+    sendRef: rf.sendRef,
     recorderRef,
     send,
     stopTTS,
@@ -231,69 +125,71 @@ export function useInterviewRoom(sessionId: number) {
     micEnabled,
     turnState,
     canInput,
-    inputText,
-    referenceHint,
-    lastQuestion,
+    inputText: st.inputText,
+    referenceHint: st.referenceHint,
+    lastQuestion: st.lastQuestion,
   });
 
-  const { flush, clearCaptureBuffers, seedCaptureFromRing, isRecording, partialText, micError } =
-    useAudioRecorder(micEnabled, actions.onSilenceStable, actions.onPartialStable, actions.onSpeechActivity, actions.onBargeCandidate, captureEnabled);
+  const { isRecording } = useInterviewRoomRecorderBridge({
+    micEnabled,
+    captureEnabled,
+    onSilenceStable: actions.onSilenceStable,
+    onPartialStable: actions.onPartialStable,
+    onSpeechActivity: actions.onSpeechActivity,
+    onBargeCandidate: actions.onBargeCandidate,
+    recorderRef,
+    clearCaptureBuffersRef: rf.clearCaptureBuffersRef,
+    seedCaptureFromRingRef: rf.seedCaptureFromRingRef,
+  });
 
-  recorderRef.current = { flush, isRecording, partialText, micError };
-
-  useEffect(() => {
-    clearCaptureBuffersRef.current = clearCaptureBuffers;
-    seedCaptureFromRingRef.current = seedCaptureFromRing;
-  }, [clearCaptureBuffers, seedCaptureFromRing]);
-
-  const canSend = canInput && (Boolean(inputText.trim()) || isRecording);
+  const canSend = canInput && (Boolean(st.inputText.trim()) || isRecording);
   const goSetup = useCallback(() => {
     router.push("/interview");
   }, [router]);
 
   return {
     sessionId,
-    sessionIdValid,
-    tokenMissing,
+    sessionIdValid: bootstrap.sessionIdValid,
+    tokenMissing: bootstrap.tokenMissing,
     goSetup,
-    sessionMeta,
-    sessionStatus,
-    phaseLabels,
-    currentPhase,
+    sessionMeta: bootstrap.sessionMeta,
+    sessionStatus: bootstrap.sessionStatus,
+    phaseLabels: bootstrap.phaseLabels,
+    currentPhase: st.currentPhase,
     turnState,
     connected,
     everConnected,
     connectionState,
     reconnectAttempt,
     retryNow,
-    messages,
-    streamingText,
-    chatEndRef,
-    inputText,
-    setInputText,
+    messages: st.messages,
+    streamingText: st.streamingText,
+    chatEndRef: rf.chatEndRef,
+    inputText: st.inputText,
+    setInputText: setSt.setInputText,
     canInput,
     canSend,
     handleSend: actions.handleSend,
     handleFinish: actions.handleFinish,
-    finishingUi,
-    videoRef,
+    finishingUi: st.finishingUi,
+    videoRef: rf.videoRef,
     isRecording,
     voiceStatus: actions.buildVoiceStatus(),
     handleFaceAnalysis: actions.handleFaceAnalysis,
-    emotion,
-    aiSpeaking,
-    audioLevel,
+    emotion: st.emotion,
+    aiSpeaking: st.aiSpeaking,
+    audioLevel: st.audioLevel,
     audioUnlocked,
-    audioBlocked,
+    audioBlocked: st.audioBlocked,
     handleEnableAudio: actions.handleEnableAudio,
-    showOutline,
+    showOutline: st.showOutline,
     handleOutlineChange: actions.handleOutlineChange,
-    lastQuestion,
+    lastQuestion: st.lastQuestion,
     requestHint,
-    hintLoading,
-    referenceHint,
-    lastSources,
-    tokenUsage,
+    hintLoading: st.hintLoading,
+    referenceHint: st.referenceHint,
+    lastSources: st.lastSources,
+    tokenUsage: st.tokenUsage,
   };
 }
 
