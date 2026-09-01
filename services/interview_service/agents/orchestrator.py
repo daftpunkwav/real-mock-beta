@@ -13,12 +13,6 @@ class InterviewOrchestrator:
     def __init__(self) -> None:
         self.snapshot = SessionSnapshot()
 
-    def build_context_prefix(self) -> str:
-        parts: list[str] = []
-        if self.snapshot.vision_summary:
-            parts.append(f"[视觉状态：{self.snapshot.vision_summary}]")
-        return " ".join(parts)
-
     def build_silence_nudge(
         self,
         personality: str,

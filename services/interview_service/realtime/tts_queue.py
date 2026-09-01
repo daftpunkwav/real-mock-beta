@@ -43,16 +43,6 @@ class _SentenceTTSQueue:
         self._speak_gen: int = 0
         self._tts_creds: TtsCredentials = TtsCredentials(handler="edge")
 
-    def set_voice(self, voice: str) -> None:
-        """兼容旧调用：仅更新音色，保留现有 rate/pitch。"""
-        if voice:
-            self._prosody = VoiceProsody(
-                voice=voice,
-                rate=self._prosody.rate,
-                pitch=self._prosody.pitch,
-            )
-            self._tts_creds.voice = voice
-
     def set_prosody(self, prosody: VoiceProsody) -> None:
         """绑定本场会话的基线音色与韵律。"""
         self._prosody = prosody
