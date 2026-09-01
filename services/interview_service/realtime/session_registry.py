@@ -50,11 +50,11 @@ async def claim_session_connection(handler: SessionConnection) -> None:
                 code="B2003",
             )
         except Exception:
-            pass
+            logger.debug("WS 顶替连接通知旧端失败 session=%s", handler.session_id, exc_info=True)
         try:
             await old.ws.close(code=4000)
         except Exception:
-            pass
+            logger.debug("WS 顶替连接关闭旧端失败 session=%s", handler.session_id, exc_info=True)
 
 
 async def release_session_connection(handler: SessionConnection) -> None:
