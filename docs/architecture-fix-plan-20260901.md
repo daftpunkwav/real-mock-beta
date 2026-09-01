@@ -67,6 +67,7 @@
 | 13 | `refactor(web): SearchResultCards 复用 safeAbsoluteHttpUrl` | ✅ a118e11 |
 | 14 | `chore: gitignore .tmp_head_review` | ✅ 663a76d |
 | 15 | `fix(config): StepFun RAG 缺 vector_store 时打 warning` | ✅ 4009f79 |
+| 16 | `fix(interview): 路由聚合 ResumePickerItem 导入修复` | ✅ 7eec905 |
 
 ---
 
