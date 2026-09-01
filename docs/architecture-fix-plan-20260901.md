@@ -71,6 +71,19 @@
 
 ---
 
+## 2b. 第二阶段修复清单（2026-09-01 续）
+
+| # | Commit 主题 | 状态 |
+| --- | --- | --- |
+| 17 | `docs(arch): 包布局约定与部署运行时约束` | ✅ 98f03d1 |
+| 18 | `refactor(api): schemas 按 profile/resume 子域拆分` | ✅ 71f5f33 |
+| 19 | `refactor(interview): schemas 按 session/report/options 拆分` | ✅ 791586c |
+| 20 | `refactor(interview): models 拆 session/growth` | ✅ a936aa7 |
+| 21 | `refactor(shared): router_mount + WS 租约说明` | ✅ 3a01570 |
+| 22 | `refactor(api): 移除 models 空壳层` | ✅ 62d4200 |
+
+---
+
 ## 3. 验证策略
 
 每批 commit 后：
@@ -84,14 +97,18 @@ cd apps/web && npx vitest run
 
 ---
 
-## 4. 明确不在本批次范围
+## 4. 仍待后续迭代
 
-- 分布式 WS 租约 / 多 worker 限流 / Whisper 跨进程缓存
+- 分布式 WS 租约 / 多 worker 限流 / Whisper 跨进程缓存（见 `docs/deployment-constraints.md`）
 - `useInterviewRoom*` 状态域重构、`useAudioRecorder` 拆分
 - OpenAPI 生成、pipeline 三轨配置收敛、`report→growth` 事件化
 - `chroma_*` 工作区清理（已在 `.gitignore`，现存目录需本地手动删）
-- `shared/config` interview 字段回迁、`main.py` 双前缀 router 工厂
+- `shared/config` interview 业务字段回迁
+
+## 5. 第一阶段已排除项（记录）
+
+- `shared/config` interview 字段回迁、`main.py` 双前缀 router 工厂 → **第二阶段已做 router_mount**
 
 ---
 
-*最后更新：2026-09-01 · 与修复 commit 同步更新「状态」列*
+*最后更新：2026-09-01 22:40 · 第二阶段 6 commit 完成*
