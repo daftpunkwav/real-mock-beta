@@ -1,8 +1,8 @@
 """Mimo / OpenAI 兼容统一客户端：支持 chat completions / anthropic messages / responses。
 
-协议请求体构建与响应解析在 :mod:`protocol_translate`，流式执行在
-:mod:`streaming`，增量组装器在 :mod:`assemblers`；本模块只保留客户端
-状态、SSRF 检查与调用编排。
+协议请求体构建在 :mod:`protocol_translate`，响应解析在 :mod:`response_extract`，
+流式执行在 :mod:`streaming`，增量组装器在 :mod:`assemblers`；本模块只保留
+客户端状态、SSRF 检查与调用编排。
 """
 
 from __future__ import annotations
@@ -26,13 +26,9 @@ from shared.core.secrets import LegacySecretFormatError, decrypt_secret
 from shared.capabilities.ai.llm.usage import UsageAccumulator
 
 from .base import _is_local_allowed, _require_https
-from .protocol_translate import (
-    _headers,
-    build_request,
-    extract_reasoning,
-    extract_text,
-    extract_tool_calls,
-)
+from .protocol_translate import build_request
+from .protocol_utils import _headers
+from .response_extract import extract_reasoning, extract_text, extract_tool_calls
 from .streaming import _StreamOptionsUnsupported, stream_message_round, stream_text_payload
 
 logger = logging.getLogger(__name__)

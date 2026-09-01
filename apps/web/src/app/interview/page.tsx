@@ -1,30 +1,30 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+/** 面试配置页：表单 + 处理器卡 + 右侧预览；default export 维持本页。 */
+
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { interviewService as api } from "@/lib/api/interviewService";
 import { apiService } from "@/lib/api/apiService";
 import { toast } from "@/components/Toast";
-import { EffortSelect, ModelSelect } from "@/components/ModelControls";
+import { Play, Sparkles } from "lucide-react";
+import { LoadError } from "@/components/LoadError";
 import type {
   ModelProfile,
   ReasoningEffort,
   Options,
   ResumePickerItem,
-  InterviewConfig,
   TaskBindings,
 } from "@/types";
+import type { InterviewConfig } from "@/types/interview";
 import {
-  Play,
-  Sparkles,
-  Building2,
-  UserCircle,
-  Briefcase,
-  Mic,
-  Lightbulb,
-  ListChecks,
-} from "lucide-react";
-import { LoadError } from "@/components/LoadError";
+  ChoiceGroup,
+  CompanyGrid,
+  ResumeWarning,
+  Select,
+} from "@/features/interview/setup/controls";
+import { ProcessorCard, ResumeSelect, strictnessLabel } from "@/features/interview/setup/form";
+import { InterviewPreview } from "@/features/interview/setup/preview";
 
 export default function InterviewSetupPage() {
   const router = useRouter();
@@ -75,7 +75,7 @@ export default function InterviewSetupPage() {
     loadData();
   }, []);
 
-  // 处理器选择数据:按能力位分桶(缺省回落各任务的默认绑定)
+  // 处理器选择数据:按能力位分桶(缺省回落各任务的默认绑定)；加载失败不阻塞主流程
   useEffect(() => {
     apiService
       .listModelOptions()
@@ -85,52 +85,11 @@ export default function InterviewSetupPage() {
         setSttModels(list.filter((m) => m.capabilities?.audio_input));
         setTtsModels(list.filter((m) => m.capabilities?.audio_output));
       })
-      .catch(() => {
-        /* 选择器数据加载失败不阻塞主流程 */
-      });
-    apiService
-      .getBindings()
-      .then(setDefaultBindings)
       .catch(() => {});
+    apiService.getBindings().then(setDefaultBindings).catch(() => {});
   }, []);
 
-  const selectedCompany = useMemo(
-    () => options?.companies.find((c) => c.id === config.company),
-    [options, config.company],
-  );
-
-  const selectedPersonality = useMemo(
-    () => options?.personalities.find((p) => p.id === config.personality),
-    [options, config.personality],
-  );
-
-  const selectedWorkflow = useMemo(
-    () => options?.workflow_types.find((w) => w.id === config.workflow_type),
-    [options, config.workflow_type],
-  );
-
-  const selectedStyle = useMemo(
-    () => options?.interview_styles.find((s) => s.id === config.interview_style),
-    [options, config.interview_style],
-  );
-
-  const selectedAvatar = useMemo(
-    () => options?.avatars?.find((a) => a.id === config.avatar_id),
-    [options, config.avatar_id],
-  );
-
-  const selectedScene = useMemo(
-    () => options?.scenes?.find((s) => s.id === config.scene_id),
-    [options, config.scene_id],
-  );
-
-  const selectedResume = useMemo(
-    () => resumes.find((r) => r.id === config.resume_id),
-    [resumes, config.resume_id],
-  );
-
-  const strictnessLabel =
-    config.strictness <= 3 ? "友好" : config.strictness <= 6 ? "正常" : config.strictness <= 8 ? "高压" : "极限";
+  const set = (patch: Partial<InterviewConfig>) => setConfig((c) => ({ ...c, ...patch }));
 
   const handleStart = async () => {
     setCreating(true);
@@ -198,87 +157,48 @@ export default function InterviewSetupPage() {
           <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pb-2 pr-0.5">
             <div className="surface-card p-3.5">
               <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-                <Select label="目标岗位" value={config.role} options={options.roles} onChange={(v) => setConfig({ ...config, role: v })} />
-                <Select label="职级" value={config.level} options={options.levels} onChange={(v) => setConfig({ ...config, level: v })} />
+                <Select label="目标岗位" value={config.role} options={options.roles} onChange={(v) => set({ role: v })} />
+                <Select label="职级" value={config.level} options={options.levels} onChange={(v) => set({ level: v })} />
                 <Select
                   label="面试类型"
                   value={config.workflow_type}
                   options={options.workflow_types.map((w) => w.id)}
                   labels={options.workflow_types.map((w) => w.name)}
-                  onChange={(v) => setConfig({ ...config, workflow_type: v })}
+                  onChange={(v) => set({ workflow_type: v })}
                 />
                 <Select
                   label="面试风格"
                   value={config.interview_style}
                   options={options.interview_styles.map((s) => s.id)}
                   labels={options.interview_styles.map((s) => s.name)}
-                  onChange={(v) =>
-                    setConfig({
-                      ...config,
-                      interview_style: v as import("@/types").InterviewStyleId,
-                    })
-                  }
+                  onChange={(v) => set({ interview_style: v as import("@/types").InterviewStyleId })}
                 />
               </div>
             </div>
 
             <div className="surface-card p-3.5">
               <label className="field-label !mb-2 !text-xs">目标公司</label>
-              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-7">
-                {options.companies.map((c) => {
-                  const selected = config.company === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setConfig({ ...config, company: c.id })}
-                      className={`rounded-md border px-2 py-2 text-center text-[12px] font-medium transition-all duration-base ease-google active:scale-[0.98] ${
-                        selected
-                          ? "border-[var(--primary)] bg-[var(--info-soft)] text-[var(--info-ink)] shadow-focus"
-                          : "border-surface-border bg-surface-card text-ink-muted hover:border-[var(--primary)] hover:bg-[var(--info-soft)] hover:text-[var(--info-ink)]"
-                      }`}
-                    >
-                      {c.name}
-                    </button>
-                  );
-                })}
-              </div>
+              <CompanyGrid value={config.company} companies={options.companies} onChange={(v) => set({ company: v })} />
             </div>
 
             <div className="surface-card p-3.5">
               <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-[1fr_auto]">
-                <div>
-                  <label className="field-label !mb-2 !text-xs">面试官性格</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {options.personalities.map((p) => {
-                      const selected = config.personality === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setConfig({ ...config, personality: p.id })}
-                          className={`rounded-md border px-3 py-1.5 text-[12px] font-medium transition-all duration-base ease-google active:scale-[0.98] ${
-                            selected
-                              ? "border-[var(--primary)] bg-[var(--info-soft)] text-[var(--info-ink)] shadow-focus"
-                              : "border-surface-border bg-surface-card text-ink-muted hover:border-[var(--primary)] hover:bg-[var(--info-soft)] hover:text-[var(--info-ink)]"
-                          }`}
-                        >
-                          {p.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <ChoiceGroup
+                  label="面试官性格"
+                  value={config.personality}
+                  options={options.personalities}
+                  onChange={(v) => set({ personality: v })}
+                />
                 <div className="lg:w-48">
                   <label className="field-label !mb-2 !text-xs">
-                    严厉 {config.strictness}/10 · {strictnessLabel}
+                    严厉 {config.strictness}/10 · {strictnessLabel(config.strictness)}
                   </label>
                   <input
                     type="range"
                     min={1}
                     max={10}
                     value={config.strictness}
-                    onChange={(e) => setConfig({ ...config, strictness: Number(e.target.value) })}
+                    onChange={(e) => set({ strictness: Number(e.target.value) })}
                     className="h-2 w-full accent-[var(--primary)]"
                   />
                 </div>
@@ -297,7 +217,7 @@ export default function InterviewSetupPage() {
                         options.tts_voices?.find((v) => v.id === a.voice)?.name || a.voice;
                       return voiceName ? `${a.name}(匹配:${voiceName})` : a.name;
                     })}
-                    onChange={(v) => setConfig({ ...config, avatar_id: v })}
+                    onChange={(v) => set({ avatar_id: v })}
                   />
                 )}
                 {options.scenes && options.scenes.length > 0 && (
@@ -306,59 +226,31 @@ export default function InterviewSetupPage() {
                     value={config.scene_id || "meeting_room"}
                     options={options.scenes.map((s) => s.id)}
                     labels={options.scenes.map((s) => s.name)}
-                    onChange={(v) => setConfig({ ...config, scene_id: v })}
+                    onChange={(v) => set({ scene_id: v })}
                   />
                 )}
                 {resumes.length > 0 ? (
-                  <Select
-                    label="关联简历"
-                    value={String(config.resume_id)}
-                    options={resumes.map((r) => String(r.id))}
-                    labels={resumes.map((r) => `${r.filename}${r.is_active ? " (投递)" : ""}`)}
-                    onChange={(v) => setConfig({ ...config, resume_id: Number(v) })}
-                  />
+                  <ResumeSelect resumes={resumes} value={config.resume_id ?? null} onChange={(v) => set({ resume_id: v })} />
                 ) : (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-ink-muted">
-                      关联简历
-                    </label>
-                    <p className="rounded-md border border-[var(--warning)]/30 bg-[var(--warning-soft)] px-2.5 py-2 text-[11px] text-[var(--warning-ink)]">
-                      暂无简历,可稍后在「简历管理」上传
-                    </p>
-                  </div>
+                  <ResumeWarning />
                 )}
 
                 {/* AI 处理器与思考强度(缺省回落系统默认绑定) */}
-                <div className="rounded-lg border border-surface-border p-3">
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink">
-                    <Mic size={13} className="text-[var(--primary)]" />
-                    处理器与思考强度
-                  </p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-[11px] text-ink-muted">思考模型</label>
-                      <ModelSelect models={chatModels} value={chatModelId} onChange={setChatModelId} disabled={creating} ariaLabel="思考模型" className="!w-full" defaultProfile={defaultBindings?.chat?.profile ?? null} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] text-ink-muted">思考强度</label>
-                      <EffortSelect
-                        model={chatModels.find((m) => m.id === chatModelId) ?? null}
-                        value={effort}
-                        onChange={setEffort}
-                        disabled={creating}
-                        forceVisible
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] text-ink-muted">语音输入（识别）</label>
-                      <ModelSelect models={sttModels} value={sttModelId} onChange={setSttModelId} disabled={creating} ariaLabel="语音输入模型" className="!w-full" defaultProfile={defaultBindings?.stt?.profile ?? null} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] text-ink-muted">语音输出（播报）</label>
-                      <ModelSelect models={ttsModels} value={ttsModelId} onChange={setTtsModelId} disabled={creating} ariaLabel="语音输出模型" className="!w-full" defaultProfile={defaultBindings?.tts?.profile ?? null} />
-                    </div>
-                  </div>
-                </div>
+                <ProcessorCard
+                  chatModels={chatModels}
+                  sttModels={sttModels}
+                  ttsModels={ttsModels}
+                  chatModelId={chatModelId}
+                  sttModelId={sttModelId}
+                  ttsModelId={ttsModelId}
+                  effort={effort}
+                  setChatModelId={setChatModelId}
+                  setSttModelId={setSttModelId}
+                  setTtsModelId={setTtsModelId}
+                  setEffort={setEffort}
+                  defaultBindings={defaultBindings}
+                  disabled={creating}
+                />
               </div>
             </div>
 
@@ -370,135 +262,10 @@ export default function InterviewSetupPage() {
 
           {/* 右侧摘要(大屏) */}
           <div className="hidden min-h-0 flex-col gap-2.5 overflow-hidden lg:flex">
-            <div className="surface-card p-3.5">
-              <h2 className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
-                <ListChecks size={14} className="text-[var(--primary)]" />
-                配置预览
-              </h2>
-              <div className="space-y-2 text-xs">
-                <PreviewRow icon={Briefcase} label="岗位" value={`${config.role} · ${config.level}`} />
-                <PreviewRow icon={Building2} label="公司" value={selectedCompany?.name ?? config.company} />
-                <PreviewRow icon={Mic} label="类型" value={`${selectedWorkflow?.name ?? ""} · ${selectedStyle?.name ?? ""}`} />
-                <PreviewRow
-                  icon={UserCircle}
-                  label="面试官"
-                  value={`${selectedPersonality?.name ?? ""} · ${strictnessLabel}`}
-                />
-                {(selectedAvatar || selectedScene) && (
-                  <PreviewRow
-                    icon={UserCircle}
-                    label="形象"
-                    value={[
-                      selectedAvatar?.name,
-                      selectedAvatar?.voice
-                        ? `音色 ${
-                            options.tts_voices?.find((v) => v.id === selectedAvatar.voice)?.name ||
-                            selectedAvatar.voice
-                          }`
-                        : null,
-                      selectedScene?.name,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  />
-                )}
-                {selectedResume && (
-                  <PreviewRow icon={Briefcase} label="简历" value={selectedResume.filename} />
-                )}
-              </div>
-            </div>
-
-            {selectedCompany && (
-              <div className="surface-card flex-1 min-h-0 overflow-y-auto p-3.5">
-                <h2 className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
-                  <Building2 size={14} className="text-[var(--primary)]" />
-                  {selectedCompany.name} 面经
-                </h2>
-                <p className="mb-2 line-clamp-3 text-[11px] leading-snug text-ink-muted">{selectedCompany.style}</p>
-                {selectedCompany.focus_areas.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    {selectedCompany.focus_areas.slice(0, 6).map((area) => (
-                      <span key={area} className="chip chip-blue !text-[10px]">
-                        {area}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {selectedWorkflow && selectedWorkflow.phases.length > 0 && (
-                  <div className="mb-2">
-                    <p className="mb-1 text-[10px] uppercase tracking-[0.08em] text-ink-subtle">
-                      流程
-                    </p>
-                    <p className="font-mono text-[11px] leading-snug text-ink-muted">
-                      {selectedWorkflow.phases.join(" → ")}
-                    </p>
-                  </div>
-                )}
-                {selectedCompany.sample_questions.length > 0 && (
-                  <p className="line-clamp-3 text-[11px] leading-snug text-ink-muted">
-                    <span className="text-ink-subtle">参考:</span>
-                    {selectedCompany.sample_questions[0]}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="surface-card shrink-0 px-3.5 py-2.5">
-              <p className="flex items-start gap-1.5 text-[11px] leading-snug text-ink-muted">
-                <Lightbulb size={13} className="mt-0.5 shrink-0 text-[var(--primary)]" />
-                关联简历后问题更贴合项目;建议先完成 BYOK 配置。
-              </p>
-            </div>
+            <InterviewPreview options={options} config={config} resumes={resumes} />
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Select({
-  label,
-  value,
-  options,
-  labels,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  labels?: string[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <label className="field-label !mb-1 !text-xs">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="field-select !h-9 !text-xs">
-        {options.map((o, i) => (
-          <option key={o} value={o}>
-            {labels?.[i] || o}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function PreviewRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-start gap-1.5">
-      <Icon size={12} className="mt-0.5 shrink-0 text-ink-subtle" strokeWidth={1.75} />
-      <div className="min-w-0">
-        <span className="text-[10px] uppercase tracking-[0.08em] text-ink-subtle">{label}</span>
-        <p className="break-words text-[12px] font-medium leading-snug text-ink">{value}</p>
-      </div>
     </div>
   );
 }

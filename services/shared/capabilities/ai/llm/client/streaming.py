@@ -18,7 +18,8 @@ from shared.core.security import make_pinned_async_client
 
 from .assemblers import _AnthropicRoundAssembler, _OpenAIRoundAssembler
 from .base import _is_local_allowed, _require_https
-from .protocol_translate import _headers, parse_sse_event
+from .protocol_utils import _headers
+from .response_extract import parse_sse_event
 from ..stream_filters import StreamSanitizer
 
 logger = logging.getLogger(__name__)
