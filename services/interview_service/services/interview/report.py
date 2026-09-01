@@ -70,13 +70,13 @@ async def generate_and_persist_report(
         try:
             db.refresh(session)
         except Exception:
-            pass
+            logger.debug("报告生成前 refresh session 失败 sid=%s", sid, exc_info=True)
         raw = (session.report or "").strip()
         if raw and raw != "{}" and raw != _REPORT_GENERATING_SENTINEL:
             try:
                 return InterviewReport.model_validate_json(raw)
             except Exception:
-                pass
+                logger.debug("报告缓存 JSON 解析失败 sid=%s", sid, exc_info=True)
         if raw == _REPORT_GENERATING_SENTINEL:
             # 另一路径正在生成：短暂等待后若已落库则返回
             for _ in range(30):
@@ -84,12 +84,14 @@ async def generate_and_persist_report(
                 try:
                     db.refresh(session)
                 except Exception:
+                    logger.debug("等待哨兵时 refresh session 失败 sid=%s", sid, exc_info=True)
                     break
                 cur = (session.report or "").strip()
                 if cur and cur != _REPORT_GENERATING_SENTINEL and cur != "{}":
                     try:
                         return InterviewReport.model_validate_json(cur)
                     except Exception:
+                        logger.debug("等待哨兵后报告 JSON 解析失败 sid=%s", sid, exc_info=True)
                         break
             # 超时仍卡在哨兵：清哨兵后由本路径重试
             try:
@@ -102,8 +104,7 @@ async def generate_and_persist_report(
                 db.commit()
             except Exception:
                 db.rollback()
-
-        # DB CAS：仅当报告仍为空时写入哨兵
+                logger.debug("清报告生成哨兵失败 sid=%s", sid, exc_info=True)
         claimed = False
         try:
             result = db.execute(
@@ -124,18 +125,17 @@ async def generate_and_persist_report(
         except Exception:
             db.rollback()
             claimed = False
+            logger.debug("报告 CAS 抢占哨兵失败 sid=%s", sid, exc_info=True)
 
         if not claimed:
             try:
                 db.refresh(session)
             except Exception:
-                pass
-            cur = (session.report or "").strip()
-            if cur and cur != _REPORT_GENERATING_SENTINEL and cur != "{}":
+                logger.debug("未抢占路径 refresh session 失败 sid=%s", sid, exc_info=True)
                 try:
                     return InterviewReport.model_validate_json(cur)
                 except Exception:
-                    pass
+                    logger.debug("未抢占时报告 JSON 解析失败 sid=%s", sid, exc_info=True)
             # 可能刚被其他方设为哨兵：再等一轮
             if cur == _REPORT_GENERATING_SENTINEL:
                 for _ in range(30):
@@ -149,6 +149,7 @@ async def generate_and_persist_report(
                         try:
                             return InterviewReport.model_validate_json(cur2)
                         except Exception:
+                            logger.debug("二次等待后报告 JSON 解析失败 sid=%s", sid, exc_info=True)
                             break
 
         try:
@@ -156,7 +157,7 @@ async def generate_and_persist_report(
             try:
                 db.refresh(session)
             except Exception:
-                pass
+                logger.debug("生成前 refresh session 失败 sid=%s", sid, exc_info=True)
             report = await generate_report(session, llm, face_records)
             report = _apply_interrupt_politeness_penalty(session, report)
 
@@ -180,7 +181,7 @@ async def generate_and_persist_report(
 
                     record_interview_learning(session, report=report.model_dump())
                 except Exception:
-                    pass
+                    logger.debug("报告落库后成长学习记录失败 sid=%s", sid, exc_info=True)
             except Exception:
                 db.rollback()
                 raise
@@ -196,8 +197,9 @@ async def generate_and_persist_report(
                 )
                 db.commit()
             except Exception:
+                logger.debug("报告异常路径清哨兵失败 sid=%s", sid, exc_info=True)
                 try:
                     db.rollback()
                 except Exception:
-                    pass
+                    logger.debug("报告异常路径 rollback 失败 sid=%s", sid, exc_info=True)
             raise
