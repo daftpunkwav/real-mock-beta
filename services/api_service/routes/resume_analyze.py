@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from api_service.models import Resume
+from shared.models import Resume
 from api_service.services.resume.analysis import analyze_resume_with_llm
 from shared.core.errors import raise_error
 from shared.database import get_db

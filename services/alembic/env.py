@@ -2,7 +2,7 @@
 
 注册三服务全部模型到 metadata：
 - shared.models：StageConfig / LLMSettings / UserProfile / Resume
-- api_service.models、agent_service.models、interview_service.models：业务表
+- agent_service.models、interview_service.models：业务表
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ from shared.database import Base
 
 # 确保三服务全部模型注册到 metadata（共享库单库聚合）
 import shared.models  # noqa: F401
-import api_service.models  # noqa: F401
 import agent_service.models  # noqa: F401
 import interview_service.models  # noqa: F401
 

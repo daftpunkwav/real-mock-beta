@@ -55,7 +55,6 @@ def session_factory(engine):
     """返回 sessionmaker，绑定到全局 engine，使测试 fixture 与 FastAPI 注入共享同一份库。"""
     from shared.database import Base
     import shared.models  # noqa: F401
-    import api_service.models  # noqa: F401
     import agent_service.models  # noqa: F401
     import interview_service.models  # noqa: F401
 

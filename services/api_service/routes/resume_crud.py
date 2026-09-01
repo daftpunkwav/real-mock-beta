@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from api_service.models import Resume
+from shared.models import Resume
 from api_service.schemas import ResumeResponse
 from shared.config import get_settings
 from shared.core.errors import raise_error

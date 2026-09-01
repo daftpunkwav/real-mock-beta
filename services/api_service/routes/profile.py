@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from shared.core.local_only import require_local_peer
 from shared.database import get_db
-from api_service.models import UserProfile
+from shared.models import UserProfile
 from api_service.schemas import UserProfileResponse, UserProfileUpdate
 
 router = APIRouter(dependencies=[Depends(require_local_peer)])

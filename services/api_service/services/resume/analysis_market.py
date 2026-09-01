@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 
-from api_service.models import Resume
+from shared.models import Resume
 from shared.capabilities.ai.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)

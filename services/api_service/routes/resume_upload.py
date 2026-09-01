@@ -22,7 +22,7 @@ from pathlib import Path
 from fastapi import Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
-from api_service.models import Resume
+from shared.models import Resume
 from api_service.schemas import ResumeResponse
 from api_service.services.resume.parser import extract_text_from_file, parse_resume_with_llm
 from shared.capabilities.ai.llm.client import LLMClient

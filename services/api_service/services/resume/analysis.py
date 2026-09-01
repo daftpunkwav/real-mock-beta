@@ -6,7 +6,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from api_service.models import Resume
+from shared.models import Resume
 from api_service.schemas import ResumeAnalysis
 from api_service.services.resume.analysis_market import (
     gather_resume_market_context,
