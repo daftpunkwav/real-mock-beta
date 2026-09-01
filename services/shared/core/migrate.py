@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 logger = logging.getLogger(__name__)
 
 # 与 alembic/versions 中 revision id 对齐
-ALEMBIC_HEAD_REVISION = "20260803_0001"
+ALEMBIC_HEAD_REVISION = "20260901_0002"
 
 # table -> [ALTER 语句列表]
 MIGRATIONS: dict[str, list[str]] = {

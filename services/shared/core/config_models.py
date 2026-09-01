@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.core.constants import DEFAULT_LLM_PROTOCOL
@@ -69,6 +69,9 @@ class ModelProfile(Base):
     """
 
     __tablename__ = "model_profiles"
+    __table_args__ = (
+        UniqueConstraint("provider_id", "model", name="uq_model_profiles_provider_model"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     provider_id: Mapped[int] = mapped_column(Integer, nullable=False)
