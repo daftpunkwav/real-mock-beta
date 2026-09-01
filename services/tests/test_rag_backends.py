@@ -202,11 +202,14 @@ def test_stepfun_ensure_index_uses_configured_vector_store_id(monkeypatch) -> No
 
     # 聚焦 HTTP 序列：URL 校验放行（真实 DNS 在不同环境解析结果不同），
     # 且 make_pinned_async_client 内部会真实解析 DNS，需一并替换
+    # （HTTP 层已拆至 stepfun_index_http，校验/pin 都在该模块；
+    #  ensure_index 入口的 assert_safe_http_url 仍在 stepfun_backend）
     from interview_service.capabilities.rag import stepfun_backend as sb
+    from interview_service.capabilities.rag import stepfun_index_http as shttp
 
-    monkeypatch.setattr(sb, "is_safe_http_url", lambda *a, **kw: True)
     monkeypatch.setattr(sb, "assert_safe_http_url", lambda *a, **kw: None)
-    monkeypatch.setattr(sb, "make_pinned_async_client", lambda *a, **kw: _StubClient())
+    monkeypatch.setattr(shttp, "is_safe_http_url", lambda *a, **kw: True)
+    monkeypatch.setattr(shttp, "make_pinned_async_client", lambda *a, **kw: _StubClient())
     monkeypatch.setattr(httpx, "AsyncClient", _StubClient)
 
     settings = _make_settings(

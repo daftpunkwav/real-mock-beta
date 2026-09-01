@@ -25,6 +25,9 @@ StepFun 服务端会在 chat 调用时自动执行检索并把相关片段塞回
 2. :meth:`query` —— 返回空列表,真实检索由 chat 时的 tools 完成；
 3. :meth:`build_retrieval_tool` —— 输出 OpenAI 兼容的 tool 定义,
    由 :class:`app.services.interview.runner.InterviewRunner` 注入到 chat payload。
+
+HTTP 私有方法（create/upload/attach/verify/pinned client）拆至
+:mod:`.stepfun_index_http`。
 """
 
 from __future__ import annotations
@@ -33,26 +36,17 @@ import json
 import logging
 from typing import Any
 
-import httpx
-
 from shared.config import Settings
 from shared.core.constants import RAGBackendKind
 from shared.core.security import (
     UnsafeURLError,
     assert_safe_http_url,
-    is_safe_http_url,
-    make_pinned_async_client,
-    redact_api_key,
 )
 from shared.capabilities.ai.llm.client import LLMClient
 from interview_service.capabilities.rag._kb_data import _build_documents
+from interview_service.capabilities.rag.stepfun_index_http import StepFunIndexHttp
 
 logger = logging.getLogger(__name__)
-
-
-_STEPFUN_FILE_NAME = "company_kb.jsonl"
-_STEPFUN_VS_NAME = "company_kb"
-_STEPFUN_REQUEST_TIMEOUT = 30.0
 
 
 def _serialize_documents_to_jsonl() -> bytes:
@@ -79,6 +73,7 @@ class StepFunRetrievalRAG:
         self._settings = settings
         self._vector_store_id: str | None = settings.stepfun_vector_store_id
         self._ready: bool = bool(self._vector_store_id)
+        self._index_http = StepFunIndexHttp(llm=llm, settings=settings)
 
     # ── 公共 API ──────────────────────────────────────
 
@@ -115,7 +110,7 @@ class StepFunRetrievalRAG:
 
         try:
             if self._vector_store_id:
-                await self._verify_vector_store(api_base, api_key, self._vector_store_id)
+                await self._index_http.verify_vector_store(api_base, api_key, self._vector_store_id)
                 self._ready = True
                 logger.info(
                     "StepFun vector_store 已就绪（复用配置）: id=%s",
@@ -123,9 +118,10 @@ class StepFunRetrievalRAG:
                 )
                 return
 
-            vs_id = await self._create_vector_store(api_base, api_key)
-            file_id = await self._upload_kb_file(api_base, api_key)
-            await self._attach_file(api_base, api_key, vs_id, file_id)
+            vs_id = await self._index_http.create_vector_store(api_base, api_key)
+            content = _serialize_documents_to_jsonl()
+            file_id = await self._index_http.upload_kb_file(api_base, api_key, content)
+            await self._index_http.attach_file(api_base, api_key, vs_id, file_id)
             self._vector_store_id = vs_id
             self._ready = True
             # 注意：仅打印 ID，文件大小可观察但不视为敏感。
@@ -191,97 +187,6 @@ class StepFunRetrievalRAG:
                 },
             },
         }
-
-    # ── StepFun HTTP 私有方法 ───────────────────────────────
-
-    def _headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self._llm.api_key}",
-            "Content-Type": "application/json",
-        }
-
-    def _pinned_client(self, api_base: str) -> httpx.AsyncClient:
-        """与 LLM client 一致：出站 DNS pin，缓解重绑定 TOCTOU。"""
-        from shared.config import get_settings
-
-        return make_pinned_async_client(
-            api_base,
-            allow_local=False,
-            require_https=bool(get_settings().is_prod),
-            timeout=_STEPFUN_REQUEST_TIMEOUT,
-        )
-
-    async def _create_vector_store(self, api_base: str, api_key: str) -> str:
-        """POST /vector_stores → 返回 vector_store_id。"""
-        url = f"{api_base}/vector_stores"
-        # 双重 SSRF 校验：防御性编程,即便 ensure_index 已校验过。
-        if not is_safe_http_url(url, allow_local=False):
-            raise UnsafeURLError(f"StepFun URL 被拒: {url}")
-        payload = {"name": _STEPFUN_VS_NAME}
-        async with self._pinned_client(api_base) as client:
-            resp = await client.post(url, headers=self._headers(), json=payload)
-            if resp.status_code >= 400:
-                logger.warning(
-                    "StepFun create vector_store 失败: status=%s key=%s",
-                    resp.status_code,
-                    redact_api_key(api_key),
-                )
-            resp.raise_for_status()
-            data = resp.json()
-        vs_id = str(data.get("id") or "").strip()
-        if not vs_id:
-            raise RuntimeError("StepFun vector_store 创建响应缺少 id 字段")
-        return vs_id
-
-    async def _upload_kb_file(self, api_base: str, api_key: str) -> str:
-        """POST /files (purpose=retrieval) → 返回 file_id。"""
-        url = f"{api_base}/files"
-        if not is_safe_http_url(url, allow_local=False):
-            raise UnsafeURLError(f"StepFun URL 被拒: {url}")
-        content = _serialize_documents_to_jsonl()
-        files = {"file": (_STEPFUN_FILE_NAME, content, "application/jsonl")}
-        data = {"purpose": "retrieval"}
-        headers = {"Authorization": f"Bearer {api_key}"}
-        async with self._pinned_client(api_base) as client:
-            resp = await client.post(url, headers=headers, data=data, files=files)
-            resp.raise_for_status()
-            payload = resp.json()
-        file_id = str(payload.get("id") or "").strip()
-        if not file_id:
-            raise RuntimeError("StepFun files 上传响应缺少 id 字段")
-        return file_id
-
-    async def _attach_file(
-        self,
-        api_base: str,
-        api_key: str,
-        vector_store_id: str,
-        file_id: str,
-    ) -> None:
-        """POST /vector_stores/{id}/files 关联文件。"""
-        url = f"{api_base}/vector_stores/{vector_store_id}/files"
-        if not is_safe_http_url(url, allow_local=False):
-            raise UnsafeURLError(f"StepFun URL 被拒: {url}")
-        payload = {"file_ids": file_id}
-        async with self._pinned_client(api_base) as client:
-            resp = await client.post(url, headers=self._headers(), json=payload)
-            resp.raise_for_status()
-
-    async def _verify_vector_store(
-        self,
-        api_base: str,
-        api_key: str,
-        vector_store_id: str,
-    ) -> None:
-        """GET /vector_stores/{id} 轻量校验 ID 存在。失败时清空,等待下次重建。"""
-        url = f"{api_base}/vector_stores/{vector_store_id}"
-        if not is_safe_http_url(url, allow_local=False):
-            raise UnsafeURLError(f"StepFun URL 被拒: {url}")
-        async with self._pinned_client(api_base) as client:
-            resp = await client.get(url, headers=self._headers())
-            if resp.status_code == 404:
-                raise RuntimeError(f"StepFun vector_store 不存在: id={vector_store_id}")
-            resp.raise_for_status()
 
 
 __all__ = ["StepFunRetrievalRAG"]
