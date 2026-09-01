@@ -52,21 +52,21 @@
 
 | # | Commit 主题 | 状态 |
 | --- | --- | --- |
-| 1 | `docs: 架构审查修复计划` | 进行中 |
-| 2 | `chore(web): 删除未引用 effects 组件包` | 待办 |
-| 3 | `chore(web): 移除 API client 死方法` | 待办 |
-| 4 | `refactor(interview): 删除 build_context_prefix 与 set_voice` | 待办 |
-| 5 | `refactor(web): 移除未使用的 reportNavTimerRef` | 待办 |
-| 6 | `refactor(shared): 统一 ResumePickerItem 契约` | 待办 |
-| 7 | `refactor(api): 收敛 _timed 重复实现` | 待办 |
-| 8 | `refactor(shared): 收敛 list_resume_picker` | 待办 |
-| 9 | `fix(api): model_profiles 增加 UNIQUE 约束` | 待办 |
-| 10 | `refactor(llm): llm_client 运行期环改延迟导入` | 待办 |
-| 11 | `fix(report): 吞错路径补 debug 日志` | 待办 |
-| 12 | `fix(realtime): session_registry 吞错补日志` | 待办 |
-| 13 | `refactor(web): SearchResultCards 复用 safeAbsoluteHttpUrl` | 待办 |
-| 14 | `chore: gitignore .tmp_head_review` | 待办 |
-| 15 | `fix(config): StepFun RAG 缺 vector_store 时打 warning` | 待办 |
+| 1 | `docs: 架构审查修复计划` | ✅ 7a300bf |
+| 2 | `chore(web): 删除未引用 effects 组件包` | ✅ fcd1dd9 |
+| 3 | `chore(web): 移除 API client 死方法` | ✅ a5a90bf |
+| 4 | `refactor(interview): 删除 build_context_prefix 与 set_voice` | ✅ 9549307 |
+| 5 | `refactor(web): 移除未使用的 reportNavTimerRef` | ✅ 5f3f5e2 |
+| 6 | `refactor(shared): 统一 ResumePickerItem 契约` | ✅ 9bc9100 |
+| 7 | `refactor(api): 收敛 _timed 重复实现` | ✅ da646dd |
+| 8 | `refactor(shared): 收敛 list_resume_picker` | ✅ d9fbc3a |
+| 9 | `fix(api): model_profiles 增加 UNIQUE 约束` | ✅ 0537920 |
+| 10 | `refactor(llm): llm_client 运行期环改延迟导入` | ✅ 44b5c30 |
+| 11 | `fix(report): 吞错路径补 debug 日志` | ✅ 0b5869d |
+| 12 | `fix(realtime): session_registry 吞错补日志` | ✅ 731e5fe |
+| 13 | `refactor(web): SearchResultCards 复用 safeAbsoluteHttpUrl` | ✅ a118e11 |
+| 14 | `chore: gitignore .tmp_head_review` | ✅ 663a76d |
+| 15 | `fix(config): StepFun RAG 缺 vector_store 时打 warning` | ✅ 4009f79 |
 
 ---
 
