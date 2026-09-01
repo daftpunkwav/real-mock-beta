@@ -29,7 +29,6 @@ export interface InterviewRoomEventsDeps {
   waitMsRef: AnyRef<number>;
   lastAssistantTextRef: AnyRef<string>;
   hintTimeoutRef: AnyRef<ReturnType<typeof setTimeout> | null>;
-  reportNavTimerRef: AnyRef<ReturnType<typeof setTimeout> | null>;
   finishingRef: AnyRef<boolean>;
   navigatingRef: AnyRef<boolean>;
   bumpSilenceTimerRef: AnyRef<() => void>;
@@ -99,7 +98,6 @@ export function useInterviewRoomEvents(deps: InterviewRoomEventsDeps) {
         type: "tts_playback_done",
         generation: d.playbackGenRef.current,
       });
-      if (d.reportNavTimerRef.current) clearTimeout(d.reportNavTimerRef.current);
       d.router.push(`/report/${d.sessionId}`);
     };
 

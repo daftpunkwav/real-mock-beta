@@ -10,7 +10,6 @@ export interface InterviewRoomTtsBindingDeps {
   playbackGenRef: AnyRef<number>;
   lastPlaybackDoneGenRef: AnyRef<number | null>;
   sendRef: AnyRef<(p: ClientEvent) => boolean>;
-  reportNavTimerRef: AnyRef<ReturnType<typeof setTimeout> | null>;
   setAiSpeaking: Dispatch<SetStateAction<boolean>>;
   setAudioLevel: Dispatch<SetStateAction<number>>;
   setAudioBlocked: Dispatch<SetStateAction<boolean>>;
@@ -58,10 +57,9 @@ export function useInterviewRoomTtsBinding(deps: InterviewRoomTtsBindingDeps) {
 
   useEffect(() => {
     return () => {
-      if (deps.reportNavTimerRef.current) clearTimeout(deps.reportNavTimerRef.current);
       stop();
     };
-  }, [stop, deps.reportNavTimerRef]);
+  }, [stop]);
 
   return {
     playBase64Mp3,

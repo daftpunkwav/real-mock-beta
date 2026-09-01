@@ -55,7 +55,6 @@ export function useInterviewRoomState(deps: InterviewRoomStateDeps) {
   const clearCaptureBuffersRef = useRef<() => void>(() => {});
   const seedCaptureFromRingRef = useRef<() => void>(() => {});
   const sttThrottleRef = useRef(0);
-  const reportNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishingRef = useRef(false);
   const navigatingRef = useRef(false);
   const playbackGenRef = useRef(0);
@@ -171,7 +170,6 @@ export function useInterviewRoomState(deps: InterviewRoomStateDeps) {
       clearCaptureBuffersRef,
       seedCaptureFromRingRef,
       sttThrottleRef,
-      reportNavTimerRef,
       finishingRef,
       navigatingRef,
       playbackGenRef,
