@@ -28,8 +28,6 @@ from shared.capabilities.ai.llm.usage import UsageAccumulator
 
 from .base import _extract_message_text, _is_local_allowed, _require_https
 from .from_db import build_from_db, build_from_stage_config
-from .llm_client_ext import embed as _embed
-from .llm_client_ext import test_connection as _test_connection
 from .openai_transport import build_payload, chat_completions
 from .retry_stream import stream_message_round_retry, stream_text_retry
 
@@ -262,6 +260,8 @@ class LLMClient:
 
     async def test_connection(self) -> tuple[bool, str]:
         """测试 API 连通性（实现见 :mod:`llm_client_ext`）。"""
+        from .llm_client_ext import test_connection as _test_connection
+
         return await _test_connection(self)
 
     async def embed(
@@ -271,6 +271,8 @@ class LLMClient:
         model: str | None = None,
     ) -> list[list[float]]:
         """调用 OpenAI 兼容 /embeddings 端点，返回每段文本的向量（实现见 :mod:`llm_client_ext`）。"""
+        from .llm_client_ext import embed as _embed
+
         return await _embed(self, texts, model=model)
 
     @classmethod
