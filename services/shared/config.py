@@ -1,5 +1,6 @@
 """应用配置模块（共享平台层）。"""
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 
@@ -7,6 +8,8 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from shared.core.constants import DEFAULT_RAG_BACKEND, RAGBackendKind
+
+logger = logging.getLogger(__name__)
 
 # 共享层根目录（services/shared/）：数据、上传、.env 集中于此
 SHARED_ROOT = Path(__file__).resolve().parent
@@ -117,8 +120,9 @@ class Settings(BaseSettings):
         if self.is_prod and self.allow_local_llm:
             raise ValueError("生产环境 (env=prod) 不允许 allow_local_llm=True")
         if self.rag_backend == RAGBackendKind.STEPFUN and not self.stepfun_vector_store_id:
-            # 不阻断启动（启动时自动创建），但打 warning
-            pass
+            logger.warning(
+                "rag_backend=stepfun 但未配置 stepfun_vector_store_id，启动时将尝试自动创建向量库"
+            )
         return self
 
 
