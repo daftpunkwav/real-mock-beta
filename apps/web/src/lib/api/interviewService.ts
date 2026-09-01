@@ -2,20 +2,15 @@
 
 import type {
   ChatMessage,
-  FaceAnalysis,
   FinishInterviewResponse,
   GetReportResponse,
   GrowthRecord,
   InterviewConfig,
-  InterviewReport,
   InterviewSession,
   Options,
-  ReportSSEEvent,
   ResumePickerItem,
-  SendMessageResponse,
-  StartInterviewResponse,
 } from "@/types";
-import { ApiError, consumeSSE, parseStructuredErrorResponse, request, resolveBackendUrl, LLM_HEAVY_TIMEOUT_MS } from "@/lib/api/base";
+import { request, LLM_HEAVY_TIMEOUT_MS } from "@/lib/api/base";
 
 export const interviewService = {
   /* 选项 */
@@ -23,11 +18,6 @@ export const interviewService = {
   listResumes: () => request<ResumePickerItem[]>("/v1/interview/resumes"),
 
   /* 面试 */
-  createSession: (config: InterviewConfig) =>
-    request<InterviewSession>("/v1/interview/sessions", {
-      method: "POST",
-      body: JSON.stringify(config),
-    }),
   /** InterviewConfig + 可选 ai_overrides（三任务模型条目 + 思考强度） */
   createSessionWithAI: (
     config: InterviewConfig,
@@ -45,19 +35,6 @@ export const interviewService = {
   listSessions: () => request<InterviewSession[]>("/v1/interview/sessions"),
   getSession: (id: number) =>
     request<InterviewSession>(`/v1/interview/sessions/${id}`),
-  startInterview: (id: number) =>
-    request<StartInterviewResponse>(`/v1/interview/sessions/${id}/start`, {
-      method: "POST",
-    }),
-  sendMessage: (id: number, content: string, faceAnalysis?: FaceAnalysis, imageBase64?: string) =>
-    request<SendMessageResponse>(`/v1/interview/sessions/${id}/message`, {
-      method: "POST",
-      body: JSON.stringify({
-        content,
-        face_analysis: faceAnalysis,
-        image_base64: imageBase64,
-      }),
-    }),
   getMessages: (id: number) =>
     request<ChatMessage[]>(`/v1/interview/sessions/${id}/messages`),
   finishInterview: (id: number) =>
@@ -68,44 +45,6 @@ export const interviewService = {
 
   /* 报告 */
   getReport: (id: number) => request<GetReportResponse>(`/v1/reports/${id}`),
-  /**
-   * 流式生成并消费报告 SSE。
-   * 触发后端按 token 分片推送，done 事件携带完整 InterviewReport。
-   * 失败时抛 ApiError，调用方降级到 getReport 轮询。
-   */
-  getReportStream: async (
-    id: number,
-    onToken: (token: string) => void,
-    signal?: AbortSignal,
-  ): Promise<InterviewReport> => {
-    const url = resolveBackendUrl(`/api/v1/reports/${id}/stream`);
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        credentials: "include",
-        signal,
-      });
-    } catch {
-      throw new ApiError(`无法直连后端流式接口 ${url}`, 0);
-    }
-    if (!res.ok) {
-      const error = await parseStructuredErrorResponse(res);
-      throw new ApiError(error.message, res.status, error);
-    }
-
-    let finalReport: InterviewReport | null = null;
-    await consumeSSE<ReportSSEEvent>(res, (event) => {
-      if (event.type === "token" && typeof event.content === "string") {
-        onToken(event.content);
-      } else if (event.type === "done") {
-        finalReport = event.report;
-      } else if (event.type === "error") {
-        throw new ApiError(event.message || "报告流式生成失败", res.status);
-      }
-    });
-    if (!finalReport) throw new ApiError("报告流式响应未包含完整数据", 0);
-    return finalReport;
-  },
 
   /* 成长 */
   getGrowthHistory: () => request<GrowthRecord[]>("/v1/reports/growth/history"),

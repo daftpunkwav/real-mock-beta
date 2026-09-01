@@ -2,7 +2,6 @@
 
 import type {
   PrepHistoryMessage,
-  PrepMessageResponse,
   PrepSessionCreateResponse,
   PrepSessionSummary,
   PrepSSEEvent,
@@ -44,11 +43,6 @@ export const agentService = {
     request<PrepHistoryMessage[]>(
       `/v1/prep/sessions/${sessionId}/messages`,
     ),
-  prepMessage: (sessionId: number, content: string) =>
-    request<PrepMessageResponse>(`/v1/prep/sessions/${sessionId}/message`, {
-      method: "POST",
-      body: JSON.stringify({ content }),
-    }),
   prepMessageStream: async (
     sessionId: number,
     content: string,

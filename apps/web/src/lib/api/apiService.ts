@@ -1,7 +1,6 @@
 /** 基础 API 服务客户端（对应后端 ``api_service``：档案 / 简历 / 处理器配置） */
 
 import type {
-  LLMSettings,
   LLMTestResponse,
   Resume,
   ResumeActivateResponse,
@@ -11,26 +10,6 @@ import type {
 import { LLM_HEAVY_TIMEOUT_MS, ApiError, parseStructuredErrorResponse, request, resolveBackendUrl } from "@/lib/api/base";
 
 export const apiService = {
-  /* LLM 设置（新版按阶段） */
-  getStageConfigs: () => request<import("@/types").StageConfigs>("/v1/settings/stages"),
-  updateStageConfig: (stage: "recognize" | "reason" | "speak", data: Partial<import("@/types").StageConfig>) =>
-    request<import("@/types").StageConfig>(`/v1/settings/stages/${stage}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  /* 兼容旧版 */
-  getLLMSettings: () => request<LLMSettings>("/v1/settings/llm"),
-  updateLLMSettings: (data: Partial<import("@/types").LLMSettingsWrite>) =>
-    request<LLMSettings>("/v1/settings/llm", {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  testLLM: () => request<LLMTestResponse>("/v1/settings/llm/test", { method: "POST" }),
-  getVoiceCatalog: () =>
-    request<import("@/types").VoiceCatalog>("/v1/settings/catalog"),
-  testPipelineStage: (stage: "recognize" | "reason" | "speak") =>
-    request<LLMTestResponse>(`/v1/settings/test/${stage}`, { method: "POST" }),
-
   /* 模型条目体系（能力声明制） */
   listModelOptions: () =>
     request<{ models: import("@/types").ModelProfile[] }>("/v1/settings/models"),
