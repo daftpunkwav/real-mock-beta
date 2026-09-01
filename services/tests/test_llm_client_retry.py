@@ -27,9 +27,10 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch, *, allow_local: bool) -> No
     s.effective_embeddings_key = "sk-test"
     s.effective_embeddings_model = "text-embedding-3-small"
     s.is_prod = not allow_local
-    # client 拆包后 get_settings 分布在 llm_client 和 base 两个子模块
+    # client 拆包后 get_settings 分布在 llm_client / base / openai_transport 三个子模块
     monkeypatch.setattr("shared.capabilities.ai.llm.client.llm_client.get_settings", lambda: s)
     monkeypatch.setattr("shared.capabilities.ai.llm.client.base.get_settings", lambda: s)
+    monkeypatch.setattr("shared.capabilities.ai.llm.client.openai_transport.get_settings", lambda: s)
 
 
 def _make_client(monkeypatch: pytest.MonkeyPatch, *, allow_local: bool) -> Any:
@@ -55,7 +56,7 @@ async def test_chat_4xx_no_retry(monkeypatch: pytest.MonkeyPatch) -> None:
         "400", request=MagicMock(), response=fake_resp
     )
     http_client.post = AsyncMock(return_value=fake_resp)
-    with patch("shared.capabilities.ai.llm.client.llm_client.make_pinned_async_client") as ac:
+    with patch("shared.capabilities.ai.llm.client.openai_transport.make_pinned_async_client") as ac:
         ac.return_value.__aenter__.return_value = http_client
         ac.return_value.__aexit__.return_value = False
         with pytest.raises(httpx.HTTPStatusError):
@@ -87,7 +88,7 @@ async def test_chat_429_retries_then_returns(monkeypatch: pytest.MonkeyPatch) ->
             succ,
         ]
     )
-    with patch("shared.capabilities.ai.llm.client.llm_client.make_pinned_async_client") as ac:
+    with patch("shared.capabilities.ai.llm.client.openai_transport.make_pinned_async_client") as ac:
         ac.return_value.__aenter__.return_value = http_client
         ac.return_value.__aexit__.return_value = False
         with patch("shared.capabilities.ai.llm.client.base.asyncio.sleep", new=AsyncMock()):
@@ -115,7 +116,7 @@ async def test_chat_allows_loopback_in_dev(monkeypatch: pytest.MonkeyPatch) -> N
     succ.raise_for_status = MagicMock()
     http_client = AsyncMock()
     http_client.post = AsyncMock(return_value=succ)
-    with patch("shared.capabilities.ai.llm.client.llm_client.make_pinned_async_client") as ac:
+    with patch("shared.capabilities.ai.llm.client.openai_transport.make_pinned_async_client") as ac:
         ac.return_value.__aenter__.return_value = http_client
         ac.return_value.__aexit__.return_value = False
         text = await client.chat([{"role": "user", "content": "hi"}])
@@ -127,7 +128,7 @@ async def test_chat_allows_loopback_in_dev(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_openai_round_assembler_joins_fragments() -> None:
     """tool_calls 的 id/name/arguments 分片按 index 拼接，组装与非流式同构 message。"""
-    from shared.capabilities.ai.llm.client.unified_client import _OpenAIRoundAssembler
+    from shared.capabilities.ai.llm.client.assemblers import _OpenAIRoundAssembler
 
     a = _OpenAIRoundAssembler()
     assert a.feed({"choices": [{"delta": {"reasoning_content": "思考"}}]}) == "思考"
@@ -151,7 +152,7 @@ def test_openai_round_assembler_joins_fragments() -> None:
 
 def test_anthropic_round_assembler_thinking_and_tool_use() -> None:
     """thinking_delta 即时回传；text 与 tool_use（partial_json 分片）缓冲组装。"""
-    from shared.capabilities.ai.llm.client.unified_client import _AnthropicRoundAssembler
+    from shared.capabilities.ai.llm.client.assemblers import _AnthropicRoundAssembler
 
     a = _AnthropicRoundAssembler()
     a.feed({"type": "content_block_start", "index": 0, "content_block": {"type": "thinking"}})

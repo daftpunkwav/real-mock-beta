@@ -269,9 +269,11 @@ def test_llm_client_embed_uses_dedicated_embeddings_base(monkeypatch) -> None:
             captured["url"] = url
             return _StubResp()
 
+    # embed 已拆包：URL 校验在 llm_client，请求执行在 openai_transport
     import shared.capabilities.ai.llm.client.llm_client as llm_mod
+    import shared.capabilities.ai.llm.client.openai_transport as ot_mod
 
-    monkeypatch.setattr(llm_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
+    monkeypatch.setattr(ot_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
     # 重置 settings 缓存,让本次测试读到独立 embeddings base
     get_settings.cache_clear()
 
@@ -318,9 +320,11 @@ def test_llm_client_embed_falls_back_to_chat_base_when_no_override(monkeypatch) 
             captured["url"] = url
             return _StubResp()
 
+    # embed 已拆包：URL 校验在 llm_client，请求执行在 openai_transport
     import shared.capabilities.ai.llm.client.llm_client as llm_mod
+    import shared.capabilities.ai.llm.client.openai_transport as ot_mod
 
-    monkeypatch.setattr(llm_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
+    monkeypatch.setattr(ot_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
     monkeypatch.setattr(llm_mod, "is_safe_http_url", lambda *a, **kw: True)
     get_settings.cache_clear()
     monkeypatch.delenv("LLM_EMBEDDINGS_BASE", raising=False)
@@ -429,6 +433,7 @@ def test_llm_client_embed_decrypt_failure_fails_closed(monkeypatch, tmp_path) ->
 
 
     import shared.capabilities.ai.llm.client.llm_client as llm_mod
+    import shared.capabilities.ai.llm.client.openai_transport as ot_mod
     from shared.core import secrets as secrets_mod
     from shared.core.secrets import encrypt_secret
 
@@ -453,13 +458,16 @@ def test_llm_client_embed_decrypt_failure_fails_closed(monkeypatch, tmp_path) ->
                 requested.append(url)
                 raise AssertionError("不应发出任何请求")
 
-        monkeypatch.setattr(llm_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
+        monkeypatch.setattr(ot_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
         monkeypatch.setattr(llm_mod, "is_safe_http_url", lambda *a, **kw: True)
         # 篡改 enc:v2 密文：同一 master 加密后再改一个字节 → 解密必然失败
         bad = encrypt_secret("sk-emb-valid") or ""
         _, rest = bad.split(":", 1)
         mangled = f"enc:v2:{rest[:-3]}xxx"
-        monkeypatch.setattr(llm_mod, "get_settings", lambda: _make_settings(llm_embeddings_key=mangled))
+        broken_settings = _make_settings(llm_embeddings_key=mangled)
+        # llm_client.embed 与 openai_transport.embed_texts 各自读 settings
+        monkeypatch.setattr(llm_mod, "get_settings", lambda: broken_settings)
+        monkeypatch.setattr(ot_mod, "get_settings", lambda: broken_settings)
 
         llm = LLMClient(api_base="https://api.openai.com/v1", api_key="sk-chat", model="gpt-4o")
         with pytest.raises(ValueError):
