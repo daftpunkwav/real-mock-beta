@@ -8,20 +8,23 @@
 
 模型条目体系（供应商 / 模型 / 任务绑定）路由见 ``api_service.routes.models``，
 DB 读写见 ``api_service.services.model_registry``。
+
+职责拆分：
+- URL 格式与阶段 provider 校验见 :mod:`api_service.services.settings_validation`；
+- 旧版 /llm 聚合读写见 :mod:`api_service.services.legacy_llm_settings`；
+- 三阶段连通性测试见 :mod:`api_service.services.stage_tests`。
 """
 
 from __future__ import annotations
 
-from urllib.parse import urlparse
 from typing import Any
 import time
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from shared.config import get_settings
 from shared.core.constants import DEFAULT_LLM_RATE_LIMIT_PER_MINUTE, PipelineStage
-from shared.core.errors import ApiBusinessError, get_spec, raise_error
+from shared.core.errors import raise_error
 from shared.core.local_only import require_local_peer
 from shared.core.ratelimit import rate_limit_dep
 from shared.database import get_db
@@ -29,19 +32,21 @@ from shared.schemas import (
     LLMSettingsResponse,
     LLMSettingsUpdate,
     LLMTestResponse,
-    StageFallbackConfig,
-    StageModelCapability,
     StageConfigResponse,
     StageConfigsResponse,
     StageConfigUpdate,
 )
-from shared.capabilities.voice.config.catalog import catalog_payload, find_provider
+from shared.capabilities.voice.config.catalog import catalog_payload
 from shared.services.pipeline_config import (
     get_stage_config_map,
-    get_stage_config_for_runtime,
     stage_to_response,
     update_stage_config,
 )
+from api_service.services.legacy_llm_settings import (
+    read_legacy_llm_settings,
+    write_legacy_llm_settings,
+)
+from api_service.services.settings_validation import safe_base, validate_stage_config
 from api_service.services.stage_tests import test_recognize, test_reason, test_speak
 
 router = APIRouter(dependencies=[Depends(require_local_peer)])
@@ -55,51 +60,6 @@ async def _timed(stage_test) -> dict:
     return result
 
 
-def _safe_base(url: str, *, label: str) -> None:
-    """保存前仅做协议格式校验，不做 DNS 解析与网段判定。
-
-    Base URL 由用户手工填写：本机代理（fake-ip）会把公网域名解析到
-    198.18.0.0/15，网段校验会误拒合法地址；域名写错也应由「测试」按钮的
-    真实连通性请求暴露，而非在保存时报「地址不安全」。
-    运行时外发仍受 ``shared.core.security`` 的 SSRF 校验约束。
-    """
-    if not (url or "").strip():
-        return
-    parsed = urlparse(url.strip())
-    require_https = bool(get_settings().is_prod)
-    scheme_ok = parsed.scheme == "https" if require_https else parsed.scheme in ("http", "https")
-    if not scheme_ok or not parsed.hostname:
-        raise ApiBusinessError(
-            get_spec("A0007"),
-            message=(
-                f"{label} 地址格式无效：仅允许 http(s) URL"
-                + ("（生产环境仅允许 https）" if require_https else "")
-                + "；请检查后重试，可用「测试」验证连通性"
-            ),
-        )
-
-
-def _validate_stage_config(stage: str, data: StageConfigUpdate) -> None:
-    """校验单个阶段的 provider 选择是否与模式匹配。"""
-    if stage == PipelineStage.RECOGNIZE:
-        meta = find_provider("recognize", data.provider)
-        if meta and meta.get("status") == "coming_soon":
-            raise ApiBusinessError(get_spec("A4003"), message="识别处理者尚未接通")
-    elif stage == PipelineStage.REASON:
-        if data.provider in ("openai_compat", "xfyun", "volcengine", "aliyun", "tencent", "baidu", "local", "edge", "minimax_speech", "none", "mimo_audio"):
-            raise ApiBusinessError(
-                get_spec("A4001"),
-                message="面试思考处理者必须是文本 LLM，不能选择仅 ASR/仅 TTS 供应商",
-            )
-        meta = find_provider("reasoning", data.provider)
-        if meta and not meta.get("can_interview_reason") and meta.get("status") != "coming_soon":
-            raise_error("A4001")
-    elif stage == PipelineStage.SPEAK:
-        meta = find_provider("speak", data.provider)
-        if meta and meta.get("status") == "coming_soon":
-            raise ApiBusinessError(get_spec("A4003"), message="播报处理者尚未接通")
-
-
 @router.get("/catalog")
 def get_voice_catalog() -> dict[str, Any]:
     """三阶段供应商能力目录。"""
@@ -109,44 +69,7 @@ def get_voice_catalog() -> dict[str, Any]:
 @router.get("/llm", response_model=LLMSettingsResponse)
 def get_llm_settings(db: Session = Depends(get_db)):
     """DEPRECATED: 兼容旧版设置读取（内部仍从 stage_configs 聚合）。将在 v2.0 移除。"""
-    cfg_map = get_stage_config_map(db)
-    reason = cfg_map.get("reason", {})
-    recognize = cfg_map.get("recognize", {})
-    speak = cfg_map.get("speak", {})
-    rec_extras = recognize.get("extras") or {}
-    speak_extras = speak.get("extras") or {}
-    rec_runtime = get_stage_config_for_runtime(db, PipelineStage.RECOGNIZE.value)
-    rec_runtime_extras = rec_runtime.get("extras") or {}
-    return LLMSettingsResponse(
-        api_base=reason.get("api_base") or "",
-        model=reason.get("model") or "",
-        max_tokens=reason.get("max_tokens", 4096),
-        context_window=reason.get("context_window", 128000),
-        provider=reason.get("provider") or "",
-        protocol=reason.get("protocol") or "openai_chat",
-        reasoning_effort="medium",
-        supports_vision=reason.get("capabilities", {}).get("supports_vision", True),
-        supports_audio=reason.get("capabilities", {}).get("supports_audio_output", False),
-        stt_model=recognize.get("model") or "",
-        tts_voice=speak_extras.get("tts_voice") or "zh-CN-XiaoxiaoNeural",
-        has_api_key=reason.get("has_api_key", False),
-        speech_recognize_handler=recognize.get("provider") or "local",
-        speech_recognize_mode=rec_extras.get("speech_recognize_mode") or "transcribe",
-        asr_api_base=recognize.get("api_base") or "",
-        asr_model=recognize.get("model") or "",
-        asr_app_id=rec_extras.get("asr_app_id") or "",
-        asr_resource_id=rec_extras.get("asr_resource_id") or "",
-        asr_app_key=rec_extras.get("asr_app_key") or "",
-        has_asr_api_key=recognize.get("has_api_key", False),
-        has_asr_api_secret=bool(rec_runtime_extras.get("asr_api_secret")),
-        has_asr_access_key=bool(rec_runtime_extras.get("asr_access_key")),
-        speech_speak_handler=speak.get("provider") or "edge",
-        speech_speak_mode=speak_extras.get("speech_speak_mode") or "tts_from_text",
-        tts_api_base=speak.get("api_base") or "",
-        tts_model=speak.get("model") or "",
-        has_tts_api_key=speak.get("has_api_key", False),
-        updated_at=reason.get("updated_at"),
-    )
+    return read_legacy_llm_settings(db)
 
 
 @router.put("/llm", response_model=LLMSettingsResponse)
@@ -155,72 +78,7 @@ def update_llm_settings(body: LLMSettingsUpdate, db: Session = Depends(get_db)):
 
     URL 安全校验使用 ``allow_local_llm``，而不是开发环境字符串判断。
     """
-    _safe_base(body.api_base, label="LLM API")
-    _safe_base(body.asr_api_base, label="ASR API")
-    _safe_base(body.tts_api_base, label="TTS API")
-
-    update_stage_config(
-        db,
-        PipelineStage.REASON,
-        StageConfigUpdate(
-            provider=body.provider,
-            api_base=body.api_base,
-            api_key=body.api_key,
-            protocol=body.protocol,
-            model=body.model,
-            max_tokens=body.max_tokens,
-            context_window=body.context_window,
-            capabilities=StageModelCapability(
-                supports_vision=body.supports_vision,
-                supports_audio_output=body.supports_audio,
-            ),
-            fallback=StageFallbackConfig(handler="", mode=""),
-            extras={},
-        ),
-    )
-    update_stage_config(
-        db,
-        PipelineStage.RECOGNIZE,
-        StageConfigUpdate(
-            provider=body.speech_recognize_handler,
-            api_base=body.asr_api_base,
-            api_key=body.asr_api_key,
-            protocol="openai_chat",
-            model=body.asr_model or body.stt_model,
-            max_tokens=4096,
-            context_window=8192,
-            capabilities=StageModelCapability(supports_audio_input=True),
-            fallback=StageFallbackConfig(handler="local", mode="transcribe"),
-            extras={
-                "speech_recognize_mode": body.speech_recognize_mode,
-                "asr_app_id": body.asr_app_id,
-                "asr_api_secret": body.asr_api_secret,
-                "asr_access_key": body.asr_access_key,
-                "asr_resource_id": body.asr_resource_id,
-                "asr_app_key": body.asr_app_key,
-            },
-        ),
-    )
-    update_stage_config(
-        db,
-        PipelineStage.SPEAK,
-        StageConfigUpdate(
-            provider=body.speech_speak_handler,
-            api_base=body.tts_api_base,
-            api_key=body.tts_api_key,
-            protocol="openai_chat",
-            model=body.tts_model,
-            max_tokens=8192,
-            context_window=8192,
-            capabilities=StageModelCapability(supports_audio_output=True),
-            fallback=StageFallbackConfig(handler="edge", mode="tts_from_text"),
-            extras={
-                "speech_speak_mode": body.speech_speak_mode,
-                "tts_voice": body.tts_voice,
-            },
-        ),
-    )
-    return get_llm_settings(db)
+    return write_legacy_llm_settings(db, body)
 
 
 @router.get("/stages", response_model=StageConfigsResponse)
@@ -246,8 +104,8 @@ def update_stage(
     if stage not in (PipelineStage.RECOGNIZE, PipelineStage.REASON, PipelineStage.SPEAK):
         raise_error("A4004")
 
-    _safe_base(body.api_base, label=f"{stage} API")
-    _validate_stage_config(stage, body)
+    safe_base(body.api_base, label=f"{stage} API")
+    validate_stage_config(stage, body)
 
     row = update_stage_config(db, stage, body)
     return StageConfigResponse(**stage_to_response(row))
