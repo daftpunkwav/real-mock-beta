@@ -101,6 +101,7 @@ _test_*.mjs
 .playwright-mcp/
 _backup_pre_fix/
 _color_audit/
+.tmp_head_review/
 _scripts/
 fix-script-entities.ps1
 
