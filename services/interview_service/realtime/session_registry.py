@@ -1,6 +1,10 @@
 """面试 WebSocket 单会话单连接租约注册表。
 
 从 ``ws_handler`` 拆出，避免连接互斥逻辑与回合业务混杂。
+
+部署约束（见 ``docs/deployment-constraints.md``）：
+- 租约表为**进程内** dict，仅单 worker / 单实例聚合部署下保证「同 session 仅一条活跃 WS」。
+- 多 Uvicorn worker 或多实例 + LB 须改用分布式租约（Redis/DB），本模块需替换实现。
 """
 
 from __future__ import annotations

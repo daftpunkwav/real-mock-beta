@@ -26,7 +26,7 @@ import re
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -53,11 +53,15 @@ from shared.core.constants import TRACE_ID_HEADER
 from shared.core.migrate import run_migrations
 from shared.core.security import UnsafeURLError
 from shared.database import engine, init_db, SessionLocal
+from shared.router_mount import include_with_legacy_api_alias
 from shared.services.seed import seed_llm_settings
 
 configure_logging()
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# 三服务纯路由（无前缀）；聚合入口统一挂载 /api/v1 与 /api 兼容别名
+SERVICE_ROUTERS = (api_router, agent_router, interview_router)
 
 
 # ── X-Request-Id 校验 ────────────────────────────────────────
@@ -162,16 +166,7 @@ def create_app() -> FastAPI:
     # ── master key 生产门禁 ────────────────────────────────────────
     _check_secret_key_policy(settings)
 
-    app.include_router(api_router, prefix="/api/v1")
-    app.include_router(agent_router, prefix="/api/v1")
-    app.include_router(interview_router, prefix="/api/v1")
-
-    # /api/* —— 3 个月兼容别名（原 backend 设计滚动期）；前端请使用 /api/v1
-    _legacy = APIRouter()
-    _legacy.include_router(api_router, prefix="/api")
-    _legacy.include_router(agent_router, prefix="/api")
-    _legacy.include_router(interview_router, prefix="/api")
-    app.include_router(_legacy)
+    include_with_legacy_api_alias(app, SERVICE_ROUTERS)
 
     # ── 统一错误响应形状 ────────────────────────────────────────
     app.add_exception_handler(RequestValidationError, on_request_validation)  # type: ignore[arg-type]
