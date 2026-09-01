@@ -20,6 +20,8 @@ def _seed(db, rows: list[PrepSession], resume: Resume | None = None) -> None:
 
 def test_list_prep_sessions_groups_by_resume(db) -> None:
     resume = Resume(filename="Resume_TwoPage.pdf", file_type="pdf")
+    db.add(resume)
+    db.flush()  # 先取自增 id：同库 fixture 下 resume 表可能已有行（如 test_resume_picker 先插入的 cv.pdf），勿硬编码 1
     older = PrepSession(
         resume_id=None,
         messages=json.dumps(
@@ -33,7 +35,7 @@ def test_list_prep_sessions_groups_by_resume(db) -> None:
         token_usage=100,
     )
     newer = PrepSession(
-        resume_id=1,  # resume 自增 id 从 1 开始
+        resume_id=resume.id,  # 用真实自增 id，不能假设从 1 开始
         messages=json.dumps(
             [
                 {"role": "system", "content": "sys"},
