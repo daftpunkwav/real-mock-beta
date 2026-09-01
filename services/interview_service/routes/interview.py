@@ -16,6 +16,7 @@ from shared.core.constants import (
 )
 from shared.core.local_only import require_local_peer
 from shared.core.ratelimit import rate_limit_dep
+from shared.schemas import ResumePickerItem
 from interview_service.routes import sessions, turns
 
 router = APIRouter()
@@ -24,7 +25,7 @@ router.add_api_route(
     "/resumes",
     sessions.list_resume_picker,
     methods=["GET"],
-    response_model=list[sessions.ResumePickerItem],
+    response_model=list[ResumePickerItem],
     dependencies=[Depends(require_local_peer)],
 )
 router.add_api_route(
