@@ -15,12 +15,10 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import httpx
 from sqlalchemy.orm import Session
 
-from shared.config import get_settings
 from shared.core.constants import DEFAULT_LLM_PROTOCOL
 from shared.core.security import (
     UnsafeURLError,
@@ -30,8 +28,13 @@ from shared.capabilities.ai.llm.usage import UsageAccumulator
 
 from .base import _extract_message_text, _is_local_allowed, _require_https
 from .from_db import build_from_db, build_from_stage_config
-from .openai_transport import build_payload, chat_completions, embed_texts
+from .llm_client_ext import embed as _embed
+from .llm_client_ext import test_connection as _test_connection
+from .openai_transport import build_payload, chat_completions
 from .retry_stream import stream_message_round_retry, stream_text_retry
+
+if TYPE_CHECKING:
+    from .unified_client import UnifiedLLMClient
 
 
 class LLMClient:
@@ -258,23 +261,8 @@ class LLMClient:
         return await parse_chat_json(self.chat, messages, temperature, max_tokens)
 
     async def test_connection(self) -> tuple[bool, str]:
-        """测试 API 连通性。"""
-        try:
-            reply = await self.chat(
-                [
-                    {
-                        "role": "system",
-                        "content": "只用纯文字回复，禁止任何 emoji 表情符号。",
-                    },
-                    {"role": "user", "content": "请回复：连接成功"},
-                ],
-                temperature=0,
-            )
-            return True, reply[:100]
-        except httpx.HTTPStatusError as e:
-            return False, f"HTTP {e.response.status_code}: {e.response.text[:200]}"
-        except Exception as e:
-            return False, str(e)
+        """测试 API 连通性（实现见 :mod:`llm_client_ext`）。"""
+        return await _test_connection(self)
 
     async def embed(
         self,
@@ -282,16 +270,8 @@ class LLMClient:
         *,
         model: str | None = None,
     ) -> list[list[float]]:
-        """调用 OpenAI 兼容 /embeddings 端点，返回每段文本的向量。"""
-        base = get_settings().effective_embeddings_base
-        if not is_safe_http_url(base, allow_local=_is_local_allowed(), require_https=_require_https()):
-            raise UnsafeURLError(f"Embeddings api_base 不安全: {base}")
-        return await embed_texts(
-            texts=texts,
-            model=model,
-            api_base=self.api_base,
-            api_key=self.api_key,
-        )
+        """调用 OpenAI 兼容 /embeddings 端点，返回每段文本的向量（实现见 :mod:`llm_client_ext`）。"""
+        return await _embed(self, texts, model=model)
 
     @classmethod
     def from_stage_config(cls, config: dict[str, Any]) -> "LLMClient":

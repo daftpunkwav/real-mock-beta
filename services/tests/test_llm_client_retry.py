@@ -27,8 +27,8 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch, *, allow_local: bool) -> No
     s.effective_embeddings_key = "sk-test"
     s.effective_embeddings_model = "text-embedding-3-small"
     s.is_prod = not allow_local
-    # client 拆包后 get_settings 分布在 llm_client / base / openai_transport 三个子模块
-    monkeypatch.setattr("shared.capabilities.ai.llm.client.llm_client.get_settings", lambda: s)
+    # client 拆包后 get_settings 分布在 llm_client_ext / base / openai_transport 三个子模块
+    monkeypatch.setattr("shared.capabilities.ai.llm.client.llm_client_ext.get_settings", lambda: s)
     monkeypatch.setattr("shared.capabilities.ai.llm.client.base.get_settings", lambda: s)
     monkeypatch.setattr("shared.capabilities.ai.llm.client.openai_transport.get_settings", lambda: s)
 

@@ -1,8 +1,9 @@
 """Mimo / OpenAI 兼容统一客户端：支持 chat completions / anthropic messages / responses。
 
 协议请求体构建在 :mod:`protocol_translate`，响应解析在 :mod:`response_extract`，
-流式执行在 :mod:`streaming`，增量组装器在 :mod:`assemblers`；本模块只保留
-客户端状态、SSRF 检查与调用编排。
+流式执行在 :mod:`streaming`，增量组装器在 :mod:`assemblers`，非流式端点
+（chat / test_connection / chat_message）在 :mod:`chat_endpoints`；本模块只
+保留客户端状态、SSRF 检查、URL+payload 构建与流式编排。
 """
 
 from __future__ import annotations
@@ -11,24 +12,19 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-import httpx
-
-from shared.config import get_settings
 from shared.core.constants import DEFAULT_LLM_PROTOCOL, LLMProtocol
-from shared.core.prompts import strip_emojis
 from shared.core.security import (
     UnsafeURLError,
     is_safe_http_url,
-    make_pinned_async_client,
-    redact_api_key,
 )
 from shared.core.secrets import LegacySecretFormatError, decrypt_secret
 from shared.capabilities.ai.llm.usage import UsageAccumulator
 
 from .base import _is_local_allowed, _require_https
+from .chat_endpoints import chat as _chat
+from .chat_endpoints import chat_message as _chat_message
+from .chat_endpoints import test_connection as _test_connection
 from .protocol_translate import build_request
-from .protocol_utils import _headers
-from .response_extract import extract_reasoning, extract_text, extract_tool_calls
 from .streaming import _StreamOptionsUnsupported, stream_message_round, stream_text_payload
 
 logger = logging.getLogger(__name__)
@@ -114,53 +110,19 @@ class UnifiedLLMClient:
         response_format: dict[str, str] | None = None,
         tools: list[dict[str, Any]] | None = None,
     ) -> str:
-        self._safe_check()
-        url, payload = self._build_url_and_payload(
-            messages, system=system, stream=False, temperature=temperature, response_format=response_format, tools=tools
+        """非流式文本回复（实现见 :mod:`chat_endpoints`）。"""
+        return await _chat(
+            self,
+            messages,
+            system=system,
+            temperature=temperature,
+            response_format=response_format,
+            tools=tools,
         )
-        async with make_pinned_async_client(
-            self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=180.0
-        ) as client:
-            try:
-                resp = await client.post(
-                    url, headers=_headers(self.api_key, self.protocol), json=payload
-                )
-                resp.raise_for_status()
-                data = resp.json()
-            except httpx.HTTPStatusError as e:
-                logger.warning(
-                    "Unified LLM chat 失败: model=%s status=%s key=%s",
-                    self.model,
-                    e.response.status_code,
-                    redact_api_key(self.api_key),
-                )
-                raise
-        self.usage.record_response(data, self.protocol)
-        return extract_text(data, self.protocol)
 
     async def test_connection(self) -> tuple[bool, str]:
-        self._safe_check()
-        url, payload = self._build_url_and_payload(
-            [{"role": "user", "content": "请回复：连接成功"}],
-            system="只用纯文字回复，禁止任何 emoji 表情符号。",
-            stream=False,
-            temperature=0,
-        )
-        async with make_pinned_async_client(
-            self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=60.0
-        ) as client:
-            try:
-                resp = await client.post(
-                    url, headers=_headers(self.api_key, self.protocol), json=payload
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                text = extract_text(data, self.protocol)
-                return True, text[:100]
-            except httpx.HTTPStatusError as e:
-                return False, f"HTTP {e.response.status_code}: {e.response.text[:200]}"
-            except Exception as e:
-                return False, str(e)
+        """测试 API 连通性（实现见 :mod:`chat_endpoints`）。"""
+        return await _test_connection(self)
 
     async def chat_message(
         self,
@@ -171,36 +133,16 @@ class UnifiedLLMClient:
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """返回文本和统一后的 function tool calls。"""
-        self._safe_check()
-        url, payload = self._build_url_and_payload(
+        """返回文本和统一后的 function tool calls（实现见 :mod:`chat_endpoints`）。"""
+        return await _chat_message(
+            self,
             messages,
             system=system,
-            stream=False,
             temperature=temperature,
             response_format=response_format,
             tools=tools,
             tool_choice=tool_choice,
         )
-        async with make_pinned_async_client(
-            self.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=180.0
-        ) as client:
-            resp = await client.post(
-                url, headers=_headers(self.api_key, self.protocol), json=payload
-            )
-            resp.raise_for_status()
-            data = resp.json()
-        self.usage.record_response(data, self.protocol)
-        result: dict[str, Any] = {
-            "role": "assistant",
-            "content": extract_text(data, self.protocol),
-            "tool_calls": extract_tool_calls(data, self.protocol),
-        }
-        # 思考过程仅随 message 回传供展示，不写入消息序列
-        reasoning = extract_reasoning(data, self.protocol)
-        if reasoning.strip():
-            result["reasoning"] = strip_emojis(reasoning)
-        return result
 
     async def chat_message_stream(
         self,

@@ -272,8 +272,8 @@ def test_llm_client_embed_uses_dedicated_embeddings_base(monkeypatch) -> None:
             captured["url"] = url
             return _StubResp()
 
-    # embed 已拆包：URL 校验在 llm_client，请求执行在 openai_transport
-    import shared.capabilities.ai.llm.client.llm_client as llm_mod
+    # embed 已拆包：URL 校验在 llm_client_ext，请求执行在 openai_transport
+    import shared.capabilities.ai.llm.client.llm_client_ext as llm_mod
     import shared.capabilities.ai.llm.client.openai_transport as ot_mod
 
     monkeypatch.setattr(ot_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
@@ -323,8 +323,8 @@ def test_llm_client_embed_falls_back_to_chat_base_when_no_override(monkeypatch) 
             captured["url"] = url
             return _StubResp()
 
-    # embed 已拆包：URL 校验在 llm_client，请求执行在 openai_transport
-    import shared.capabilities.ai.llm.client.llm_client as llm_mod
+    # embed 已拆包：URL 校验在 llm_client_ext，请求执行在 openai_transport
+    import shared.capabilities.ai.llm.client.llm_client_ext as llm_mod
     import shared.capabilities.ai.llm.client.openai_transport as ot_mod
 
     monkeypatch.setattr(ot_mod, "make_pinned_async_client", lambda *a, **kw: _StubClient())
@@ -435,7 +435,7 @@ def test_llm_client_embed_decrypt_failure_fails_closed(monkeypatch, tmp_path) ->
     import asyncio
 
 
-    import shared.capabilities.ai.llm.client.llm_client as llm_mod
+    import shared.capabilities.ai.llm.client.llm_client_ext as llm_mod
     import shared.capabilities.ai.llm.client.openai_transport as ot_mod
     from shared.core import secrets as secrets_mod
     from shared.core.secrets import encrypt_secret
@@ -468,7 +468,7 @@ def test_llm_client_embed_decrypt_failure_fails_closed(monkeypatch, tmp_path) ->
         _, rest = bad.split(":", 1)
         mangled = f"enc:v2:{rest[:-3]}xxx"
         broken_settings = _make_settings(llm_embeddings_key=mangled)
-        # llm_client.embed 与 openai_transport.embed_texts 各自读 settings
+        # llm_client_ext.embed 与 openai_transport.embed_texts 各自读 settings
         monkeypatch.setattr(llm_mod, "get_settings", lambda: broken_settings)
         monkeypatch.setattr(ot_mod, "get_settings", lambda: broken_settings)
 
