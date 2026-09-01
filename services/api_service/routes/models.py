@@ -35,6 +35,7 @@ from api_service.services.model_registry import (
     merge_profile_extras,
     update_binding_record,
 )
+from api_service.services.route_timing import run_timed_stage_test
 from api_service.services.stage_tests import test_recognize, test_reason, test_speak
 
 router = APIRouter(dependencies=[Depends(require_local_peer)])
@@ -60,16 +61,6 @@ def _safe_base(url: str, *, label: str) -> None:
                 + "；请检查后重试，可用「测试」验证连通性"
             ),
         )
-
-
-async def _timed(stage_test) -> dict:
-    """执行阶段测试并附带耗时（毫秒），供前端 toast 展示。"""
-    import time
-
-    start = time.perf_counter()
-    result = await stage_test
-    result["latency_ms"] = int((time.perf_counter() - start) * 1000)
-    return result
 
 
 @router.get("/models")
@@ -240,7 +231,7 @@ async def test_model(model_id: int, db: Session = Depends(get_db)) -> dict:
     """按模型条目声明的能力选择测试管线；不改变当前任务绑定。"""
     profile = get_profile(db, model_id)
     if profile.cap_audio_in:
-        return await _timed(test_recognize(db, profile_id=model_id))
+        return await run_timed_stage_test(test_recognize(db, profile_id=model_id))
     if profile.cap_audio_out:
-        return await _timed(test_speak(db, profile_id=model_id))
-    return await _timed(test_reason(db, profile_id=model_id))
+        return await run_timed_stage_test(test_speak(db, profile_id=model_id))
+    return await run_timed_stage_test(test_reason(db, profile_id=model_id))
