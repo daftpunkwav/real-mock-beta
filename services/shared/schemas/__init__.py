@@ -183,9 +183,6 @@ class CompanyInfo(BaseModel):
     sample_questions: list[str]
 
 
-# ── 候选人档案契约 ──────────────────────────────────────────
-
-
 class CandidateProfile(BaseModel):
     """结构化候选人简历档案。
 
@@ -201,6 +198,15 @@ class CandidateProfile(BaseModel):
     summary: str = ""
 
 
+class ResumePickerItem(BaseModel):
+    """简历下拉只读摘要：prep / interview 配置页共用，不含解析正文与深度评价。"""
+
+    id: int
+    filename: str
+    is_active: bool = False
+    score: int | None = None
+
+
 __all__ = [
     "APIError",
     "CandidateProfile",
@@ -209,6 +215,7 @@ __all__ = [
     "LLMSettingsResponse",
     "LLMSettingsUpdate",
     "LLMTestResponse",
+    "ResumePickerItem",
     "StageConfigResponse",
     "StageConfigUpdate",
     "StageConfigsResponse",

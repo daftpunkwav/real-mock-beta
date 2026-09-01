@@ -9,16 +9,7 @@ from pydantic import BaseModel, Field
 
 from interview_service.constants import DEFAULT_INTERVIEW_STYLE, DEFAULT_PERSONALITY
 from shared.core.constants import MAX_CONFIG_STR_CHARS, MAX_USER_TEXT_CHARS
-from shared.schemas import CompanyInfo
-
-
-class ResumePickerItem(BaseModel):
-    """面试配置页简历下拉：只读摘要，不含解析正文与评价。"""
-
-    id: int
-    filename: str
-    is_active: bool = False
-    score: int | None = None
+from shared.schemas import CompanyInfo, ResumePickerItem
 
 
 # ── 面试配置 ──────────────────────────────────────────
