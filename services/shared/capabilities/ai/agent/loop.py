@@ -3,106 +3,37 @@
 对齐 Pi ``agentLoop`` / DeepSeek Harness 的 step（model request + tools it calls）。
 域工具以 OpenAI tools schema + ``execute`` 回调注册（harness「能力即插件」的精简形态），
 不引入 Cordis、MCP、shell 或子 Agent。
+
+按职责分层：
+- ``loop.py``：主编排 ``run_agent_loop`` 与结果结构；
+- ``llm_round.py``：单轮 LLM 调用（流式优先）与工具结果截断；
+- ``hints.py``：收尾/纠偏提示常量；``halt.py``：``AgentHalt`` 终止信号。
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from shared.capabilities.ai.llm.tool_args import parse_tool_arguments
 
+from .halt import AgentHalt
+from .hints import _DRIFT_HINT, _DRIFT_MAX_CHARS, _WRAP_UP_HINT
+from .llm_round import (
+    ExecuteFn,
+    OnThinkFn,
+    OnToolFn,
+    _call_llm_round,
+    _truncate_tool_result,
+)
+
 logger = logging.getLogger(__name__)
-
-ExecuteFn = Callable[[str, dict[str, Any]], Awaitable[str]]
-OnToolFn = Callable[[str, dict[str, Any], str, str], Awaitable[None] | None]
-OnThinkFn = Callable[[str], Awaitable[None] | None]
-
-MAX_TOOL_RESULT_CHARS = 8_000
-
-
-class AgentHalt(Exception):
-    """工具要求立即终止循环（如 ask_user 等待用户输入）。
-
-    message 会作为该工具的 observation 写回消息序列，
-    保证 assistant.tool_calls 与 tool 结果一一对应。
-    """
-
-    def __init__(self, observation: str = ""):
-        super().__init__(observation or "agent halted by tool")
-        self.observation = observation or "agent halted by tool"
-
-
-# 预算感知提示（对齐终端类 Agent 的收尾 nudge）：仅在最后一轮注入本次调用，
-# 不写入 working——保证轮次耗尽前模型有机会收尾，而不是被硬截断。
-_WRAP_UP_HINT = {
-    "role": "system",
-    "content": (
-        "这是最后一轮工具调用机会：若信息已足够，请直接给出面向用户的完整回答，"
-        "不要再调用工具；若仍缺关键信息，只调用最必要的一个工具。"
-    ),
-}
-
-# 行动旁白纠偏提示（一次性，drift_retry=True 时启用）：模型尚未调用任何工具
-# 就输出「我去搜一下…」式的短旁白即收尾——用户什么实际内容都没收到。注入
-# 一次性纠偏提示重试一轮；模型坚持只给短旁白则按最终回答接受（有界，不死循环）。
-_DRIFT_HINT = {
-    "role": "system",
-    "content": (
-        "系统提示：你上一条消息宣布了要执行的操作，但没有调用任何工具，"
-        "用户没有收到任何实际内容。请立即调用对应工具；若确实无需工具，"
-        "直接给出面向用户的完整回答。"
-    ),
-}
-# 短于此长度的无工具首轮正文视为行动旁白（完整辅导回答几乎不会这么短）
-_DRIFT_MAX_CHARS = 200
 
 
 def _join_thinking(parts: list[str]) -> str:
     return "\n\n".join(p.strip() for p in parts if p and p.strip())
-
-
-async def _call_llm_round(
-    llm: Any,
-    call_messages: list[dict[str, Any]],
-    *,
-    temperature: float,
-    tools: list[dict[str, Any]] | None,
-    emit_thinking: "OnThinkFn",
-) -> dict[str, Any]:
-    """一轮模型调用：优先流式（reasoning 增量实时回调），不支持时回落非流式。
-
-    流式路径正文/工具调用由客户端组装成与非流式 ``chat_message`` 同构的
-    message 事件返回；reasoning 增量已实时回调，不再重复取 ``reasoning`` 键。
-    """
-    streamer = getattr(llm, "chat_message_stream", None)
-    if streamer is None:
-        return await llm.chat_message(call_messages, temperature=temperature, tools=tools)
-    try:
-        msg: dict[str, Any] | None = None
-        async for event in streamer(call_messages, temperature=temperature, tools=tools):
-            etype = event.get("type")
-            if etype == "reasoning":
-                await emit_thinking(str(event.get("text") or ""))
-            elif etype == "message":
-                candidate = event.get("message")
-                if isinstance(candidate, dict):
-                    msg = candidate
-        if msg is not None:
-            return msg
-        logger.warning("Agent 流式轮次未返回 message，回落非流式")
-    except NotImplementedError:
-        logger.info("LLM 不支持流式工具轮，回落非流式: %s", type(llm).__name__)
-    return await llm.chat_message(call_messages, temperature=temperature, tools=tools)
-
-
-def _truncate_tool_result(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
-    if len(text) <= limit:
-        return text
-    return text[: limit - 20] + "\n…[truncated]"
 
 
 @dataclass
