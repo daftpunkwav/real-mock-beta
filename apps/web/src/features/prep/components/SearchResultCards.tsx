@@ -2,6 +2,7 @@
 
 import { memo, useState } from "react";
 import { ChevronRight, ExternalLink, Search } from "lucide-react";
+import { safeAbsoluteHttpUrl } from "@/components/markdownSafeUrl";
 import type { PrepSearchGroup } from "@/types";
 
 function hostOf(url: string): string {
@@ -10,19 +11,6 @@ function hostOf(url: string): string {
   } catch {
     return url;
   }
-}
-
-/** 仅允许 http(s) 链接,防止 javascript:/data: 等危险协议。 */
-function safeHttpUrl(url: string): string | null {
-  try {
-    const u = new URL(url);
-    if (u.protocol === "http:" || u.protocol === "https:") {
-      return u.toString();
-    }
-  } catch {
-    /* invalid */
-  }
-  return null;
 }
 
 /** 面试准备:可点击打开原文的搜索结果卡片;默认收起,不抢占正文阅读区。 */
@@ -71,7 +59,7 @@ export const SearchResultCards = memo(function SearchResultCards({
               ) : null}
               <ul className="space-y-1.5">
                 {group.results.map((hit) => {
-                  const href = safeHttpUrl(hit.url);
+                  const href = safeAbsoluteHttpUrl(hit.url);
                   const inner = (
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
