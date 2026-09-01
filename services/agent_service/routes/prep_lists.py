@@ -12,23 +12,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from agent_service.models import PrepSession
-from agent_service.schemas import ResumePickerItem
 from shared.database import get_db
 from shared.models import Resume
+from shared.services.resume_picker import list_resume_picker_items
 
 
 def list_resume_picker(db: Session = Depends(get_db)):
     """准备页下拉用的简历摘要；不返回解析正文与深度评价。"""
-    rows = db.query(Resume).order_by(Resume.created_at.desc()).all()
-    return [
-        ResumePickerItem(
-            id=r.id,
-            filename=r.filename,
-            is_active=bool(r.is_active),
-            score=r.score,
-        )
-        for r in rows
-    ]
+    return list_resume_picker_items(db)
 
 
 def list_prep_sessions(db: Session = Depends(get_db)):

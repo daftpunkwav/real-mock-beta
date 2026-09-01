@@ -27,9 +27,9 @@ from interview_service.schemas import (
     ChatMessage,
     InterviewConfig,
     InterviewSessionResponse,
-    ResumePickerItem,
 )
-from shared.models import Resume
+from shared.services.resume_picker import list_resume_picker_items
+
 
 # 强类型 ChatMessage 列表校验（防御存储层历史脏数据）
 _CHAT_MSG_ADAPTER: TypeAdapter[list[ChatMessage]] = TypeAdapter(list[ChatMessage])
@@ -37,16 +37,7 @@ _CHAT_MSG_ADAPTER: TypeAdapter[list[ChatMessage]] = TypeAdapter(list[ChatMessage
 
 def list_resume_picker(db: Session = Depends(get_db)):
     """配置页下拉用的简历摘要；不返回解析正文与深度评价。"""
-    rows = db.query(Resume).order_by(Resume.created_at.desc()).all()
-    return [
-        ResumePickerItem(
-            id=r.id,
-            filename=r.filename,
-            is_active=bool(r.is_active),
-            score=r.score,
-        )
-        for r in rows
-    ]
+    return list_resume_picker_items(db)
 
 
 def create_session(
