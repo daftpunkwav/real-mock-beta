@@ -1,29 +1,24 @@
 "use client";
 
-/** 面试配置页：表单 + 处理器卡 + 右侧预览；default export 维持本页。 */
+/** 面试配置页：状态与数据加载 + 页面组装；大块 JSX 在 features/interview/setup/。 */
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { interviewService as api } from "@/lib/api/interviewService";
 import { apiService } from "@/lib/api/apiService";
 import { toast } from "@/components/Toast";
-import { Play, Sparkles } from "lucide-react";
+import { Play } from "lucide-react";
 import { LoadError } from "@/components/LoadError";
 import type {
   ModelProfile,
-  ReasoningEffort,
   Options,
+  ReasoningEffort,
   ResumePickerItem,
   TaskBindings,
 } from "@/types";
 import type { InterviewConfig } from "@/types/interview";
-import {
-  ChoiceGroup,
-  CompanyGrid,
-  ResumeWarning,
-  Select,
-} from "@/features/interview/setup/controls";
-import { ProcessorCard, ResumeSelect, strictnessLabel } from "@/features/interview/setup/form";
+import { SetupFields } from "@/features/interview/setup/fields";
+import { SetupHeader, SetupLoading, SetupMain } from "@/features/interview/setup/shell";
 import { InterviewPreview } from "@/features/interview/setup/preview";
 
 export default function InterviewSetupPage() {
@@ -126,145 +121,41 @@ export default function InterviewSetupPage() {
 
   return (
     <div className="page-shell flex h-full flex-col overflow-hidden !py-4 sm:!py-5 anim-rise">
-      <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
-        <div className="page-header !mb-0 min-w-0">
-          <div className="flex items-start gap-3">
-            <span className="icon-badge icon-badge-brand shrink-0">
-              <Sparkles size={18} strokeWidth={1.75} />
-            </span>
-            <div className="min-w-0">
-              <p className="page-eyebrow">Mock Setup</p>
-              <h1 className="page-title !text-[20px]">配置模拟面试</h1>
-              <p className="page-desc !text-xs">定制你的专属面试体验</p>
-            </div>
-          </div>
-        </div>
-        <div className="hidden sm:block">
-          {!loading && !loadError && options ? startButton(false) : null}
-        </div>
-      </div>
-
+      <SetupHeader action={!loading && !loadError && options ? startButton(false) : undefined} />
       {loading ? (
-        <div className="flex flex-1 items-center justify-center gap-2 text-[13px] text-ink-muted">
-          <span className="block h-4 w-4 anim-spin rounded-full border-2 border-current border-t-transparent" />
-          加载配置中…
-        </div>
+        <SetupLoading />
       ) : loadError ? (
         <LoadError message={loadError} onRetry={loadData} />
       ) : options ? (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[1fr_260px]">
-          {/* 左侧配置 */}
-          <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pb-2 pr-0.5">
-            <div className="surface-card p-3.5">
-              <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-                <Select label="目标岗位" value={config.role} options={options.roles} onChange={(v) => set({ role: v })} />
-                <Select label="职级" value={config.level} options={options.levels} onChange={(v) => set({ level: v })} />
-                <Select
-                  label="面试类型"
-                  value={config.workflow_type}
-                  options={options.workflow_types.map((w) => w.id)}
-                  labels={options.workflow_types.map((w) => w.name)}
-                  onChange={(v) => set({ workflow_type: v })}
-                />
-                <Select
-                  label="面试风格"
-                  value={config.interview_style}
-                  options={options.interview_styles.map((s) => s.id)}
-                  labels={options.interview_styles.map((s) => s.name)}
-                  onChange={(v) => set({ interview_style: v as import("@/types").InterviewStyleId })}
-                />
-              </div>
-            </div>
-
-            <div className="surface-card p-3.5">
-              <label className="field-label !mb-2 !text-xs">目标公司</label>
-              <CompanyGrid value={config.company} companies={options.companies} onChange={(v) => set({ company: v })} />
-            </div>
-
-            <div className="surface-card p-3.5">
-              <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-[1fr_auto]">
-                <ChoiceGroup
-                  label="面试官性格"
-                  value={config.personality}
-                  options={options.personalities}
-                  onChange={(v) => set({ personality: v })}
-                />
-                <div className="lg:w-48">
-                  <label className="field-label !mb-2 !text-xs">
-                    严厉 {config.strictness}/10 · {strictnessLabel(config.strictness)}
-                  </label>
-                  <input
-                    type="range"
-                    min={1}
-                    max={10}
-                    value={config.strictness}
-                    onChange={(e) => set({ strictness: Number(e.target.value) })}
-                    className="h-2 w-full accent-[var(--primary)]"
-                  />
+        <SetupMain
+          left={
+            <SetupFields
+              options={options}
+              config={config}
+              resumes={resumes}
+              creating={creating}
+              chatModels={chatModels}
+              sttModels={sttModels}
+              ttsModels={ttsModels}
+              chatModelId={chatModelId}
+              sttModelId={sttModelId}
+              ttsModelId={ttsModelId}
+              effort={effort}
+              defaultBindings={defaultBindings}
+              onConfig={set}
+              setChatModelId={setChatModelId}
+              setSttModelId={setSttModelId}
+              setTtsModelId={setTtsModelId}
+              setEffort={setEffort}
+              footer={
+                <div className="sticky bottom-0 shrink-0 bg-[var(--background)]/90 pb-1 pt-1 backdrop-blur-sm sm:hidden">
+                  {startButton(true)}
                 </div>
-              </div>
-            </div>
-
-            <div className="surface-card p-3.5">
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                {options.avatars && options.avatars.length > 0 && (
-                  <Select
-                    label="面试官形象"
-                    value={config.avatar_id || "professional_male"}
-                    options={options.avatars.map((a) => a.id)}
-                    labels={options.avatars.map((a) => {
-                      const voiceName =
-                        options.tts_voices?.find((v) => v.id === a.voice)?.name || a.voice;
-                      return voiceName ? `${a.name}(匹配:${voiceName})` : a.name;
-                    })}
-                    onChange={(v) => set({ avatar_id: v })}
-                  />
-                )}
-                {options.scenes && options.scenes.length > 0 && (
-                  <Select
-                    label="面试场景"
-                    value={config.scene_id || "meeting_room"}
-                    options={options.scenes.map((s) => s.id)}
-                    labels={options.scenes.map((s) => s.name)}
-                    onChange={(v) => set({ scene_id: v })}
-                  />
-                )}
-                {resumes.length > 0 ? (
-                  <ResumeSelect resumes={resumes} value={config.resume_id ?? null} onChange={(v) => set({ resume_id: v })} />
-                ) : (
-                  <ResumeWarning />
-                )}
-
-                {/* AI 处理器与思考强度(缺省回落系统默认绑定) */}
-                <ProcessorCard
-                  chatModels={chatModels}
-                  sttModels={sttModels}
-                  ttsModels={ttsModels}
-                  chatModelId={chatModelId}
-                  sttModelId={sttModelId}
-                  ttsModelId={ttsModelId}
-                  effort={effort}
-                  setChatModelId={setChatModelId}
-                  setSttModelId={setSttModelId}
-                  setTtsModelId={setTtsModelId}
-                  setEffort={setEffort}
-                  defaultBindings={defaultBindings}
-                  disabled={creating}
-                />
-              </div>
-            </div>
-
-            {/* 小屏底部开始按钮 */}
-            <div className="sticky bottom-0 shrink-0 bg-[var(--background)]/90 pb-1 pt-1 backdrop-blur-sm sm:hidden">
-              {startButton(true)}
-            </div>
-          </div>
-
-          {/* 右侧摘要(大屏) */}
-          <div className="hidden min-h-0 flex-col gap-2.5 overflow-hidden lg:flex">
-            <InterviewPreview options={options} config={config} resumes={resumes} />
-          </div>
-        </div>
+              }
+            />
+          }
+          preview={<InterviewPreview options={options} config={config} resumes={resumes} />}
+        />
       ) : null}
     </div>
   );
