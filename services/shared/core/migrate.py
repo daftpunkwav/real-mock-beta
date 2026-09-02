@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 logger = logging.getLogger(__name__)
 
 # 与 alembic/versions 中 revision id 对齐
-ALEMBIC_HEAD_REVISION = "20260901_0002"
+ALEMBIC_HEAD_REVISION = "20260901_0004"
 
 # table -> [ALTER 语句列表]
 MIGRATIONS: dict[str, list[str]] = {
@@ -115,6 +115,11 @@ def _column_name_from_stmt(stmt: str) -> str | None:
 
 def apply_column_migrations(engine: Engine) -> dict[str, list[str]]:
     """幂等补齐缺失列。返回 ``{table: [applied_sql, ...]}``。"""
+    backend = engine.url.get_backend_name()
+    if backend != "sqlite":
+        logger.info("非 SQLite 数据库(%s)，跳过列级 ALTER 迁移，依赖 Alembic", backend)
+        return {}
+
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
     applied: dict[str, list[str]] = {}
@@ -196,12 +201,24 @@ def stamp_alembic_head(engine: Engine, revision: str = ALEMBIC_HEAD_REVISION) ->
 
 
 def run_migrations(engine: Engine) -> dict[str, list[str]]:
-    """启动入口：列补全 + Alembic 版本戳。"""
+    """启动入口：列补全 + Alembic 版本戳（单库）。"""
     applied = apply_column_migrations(engine)
     try:
         stamp_alembic_head(engine)
     except Exception:
         logger.exception("写入 alembic_version 失败（列迁移已完成）")
+    return applied
+
+
+def run_migrations_all() -> dict[str, list[str]]:
+    """对 api / sessions 双库执行列级迁移与 Alembic stamp。"""
+    from shared.database import get_api_engine, get_sessions_engine
+
+    applied: dict[str, list[str]] = {}
+    for label, eng in (("api", get_api_engine()), ("sessions", get_sessions_engine())):
+        part = run_migrations(eng)
+        if part:
+            applied[label] = [f"{t}:{len(v)}" for t, v in part.items()]
     return applied
 
 

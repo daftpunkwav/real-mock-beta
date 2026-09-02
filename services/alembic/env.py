@@ -13,7 +13,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from shared.config import get_settings
-from shared.database import Base
+from shared.database import ApiBase, SessionsBase
 
 # 确保三服务全部模型注册到 metadata（共享库单库聚合）
 import shared.models  # noqa: F401
@@ -24,11 +24,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Base.metadata
+target_metadata = ApiBase.metadata
 
 
 def get_url() -> str:
-    return get_settings().database_url
+    return get_settings().api_database_url
 
 
 def run_migrations_offline() -> None:

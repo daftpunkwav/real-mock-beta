@@ -3,6 +3,7 @@
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,8 +46,10 @@ class Settings(BaseSettings):
     # StepFun 后端专用：若已存在 StepFun vector_store，直接复用 ID；留空则启动时自动创建。
     stepfun_vector_store_id: str | None = None
 
-    # 服务
-    database_url: str = f"sqlite:///{SHARED_ROOT / 'data' / 'app.db'}"
+    # 数据库（双 SQLite 文件；legacy ``database_url`` 仍映射到 sessions 库）
+    api_database_url: str = f"sqlite:///{SHARED_ROOT / 'data' / 'api.db'}"
+    sessions_database_url: str = f"sqlite:///{SHARED_ROOT / 'data' / 'sessions.db'}"
+    database_url: str = f"sqlite:///{SHARED_ROOT / 'data' / 'sessions.db'}"
     upload_dir: str = str(SHARED_ROOT / "uploads")
     cors_origins: str = Field(
         # 端口规划（经 .env 配置，默认值仅本机兜底）：
@@ -77,8 +80,14 @@ class Settings(BaseSettings):
     # LLM 调用：是否允许本机/私网 base_url。生产必须为 False。
     allow_local_llm: bool = Field(default=False)
 
+    # WS 租约：memory=进程内 dict（默认，单 worker）；database=DB 表（多 worker 可见）
+    ws_lease_backend: Literal["memory", "database"] = "memory"
+
     # 限流：可信任的反向代理 CIDR 列表（逗号分隔）；空表示仅 request.client.host。
     trusted_proxy_cidrs: str = Field(default="")
+
+    # 限流后端：memory=进程内；database=共享表（多 worker 一致）
+    ratelimit_backend: Literal["memory", "database"] = "memory"
 
     # Cookie Secure：None=自动（https 或可信代理 X-Forwarded-Proto=https）
     cookie_secure: bool | None = Field(default=None)
@@ -117,6 +126,13 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate_cross_fields(self) -> "Settings":
         """跨字段配置校验。"""
+        # legacy DATABASE_URL：若显式设置且与默认 sessions 路径不同，同步到 sessions 库
+        import os
+
+        legacy = os.environ.get("DATABASE_URL")
+        if legacy and legacy != self.sessions_database_url:
+            object.__setattr__(self, "sessions_database_url", legacy)
+            object.__setattr__(self, "database_url", legacy)
         if self.is_prod and self.allow_local_llm:
             raise ValueError("生产环境 (env=prod) 不允许 allow_local_llm=True")
         if self.rag_backend == RAGBackendKind.STEPFUN and not self.stepfun_vector_store_id:
