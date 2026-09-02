@@ -68,12 +68,12 @@ async def stream_message_round_retry(
                             payload.pop("stream_options", None)
                             if attempt < max_retries:
                                 continue
-                    resp.raise_for_status()
+                    # 先判 429/5xx 重试，再统一 raise_for_status——4xx 不重试、
+                    # 429/5xx 在重试耗尽时才抛出（与 base._retry_request 语义一致）
                     if resp.status_code == 429 or resp.status_code >= 500:
                         if attempt < max_retries:
                             await asyncio.sleep(backoff * (2**attempt))
                             continue
-                        resp.raise_for_status()
                     resp.raise_for_status()
                     async for line in resp.aiter_lines():
                         if not line.startswith("data: "):
@@ -137,7 +137,7 @@ async def stream_text_retry(
                             payload.pop("stream_options", None)
                             if attempt < max_retries:
                                 continue
-                    resp.raise_for_status()
+                    # 先判 429/5xx 重试，再统一 raise_for_status（同 stream_message_round_retry）
                     if resp.status_code == 429 or resp.status_code >= 500:
                         last_exc = httpx.HTTPStatusError(
                             f"transient {resp.status_code}",
@@ -147,7 +147,7 @@ async def stream_text_retry(
                         if attempt < max_retries:
                             await asyncio.sleep(backoff * (2**attempt))
                             continue
-                        resp.raise_for_status()
+                        raise last_exc
                     resp.raise_for_status()
                     async for line in resp.aiter_lines():
                         if not line.startswith("data: "):

@@ -173,3 +173,124 @@ def test_anthropic_round_assembler_thinking_and_tool_use() -> None:
     assert msg["tool_calls"] == [
         {"id": "t1", "type": "function", "function": {"name": "lookup", "arguments": '{"q": "x"}'}}
     ]
+
+
+# ── 流式 429/5xx 重试（retry_stream：raise_for_status 须在重试判断之后）──────
+
+
+def _stream_http_client(status_sequence):
+    """构造按次序返回不同响应的 mock http client（c.stream 上下文）。"""
+    http_client = MagicMock()
+    calls = {"n": 0}
+
+    def _ok_resp(lines):
+        resp = MagicMock(spec=httpx.Response)
+        resp.status_code = 200
+        resp.request = MagicMock()
+        resp.raise_for_status = MagicMock()
+
+        def _aiter_lines():
+            async def _gen():
+                for line in lines:
+                    yield line
+            return _gen()
+
+        resp.aiter_lines = _aiter_lines
+        return resp
+
+    def _err_resp(status: int):
+        resp = MagicMock(spec=httpx.Response)
+        resp.status_code = status
+        resp.request = MagicMock()
+        # aread 供 400/422 stream_options 检测分支读取 body；空 body 不含该字段
+        resp.aread = AsyncMock(return_value=b"{}")
+        resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            str(status), request=MagicMock(), response=resp
+        )
+        return resp
+
+    def _stream(*args, **kwargs):
+        idx = calls["n"]
+        calls["n"] += 1
+        item = status_sequence[min(idx, len(status_sequence) - 1)]
+        ctx = MagicMock()
+        if isinstance(item, int):
+            ctx.__aenter__ = AsyncMock(return_value=_err_resp(item))
+        else:
+            ctx.__aenter__ = AsyncMock(return_value=_ok_resp(item))
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        return ctx
+
+    http_client.stream = _stream
+    http_client.calls = calls
+    return http_client
+
+
+def _patch_retry_stream_env(monkeypatch: pytest.MonkeyPatch, http_client) -> None:
+    _patch_settings(monkeypatch, allow_local=False)
+    monkeypatch.setattr(
+        "shared.capabilities.ai.llm.client.llm_client.is_safe_http_url",
+        lambda *a, **kw: True,
+    )
+    sleeper = AsyncMock()
+
+    async def _no_sleep(_seconds):
+        return None
+
+    sleeper.side_effect = _no_sleep
+    monkeypatch.setattr("shared.capabilities.ai.llm.client.retry_stream.asyncio.sleep", sleeper)
+    return sleeper
+
+
+@pytest.mark.asyncio
+async def test_chat_message_stream_429_retries_then_emits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """流式工具轮 429：未产出增量前指数退避重试，第二次成功。"""
+    client = _make_client(monkeypatch, allow_local=False)
+    http_client = _stream_http_client([429, ['data: {"choices":[{"delta":{"content":"hi"}}]}', "data: [DONE]"]])
+    _patch_retry_stream_env(monkeypatch, http_client)
+
+    with patch("shared.capabilities.ai.llm.client.retry_stream.make_pinned_async_client") as ac:
+        ac.return_value.__aenter__.return_value = http_client
+        ac.return_value.__aexit__.return_value = False
+        events = []
+        async for ev in client.chat_message_stream([{"role": "user", "content": "hi"}]):
+            events.append(ev)
+
+    assert http_client.calls["n"] == 2
+    final = [e for e in events if e.get("type") == "message"]
+    assert final and final[0]["message"]["content"] == "hi"
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_429_retries_then_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+    """流式文本 429：未产出 token 前重试，第二次吐正文。"""
+    client = _make_client(monkeypatch, allow_local=False)
+    http_client = _stream_http_client([429, ['data: {"choices":[{"delta":{"content":"hi"}}]}', "data: [DONE]"]])
+    _patch_retry_stream_env(monkeypatch, http_client)
+
+    with patch("shared.capabilities.ai.llm.client.retry_stream.make_pinned_async_client") as ac:
+        ac.return_value.__aenter__.return_value = http_client
+        ac.return_value.__aexit__.return_value = False
+        tokens = []
+        async for tok in client.chat_stream([{"role": "user", "content": "hi"}]):
+            tokens.append(tok)
+
+    assert http_client.calls["n"] == 2
+    assert "".join(tokens) == "hi"
+
+
+@pytest.mark.asyncio
+async def test_chat_message_stream_4xx_no_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """流式 4xx：不重试，直接抛出。"""
+    client = _make_client(monkeypatch, allow_local=False)
+    http_client = _stream_http_client([400])
+    _patch_retry_stream_env(monkeypatch, http_client)
+
+    with patch("shared.capabilities.ai.llm.client.retry_stream.make_pinned_async_client") as ac:
+        ac.return_value.__aenter__.return_value = http_client
+        ac.return_value.__aexit__.return_value = False
+        with pytest.raises(httpx.HTTPStatusError):
+            async for _ in client.chat_message_stream([{"role": "user", "content": "hi"}]):
+                pass
+
+    assert http_client.calls["n"] == 1
