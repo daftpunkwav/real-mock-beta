@@ -1,36 +1,30 @@
-"""模拟面试服务启动钩子。
-
-- ``startup``：聚合建表/迁移（过渡期经 shared.init_db）+ 企业知识库 RAG
-  索引构建（rag 唯一运行时消费者是本服务的面试引擎，索引归本服务拥有）。
-"""
+"""模拟面试服务启动钩子。"""
 
 from __future__ import annotations
 
 import logging
 
-from shared.database import init_db, SessionLocal
-from shared.core.migrate import run_migrations
-from shared.database import engine
+from shared.database import ApiSessionLocal
+from shared.services.db_bootstrap import bootstrap_databases_and_seed
 
 logger = logging.getLogger(__name__)
 
 
 def startup() -> None:
-    """同步初始化：建表 + 迁移 + 企业知识库 RAG 索引。"""
-    init_db()
-    run_migrations(engine)
+    bootstrap_databases_and_seed()
 
 
 async def ensure_rag_index() -> None:
-    """首次启动构建企业知识库 RAG 索引（失败不阻断启动）。
+    """首次启动构建企业知识库 RAG 索引（失败不阻断启动）。"""
+    import os
 
-    LLM 未配置或没有 API Key 时安全跳过。
-    """
+    if os.environ.get("TEST_MODE") == "1":
+        return
     try:
         from shared.capabilities.ai.llm.client import LLMClient
         from interview_service.capabilities.rag.company_rag import CompanyKnowledgeRAG
 
-        db = SessionLocal()
+        db = ApiSessionLocal()
         try:
             llm = LLMClient.from_db(db)
             api_key = getattr(llm, "api_key", None)
@@ -43,6 +37,6 @@ async def ensure_rag_index() -> None:
             try:
                 db.close()
             except Exception:
-                pass
+                logger.debug("RAG 启动 ApiSessionLocal close 失败", exc_info=True)
     except Exception as e:
         logger.warning("RAG 索引构建失败（启动继续）: %s", e)

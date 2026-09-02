@@ -11,7 +11,7 @@ from interview_service.models import InterviewSession
 from interview_service.services.interview.report import generate_and_persist_report
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,11 @@ class ReportSchedulerMixin:
                         overall_score=session.overall_score,
                     )
                 except Exception:
-                    pass
+                    logger.debug(
+                        "报告已完成通知发送失败 sid=%s",
+                        self.ctx.session_id,
+                        exc_info=True,
+                    )
                 return
             await generate_and_persist_report(session, self.ctx.llm, db)
             try:
@@ -60,8 +64,11 @@ class ReportSchedulerMixin:
                     overall_score=session.overall_score,
                 )
             except Exception:
-                pass
-        except Exception as e:
+                logger.debug(
+                    "报告生成完成通知发送失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
             logger.exception(
                 "后台报告生成失败 sid=%s: %s", self.ctx.session_id, e
             )
@@ -73,8 +80,11 @@ class ReportSchedulerMixin:
                     retryable=True,
                 )
             except Exception:
-                pass
-        finally:
+                logger.debug(
+                    "报告失败 error 事件发送失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
             try:
                 db.close()
             except Exception:

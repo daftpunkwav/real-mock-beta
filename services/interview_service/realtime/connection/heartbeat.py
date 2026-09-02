@@ -6,8 +6,10 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
+from interview_service.realtime.core.session_registry import verify_connection_lease
+
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,20 @@ class HeartbeatMixin:
         """
         miss_count = 0
         while not self.ctx.superseded:
+            if not await verify_connection_lease(self):
+                try:
+                    await self.send(
+                        "error",
+                        message="该面试已在其他窗口打开，当前连接已失效",
+                        code="B2003",
+                    )
+                except Exception:
+                    logger.debug(
+                        "租约失效通知发送失败 session=%s",
+                        self.ctx.session_id,
+                        exc_info=True,
+                    )
+                return None
             try:
                 data = await asyncio.wait_for(
                     self.ctx.ws.receive_json(),
@@ -52,9 +68,19 @@ class HeartbeatMixin:
                 try:
                     await self.send("server_ping", t=int(asyncio.get_event_loop().time() * 1000))
                 except Exception:
+                    logger.debug(
+                        "心跳 server_ping 发送失败 session=%s",
+                        self.ctx.session_id,
+                        exc_info=True,
+                    )
                     return None
                 continue
             except Exception:
+                logger.debug(
+                    "WS 收包异常 session=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
                 return None
             if self.ctx.superseded:
                 return None

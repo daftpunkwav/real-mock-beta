@@ -21,7 +21,6 @@ from shared.capabilities.voice.tts.edge import (
 from shared.capabilities.voice.tts.voice_resolve import VoiceProsody, with_emotion
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 class _SentenceTTSQueue:
@@ -36,7 +35,7 @@ class _SentenceTTSQueue:
         self._worker_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
         self._dropped_count = 0
-        self._prosody: VoiceProsody = VoiceProsody(voice=settings.tts_voice)
+        self._prosody: VoiceProsody = VoiceProsody(voice=get_settings().tts_voice)
         self._fail_count = 0
         self._on_sent: Any = None
         # 打断世代：clear 后旧合成结果不再发出
@@ -150,7 +149,11 @@ class _SentenceTTSQueue:
                                     retryable=True,
                                 )
                             except Exception:
-                                pass
+                                logger.debug(
+                                    "TTS 错误事件发送失败 voice=%s",
+                                    p.voice,
+                                    exc_info=True,
+                                )
                         continue
                     if gen != self._speak_gen:
                         continue
@@ -168,7 +171,10 @@ class _SentenceTTSQueue:
                                 message="语音合成返回空音频，请检查网络或改用文字作答",
                             )
                         except Exception:
-                            pass
+                            logger.debug(
+                                "tts_failed 事件发送失败",
+                                exc_info=True,
+                            )
             finally:
                 self._queue.task_done()
 
