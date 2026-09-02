@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { interviewService as api } from "@/lib/api/interviewService";
-import type { InterviewSession } from "@/types";
+import { interviewHttp as api } from "@/lib/api/clients";
+import type { InterviewSession } from "@/lib/api/contract";
 
 /** 记录页加载域：sessions + 默认选中 + stats + LoadError 重试。 */
 export function useHistoryPage() {

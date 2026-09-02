@@ -4,19 +4,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { interviewService as api } from "@/lib/api/interviewService";
-import { apiService } from "@/lib/api/apiService";
+import { interviewHttp as api, profileHttp } from "@/lib/api/clients";
 import { toast } from "@/components/Toast";
 import { Play } from "lucide-react";
 import { LoadError } from "@/components/LoadError";
+import type { InterviewConfig, Options, ResumePickerItem } from "@/lib/api/contract";
 import type {
   ModelProfile,
-  Options,
   ReasoningEffort,
-  ResumePickerItem,
   TaskBindings,
 } from "@/types";
-import type { InterviewConfig } from "@/types/interview";
 import { SetupFields } from "@/features/interview/setup/fields";
 import { SetupHeader, SetupLoading, SetupMain } from "@/features/interview/setup/shell";
 import { InterviewPreview } from "@/features/interview/setup/preview";
@@ -72,7 +69,7 @@ export default function InterviewSetupPage() {
 
   // 处理器选择数据:按能力位分桶(缺省回落各任务的默认绑定)；加载失败不阻塞主流程
   useEffect(() => {
-    apiService
+    profileHttp
       .listModelOptions()
       .then((res) => {
         const list = Array.isArray(res?.models) ? res.models : [];
@@ -81,7 +78,7 @@ export default function InterviewSetupPage() {
         setTtsModels(list.filter((m) => m.capabilities?.audio_output));
       })
       .catch(() => {});
-    apiService.getBindings().then(setDefaultBindings).catch(() => {});
+    profileHttp.getBindings().then(setDefaultBindings).catch(() => {});
   }, []);
 
   const set = (patch: Partial<InterviewConfig>) => setConfig((c) => ({ ...c, ...patch }));

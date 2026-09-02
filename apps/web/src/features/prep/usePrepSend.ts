@@ -3,7 +3,7 @@
 /** prep 发送：流式消息、插话排队、快捷提问。 */
 
 import { useRef, type MutableRefObject } from "react";
-import { agentService as api } from "@/lib/api/agentService";
+import { prepCoachHttp as api } from "@/lib/api/clients";
 import type { ModelProfile, PrepUsageStats, ReasoningEffort } from "@/types";
 import type { PrepChatMessage, PrepStreamHandlers } from "./types";
 

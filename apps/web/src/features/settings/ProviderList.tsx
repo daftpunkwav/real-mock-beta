@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { ChevronRight, Plus } from "lucide-react";
-import { apiService } from "@/lib/api/apiService";
+import { profileHttp } from "@/lib/api/clients";
 import { toast } from "@/components/Toast";
 import type { ProviderWithModels } from "@/types";
 
@@ -23,7 +23,7 @@ export function ProviderList({
 
   const create = async () => {
     try {
-      await apiService.createProvider({ name: newProviderName.trim() });
+      await profileHttp.createProvider({ name: newProviderName.trim() });
       setNewProviderName("");
       await onChanged();
     } catch (e) {

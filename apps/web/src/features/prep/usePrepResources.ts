@@ -3,8 +3,9 @@
 /** prep 侧栏资源：简历列表、会话列表、场景模型选择器数据。 */
 
 import { useCallback, useEffect, useState } from "react";
-import { agentService as api } from "@/lib/api/agentService";
-import type { ModelProfile, PrepSessionSummary, ReasoningEffort, ResumePickerItem } from "@/types";
+import { prepCoachHttp, profileHttp } from "@/lib/api/clients";
+import type { PrepSessionSummary, ResumePickerItem } from "@/lib/api/contract";
+import type { ModelProfile, ReasoningEffort } from "@/types";
 
 export function usePrepResources() {
   const [resumes, setResumes] = useState<ResumePickerItem[]>([]);
@@ -17,7 +18,7 @@ export function usePrepResources() {
   const [defaultChatProfile, setDefaultChatProfile] = useState<ModelProfile | null>(null);
 
   useEffect(() => {
-    api
+    prepCoachHttp
       .listResumes()
       .then((list) => {
         setResumeLoadError("");
@@ -31,7 +32,7 @@ export function usePrepResources() {
   }, []);
 
   const refreshSessions = useCallback(() => {
-    api
+    prepCoachHttp
       .listPrepSessions()
       .then((list) => setSessions(Array.isArray(list) ? list : []))
       .catch(() => {});
@@ -42,22 +43,20 @@ export function usePrepResources() {
   }, [refreshSessions]);
 
   useEffect(() => {
-    import("@/lib/api/apiService")
-      .then(({ apiService }) =>
-        apiService.listModelOptions?.().then((res) => {
-          const list = Array.isArray(res?.models) ? res.models : [];
-          setChatModels(list.filter((m) => m.capabilities?.chat));
-        }),
-      )
+    profileHttp
+      .listModelOptions()
+      .then((res) => {
+        const list = Array.isArray(res?.models) ? res.models : [];
+        setChatModels(list.filter((m) => m.capabilities?.chat));
+      })
       .catch(() => {
         /* 选择器数据加载失败不阻塞主流程 */
       });
-    import("@/lib/api/apiService")
-      .then(({ apiService }) =>
-        apiService.getBindings?.().then((b) => {
-          setDefaultChatProfile(b?.chat?.profile ?? null);
-        }),
-      )
+    profileHttp
+      .getBindings()
+      .then((b) => {
+        setDefaultChatProfile(b?.chat?.profile ?? null);
+      })
       .catch(() => {});
   }, []);
 

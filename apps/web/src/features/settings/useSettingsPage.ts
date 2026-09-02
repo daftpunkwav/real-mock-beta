@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "@/components/Toast";
-import { apiService } from "@/lib/api/apiService";
+import { profileHttp } from "@/lib/api/clients";
 import type { ModelProfile, ProviderWithModels, TaskBindings } from "@/types";
 import { EMPTY_DRAFT, type ModelDraft } from "./constants";
 
@@ -35,8 +35,8 @@ export function useSettingsPage() {
     setLoadError("");
     try {
       const [provRes, bindRes] = await Promise.all([
-        apiService.listProviders(),
-        apiService.getBindings().catch(() => null),
+        profileHttp.listProviders(),
+        profileHttp.getBindings().catch(() => null),
       ]);
       const list = Array.isArray(provRes?.providers) ? provRes.providers : [];
       setProviders(list);
@@ -109,10 +109,10 @@ export function useSettingsPage() {
     setSaving(true);
     try {
       if (editingModelId) {
-        await apiService.updateModel(editingModelId, body);
+        await profileHttp.updateModel(editingModelId, body);
         toast.success("模型已更新");
       } else {
-        await apiService.createModel(providerId, body);
+        await profileHttp.createModel(providerId, body);
         toast.success("模型已添加");
       }
       setEditingModelId(null);
@@ -128,7 +128,7 @@ export function useSettingsPage() {
 
   const deleteModel = async (id: number) => {
     try {
-      await apiService.deleteModel(id);
+      await profileHttp.deleteModel(id);
       toast.success("已删除");
       await reload();
     } catch (e) {
@@ -139,7 +139,7 @@ export function useSettingsPage() {
   const testModel = async (id: number) => {
     setTestingId(id);
     try {
-      const res = await apiService.testModel(id);
+      const res = await profileHttp.testModel(id);
       if (res.success) toast.success(res.message || "测试通过");
       else toast.warning(res.message || "测试未通过");
     } catch (e) {
@@ -151,7 +151,7 @@ export function useSettingsPage() {
 
   const saveBinding = async (task: "chat" | "stt" | "tts", profileId: number) => {
     try {
-      const res = await apiService.updateBinding(task, { profile_id: profileId });
+      const res = await profileHttp.updateBinding(task, { profile_id: profileId });
       setBindings(res);
       toast.success("默认处理器已更新");
     } catch (e) {

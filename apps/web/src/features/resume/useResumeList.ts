@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { apiService as api } from "@/lib/api/apiService";
+import { profileHttp as api } from "@/lib/api/clients";
 import { toast } from "@/components/Toast";
 import type { Resume } from "@/types";
 import { asAnalysis } from "./analysisFormat";

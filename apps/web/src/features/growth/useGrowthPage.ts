@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { interviewService as api } from "@/lib/api/interviewService";
+import { interviewHttp as api } from "@/lib/api/clients";
 import type { GrowthRecord } from "@/types";
 import { computeGrowthStats } from "./growthStats";
 import type { SystemInsights } from "./types";

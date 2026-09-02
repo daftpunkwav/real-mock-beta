@@ -1,7 +1,7 @@
 /** API 客户端基础层（聚合 re-export）
  *
  * fetch 封装 / SSE 解析 / 错误规范化 / URL 解析。
- * 三个业务域 client（apiService / agentService / interviewService）共享本层。
+ * 三个业务能力 client（profileHttp / prepCoachHttp / interviewHttp）共享本层。
  * 实现分散在 apiUrl / apiError / apiRequest / apiSse 四个子模块。
  *
  * 所有接口**直连后端**（``NEXT_PUBLIC_API_BASE`` / ``STREAM_API_BASE``），

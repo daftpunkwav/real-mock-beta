@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiService as api } from "@/lib/api/apiService";
-import type { UserProfile } from "@/types";
+import { profileHttp as api } from "@/lib/api/clients";
+import type { UserProfileResponse } from "@/lib/api/contract";
 import {
   REQUIRED_KEYS,
   REQUIRED_LABELS,
@@ -12,7 +12,7 @@ import {
 } from "./profileRules";
 
 export function useProfileForm() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -35,7 +35,7 @@ export function useProfileForm() {
 
   const stats: ProfileCompletionStats = useMemo(() => completionStatsOf(profile), [profile]);
 
-  const patch = <K extends keyof UserProfile>(key: K, value: UserProfile[K]) => {
+  const patch = <K extends keyof UserProfileResponse>(key: K, value: UserProfileResponse[K]) => {
     if (!profile) return;
     setProfile({ ...profile, [key]: value });
     if (REQUIRED_KEYS.includes(key as RequiredKey)) {

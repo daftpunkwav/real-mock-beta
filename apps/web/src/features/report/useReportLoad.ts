@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { interviewService as api } from "@/lib/api/interviewService";
+import { interviewHttp as api } from "@/lib/api/clients";
 import { ApiError } from "@/lib/api/base";
-import type { GetReportResponse, InterviewReport } from "@/types";
+import type { GetReportResponse, InterviewReport } from "@/lib/api/contract";
 
 function isReportPending(error: unknown): boolean {
   if (error instanceof ApiError) {
@@ -46,8 +46,8 @@ export function useReportLoad(sessionId: number) {
 
   const applyPayload = (data: GetReportResponse) => {
     setReport(data.report);
-    setDuration(data.duration_minutes);
-    setMessagesCount(data.messages_count);
+    setDuration(data.duration_minutes ?? undefined);
+    setMessagesCount(data.messages_count ?? undefined);
   };
 
   /** 单次拉取(不轮询),供「生成 / 重新加载」在 finish 后调用。 */

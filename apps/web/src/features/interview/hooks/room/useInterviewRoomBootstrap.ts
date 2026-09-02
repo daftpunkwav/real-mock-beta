@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage } from "@/lib/api/contract";
 import { PHASE_LABELS } from "@/config/phases";
-import { interviewService as api } from "@/lib/api/interviewService";
-import { toVisibleChatMessages } from "../messages";
+import { interviewHttp as api } from "@/lib/api/clients";
+import { toVisibleChatMessages } from "../../messages";
 
 export interface InterviewSessionMeta {
   avatar_id: string;

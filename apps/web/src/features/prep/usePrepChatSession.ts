@@ -3,8 +3,9 @@
 /** prep 会话生命周期：localStorage 恢复 / 切换会话 / 新建会话。 */
 
 import { useCallback, useEffect, useState, type MutableRefObject } from "react";
-import { agentService as api } from "@/lib/api/agentService";
-import type { PrepHistoryMessage, PrepSessionSummary, PrepUsageStats } from "@/types";
+import { prepCoachHttp as api } from "@/lib/api/clients";
+import type { PrepSessionSummary } from "@/lib/api/contract";
+import type { PrepUsageStats } from "@/types";
 import type { PrepChatMessage } from "./types";
 import { mapHistoryMessages } from "./history";
 
@@ -53,7 +54,7 @@ export function usePrepChatSession({
     setRestoring(true);
     api
       .prepMessages(saved)
-      .then((list: PrepHistoryMessage[]) => {
+      .then((list) => {
         const restored = mapHistoryMessages(list, nextMsgId);
         if (restored.length === 0) throw new Error("empty session");
         setPrepSessionId(saved);

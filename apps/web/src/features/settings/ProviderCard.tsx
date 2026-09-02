@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { Save, Trash2 } from "lucide-react";
-import { apiService } from "@/lib/api/apiService";
+import { profileHttp } from "@/lib/api/clients";
 import { toast } from "@/components/Toast";
 import type { LLMProtocol, ProviderWithModels } from "@/types";
 import { PROTOCOL_OPTIONS } from "./constants";
@@ -35,7 +35,7 @@ export function ProviderCard({
   const save = async () => {
     setSaving(true);
     try {
-      await apiService.updateProvider(provider.id, {
+      await profileHttp.updateProvider(provider.id, {
         name,
         api_base: apiBase,
         protocol,
@@ -53,7 +53,7 @@ export function ProviderCard({
 
   const remove = async () => {
     try {
-      await apiService.deleteProvider(provider.id);
+      await profileHttp.deleteProvider(provider.id);
       toast.success("供应商已删除");
       await onChanged();
     } catch (e) {
