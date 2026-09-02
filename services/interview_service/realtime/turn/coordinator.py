@@ -13,10 +13,9 @@
 
 from __future__ import annotations
 
-# 测试 patch 目标：测试 patch "interview_service.realtime.turn.coordinator.
-# transcribe_utterance_result"（改写本模块的模块级名字）。turn_stt_finish 的
-# 调用点从本模块动态读取同名属性，patch 后随之命中。
-from shared.capabilities.voice.stt import transcribe_utterance_result  # noqa: F401 — 测试 patch 目标
+# 兼容再导出：保持旧 import 路径可用。生产调用点在 :mod:`stt_finish`
+# （顶层绑定），测试 patch 目标为 ``stt_finish.transcribe_utterance_result``。
+from shared.capabilities.voice.stt import transcribe_utterance_result  # noqa: F401 — 兼容再导出
 
 from interview_service.realtime.turn.control import TurnControlMixin
 from interview_service.realtime.turn.lock import TurnLockMixin

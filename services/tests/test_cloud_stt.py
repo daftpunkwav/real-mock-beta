@@ -69,7 +69,7 @@ class TestCloudSttPath:
         h.ctx.agent = None
         h._process_user_text = AsyncMock()
         with patch(
-            "interview_service.realtime.turn.coordinator.transcribe_utterance_result",
+            "interview_service.realtime.turn.stt_finish.transcribe_utterance_result",
             new_callable=AsyncMock,
             return_value=SttResult(text="你好面试官都能听到的", provider="local"),
         ) as mock_tr:

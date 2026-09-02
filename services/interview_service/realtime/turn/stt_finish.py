@@ -1,9 +1,9 @@
 """话轮收尾 STT（WS mixin）：PCM 超限 / 回采判定 / 识别失败与入轮。
 
 拆自 :mod:`...turn_coordinator`。PCM 与浏览器文本两条路径共用同一份
-``transcribe_utterance_result`` 绑定（``turn_coordinator`` 再导出，测试
-patch ``interview_service.realtime.turn.coordinator.transcribe_utterance_result``
-依然命中），最后统一 ``_pick_stt_text`` → 回采判定 → ``_process_user_text``。
+``transcribe_utterance_result`` 绑定（本模块顶层名字，测试
+patch ``interview_service.realtime.turn.stt_finish.transcribe_utterance_result``），
+最后统一 ``_pick_stt_text`` → 回采判定 → ``_process_user_text``。
 """
 
 from __future__ import annotations
@@ -16,20 +16,8 @@ from sqlalchemy.orm import Session
 from shared.database import SessionLocal
 from interview_service.models import InterviewSession
 from interview_service.realtime.core.events import TurnState
+from shared.capabilities.voice.stt import transcribe_utterance_result
 from interview_service.realtime.voice.pipeline import _is_echo_of_assistant, _pick_stt_text
-# 注意：不在这里 import turn_coordinator（会循环）。测试 patch
-# "interview_service.realtime.turn.coordinator.transcribe_utterance_result" 改写的
-# 是 turn_coordinator 模块属性；本模块在调用点从该模块动态读取同名属性，
-# 因此 patch 后同一调用点命中新值。
-import importlib
-
-_TC_MODULE = "interview_service.realtime.turn.coordinator"
-
-
-def _stt_call(*args, **kwargs):
-    """调用 ``transcribe_utterance_result``（patch turn_coordinator 后跟随新值）。"""
-    tc_mod = importlib.import_module(_TC_MODULE)
-    return tc_mod.transcribe_utterance_result(*args, **kwargs)
 
 if TYPE_CHECKING:
     from interview_service.realtime.core.context import ConnectionContext
@@ -114,7 +102,7 @@ class TurnSttFinishMixin:
                 sample_rate = 16000
             if sample_rate < 8000 or sample_rate > 96000:
                 sample_rate = 16000
-            stt_result = await _stt_call(
+            stt_result = await transcribe_utterance_result(
                 pcm_b64,
                 sample_rate=sample_rate,
                 creds=self.ctx.stt_creds,
@@ -147,7 +135,7 @@ class TurnSttFinishMixin:
                 )
                 await self.set_turn(TurnState.USER_SPEAKING)
                 return
-            stt_result = await _stt_call(
+            stt_result = await transcribe_utterance_result(
                 pcm,
                 creds=self.ctx.stt_creds,
             )

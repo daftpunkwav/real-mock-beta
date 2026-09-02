@@ -164,7 +164,7 @@ class TestSttAlwaysRuns:
         )
         h._process_user_text = AsyncMock()
         with patch(
-            "interview_service.realtime.turn.coordinator.transcribe_utterance_result",
+            "interview_service.realtime.turn.stt_finish.transcribe_utterance_result",
             new_callable=AsyncMock,
             return_value=SttResult(text="这是一段足够长的中文技术回答内容", provider="local"),
         ) as mock_tr:
@@ -194,7 +194,7 @@ class TestSttAlwaysRuns:
         )
         h._process_user_text = AsyncMock()
         with patch(
-            "interview_service.realtime.turn.coordinator.transcribe_utterance_result",
+            "interview_service.realtime.turn.stt_finish.transcribe_utterance_result",
             new_callable=AsyncMock,
             return_value=SttResult(text="I used React hooks", provider="local"),
         ) as mock_tr:
