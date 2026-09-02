@@ -21,6 +21,29 @@ const eslintConfig = [
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/lib/api/apiService",
+              message: "使用 profileHttp（@/lib/api/clients）",
+            },
+            {
+              name: "@/lib/api/agentService",
+              message: "使用 prepCoachHttp（@/lib/api/clients）",
+            },
+            {
+              name: "@/lib/api/interviewService",
+              message: "使用 interviewHttp（@/lib/api/clients）",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

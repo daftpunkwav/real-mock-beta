@@ -12,10 +12,3 @@ export { interviewHttp, type SystemGrowthInsights } from "./interviewHttp";
 
 /** OpenAPI 契约类型 */
 export * from "./contract";
-
-/** @deprecated 兼容旧名，新代码勿用 */
-export { profileHttp as apiService } from "./profileHttp";
-/** @deprecated */
-export { prepCoachHttp as agentService } from "./prepCoachHttp";
-/** @deprecated */
-export { interviewHttp as interviewService } from "./interviewHttp";
