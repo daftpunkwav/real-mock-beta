@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 
 from shared.core.constants import SessionStatus
 from shared.database import SessionLocal
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.core.events import TurnState
 from interview_service.services.interview.events import EventKind
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,11 @@ class FinishControlMixin:
             try:
                 db.close()
             except Exception:
-                pass
+                logger.debug(
+                    "request_finish DB close 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
 
 
 __all__ = ["FinishControlMixin"]

@@ -13,7 +13,7 @@ from interview_service.models import InterviewSession
 from interview_service.services.interview.agent_text import strip_markers, strip_think_blocks
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,11 @@ class HintServiceMixin:
             try:
                 hint_db.close()
             except Exception:
-                pass
+                logger.debug(
+                    "参考提纲 DB close 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
 
     @staticmethod
     def _extract_hint_question(text: str) -> str:

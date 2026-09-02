@@ -19,11 +19,11 @@ from fastapi import WebSocketDisconnect
 
 from shared.core.logging import set_trace_id
 from shared.database import SessionLocal
-from interview_service.realtime.events import TurnState
-from interview_service.realtime.session_registry import release_session_connection
+from interview_service.realtime.core.events import TurnState
+from interview_service.realtime.core.session_registry import release_session_connection
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 
@@ -64,11 +64,19 @@ class ConnectionLifecycleMixin:
                 retryable=retryable,
             )
         except Exception:
-            pass
+            logger.debug(
+                "fail_and_close 发送 error 失败 sid=%s",
+                self.ctx.session_id,
+                exc_info=True,
+            )
         try:
             await self.ctx.ws.close(code=code)
         except Exception:
-            pass
+            logger.debug(
+                "fail_and_close 关闭 WS 失败 sid=%s",
+                self.ctx.session_id,
+                exc_info=True,
+            )
 
     # ------------------------------------------------------------------
     # 主循环
@@ -107,11 +115,19 @@ class ConnectionLifecycleMixin:
                     retryable=True,
                 )
             except Exception:
-                pass
+                logger.debug(
+                    "WS 异常恢复通知发送失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
             try:
                 db.rollback()
             except Exception:
-                pass
+                logger.debug(
+                    "WS 异常路径 rollback 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
         finally:
             await self._teardown(db)
 

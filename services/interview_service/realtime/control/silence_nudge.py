@@ -6,13 +6,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING
 
 from shared.database import SessionLocal
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.core.events import TurnState
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
+
+logger = logging.getLogger(__name__)
 
 
 class SilenceNudgeMixin:
@@ -83,7 +86,11 @@ class SilenceNudgeMixin:
             try:
                 db.close()
             except Exception:
-                pass
+                logger.debug(
+                    "silence_nudge DB close 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
 
     def _last_assistant_text(self) -> str:
         """消息历史中最近一条面试官发言（拟真追问的上下文锚点）。"""

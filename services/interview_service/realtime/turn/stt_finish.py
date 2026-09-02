@@ -2,7 +2,7 @@
 
 拆自 :mod:`...turn_coordinator`。PCM 与浏览器文本两条路径共用同一份
 ``transcribe_utterance_result`` 绑定（``turn_coordinator`` 再导出，测试
-patch ``interview_service.realtime.turn_coordinator.transcribe_utterance_result``
+patch ``interview_service.realtime.turn.coordinator.transcribe_utterance_result``
 依然命中），最后统一 ``_pick_stt_text`` → 回采判定 → ``_process_user_text``。
 """
 
@@ -15,15 +15,15 @@ from sqlalchemy.orm import Session
 
 from shared.database import SessionLocal
 from interview_service.models import InterviewSession
-from interview_service.realtime.events import TurnState
-from interview_service.realtime.voice_pipeline import _is_echo_of_assistant, _pick_stt_text
+from interview_service.realtime.core.events import TurnState
+from interview_service.realtime.voice.pipeline import _is_echo_of_assistant, _pick_stt_text
 # 注意：不在这里 import turn_coordinator（会循环）。测试 patch
-# "interview_service.realtime.turn_coordinator.transcribe_utterance_result" 改写的
+# "interview_service.realtime.turn.coordinator.transcribe_utterance_result" 改写的
 # 是 turn_coordinator 模块属性；本模块在调用点从该模块动态读取同名属性，
 # 因此 patch 后同一调用点命中新值。
 import importlib
 
-_TC_MODULE = "interview_service.realtime.turn_coordinator"
+_TC_MODULE = "interview_service.realtime.turn.coordinator"
 
 
 def _stt_call(*args, **kwargs):
@@ -32,7 +32,7 @@ def _stt_call(*args, **kwargs):
     return tc_mod.transcribe_utterance_result(*args, **kwargs)
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +63,21 @@ class TurnSttFinishMixin:
                 if epoch == self.ctx.stream_epoch:
                     await self.set_turn(TurnState.USER_SPEAKING)
             except Exception:
-                pass
+                logger.debug(
+                    "user_turn_end 恢复 USER_SPEAKING 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
         finally:
             self._end_user_turn(epoch)
             try:
                 db.close()
             except Exception:
-                pass
+                logger.debug(
+                    "user_turn_end DB close 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
 
     async def _on_user_turn_end(
         self, data: dict[str, Any], db: Session, session: InterviewSession

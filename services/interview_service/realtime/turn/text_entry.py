@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING, Any
 
 
 from shared.database import SessionLocal
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.core.events import TurnState
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +46,21 @@ class TurnTextEntryMixin:
                 if epoch == self.ctx.stream_epoch:
                     await self.set_turn(TurnState.USER_SPEAKING)
             except Exception:
-                pass
+                logger.debug(
+                    "user_text 恢复 USER_SPEAKING 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
         finally:
             self._end_user_turn(epoch)
             try:
                 db.close()
             except Exception:
-                pass
+                logger.debug(
+                    "user_text DB close 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
 
 
 __all__ = ["TurnTextEntryMixin"]
