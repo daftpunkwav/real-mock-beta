@@ -26,7 +26,7 @@ from shared.core.config_models import LlmProvider, ModelProfile
 from shared.core.constants import DEFAULT_LLM_PROTOCOL
 from shared.core.secrets import encrypt_secret
 from shared.models import StageConfig
-from shared.services.pipeline_legacy import legacy_llm_settings, migrate_legacy_to_stages
+from shared.services.pipeline_legacy import fetch_llm_settings_row, migrate_legacy_to_stages
 from shared.services.pipeline_migration import (
     STAGE_BY_TASK,
     TASK_BY_STAGE,
@@ -72,7 +72,7 @@ __all__ = [
     "stage_to_response",
     "update_stage_config",
     "get_stage_config_map",
-    "legacy_llm_settings",
+    "fetch_llm_settings_row",
     "migrate_legacy_to_stages",
     "_allocate_provider_name",
     "migrate_stages_to_profiles",
@@ -80,7 +80,7 @@ __all__ = [
     "profile_to_response",
     "resolve_model_config",
     "get_stage_config_for_runtime",
-    "get_stage_config_for_runtime_v2",
+    "ensure_pipeline_migrated",
 ]
 
 
@@ -126,7 +126,7 @@ def get_stage_config_map(db: Session) -> dict[str, dict[str, Any]]:
     rows = get_all_stage_configs(db)
     # 按阶段迁移旧表，避免一个阶段已配置时阻止其它空阶段迁移，也避免
     # 覆盖已保存但未填写 provider 名称的自定义配置。
-    if legacy_llm_settings(db) and any(
+    if fetch_llm_settings_row(db) and any(
         not row.provider and not row.api_base and not row.model and not row.api_key
         for row in rows.values()
     ):
@@ -170,8 +170,16 @@ def resolve_model_config(
     return _legacy_stage_config(db, stage)
 
 
-def get_stage_config_for_runtime_v2(
-    db: Session, stage: str, *, profile_id: int | None = None
-) -> dict[str, Any]:
-    """兼容入口：旧 stage 名取运行时配置，内部已切到模型条目体系。"""
-    return resolve_model_config(db, stage, profile_id=profile_id)
+def ensure_pipeline_migrated(db: Session) -> None:
+    """启动时一次性：旧 ``llm_settings`` → ``stage_configs`` → 模型条目 + 任务绑定。"""
+    rows = get_all_stage_configs(db)
+    if fetch_llm_settings_row(db) and any(
+        not row.provider and not row.api_base and not row.model and not row.api_key
+        for row in rows.values()
+    ):
+        migrate_legacy_to_stages(db)
+    migrate_stages_to_profiles(db)
+
+
+# 历史别名（与 get_stage_config_for_runtime 相同）
+get_stage_config_for_runtime_v2 = get_stage_config_for_runtime

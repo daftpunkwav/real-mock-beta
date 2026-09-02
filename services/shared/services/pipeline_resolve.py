@@ -15,7 +15,7 @@ from shared.core.config_models import LlmProvider, ModelProfile, TaskBinding
 from shared.core.constants import DEFAULT_LLM_PROTOCOL
 from shared.core.secrets import decrypt_secret
 from shared.models import StageConfig
-from shared.services.pipeline_legacy import legacy_llm_settings, migrate_legacy_to_stages
+from shared.services.pipeline_legacy import fetch_llm_settings_row, migrate_legacy_to_stages
 from shared.services.pipeline_migration import TASK_BY_STAGE, _DEFAULT_FALLBACK
 from shared.services.pipeline_secrets import _dec, _parse_json, _public_extras, _runtime_extras
 from shared.services.pipeline_stages import get_all_stage_configs, stage_to_response
@@ -114,7 +114,7 @@ def _binding_config(db: Session, task: str, stage: str) -> dict[str, Any] | None
 
 def _legacy_stage_config(db: Session, stage: str) -> dict[str, Any]:
     rows = get_all_stage_configs(db)
-    if legacy_llm_settings(db) and any(
+    if fetch_llm_settings_row(db) and any(
         not row.provider and not row.api_base and not row.model and not row.api_key
         for row in rows.values()
     ):

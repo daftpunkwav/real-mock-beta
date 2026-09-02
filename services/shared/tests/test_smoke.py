@@ -16,7 +16,8 @@ def test_shared_core_importable() -> None:
     import shared.database
 
     assert shared.core.secrets._MASTER_SALT == b"app-master-v2"
-    assert shared.database.Base is not None
+    assert shared.database.SessionsBase is not None
+    assert shared.database.ApiBase is not None
 
 
 def test_shared_capabilities_importable() -> None:

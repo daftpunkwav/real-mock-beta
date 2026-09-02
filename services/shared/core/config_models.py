@@ -12,14 +12,14 @@ from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstrain
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.core.constants import DEFAULT_LLM_PROTOCOL
-from shared.database import Base
+from shared.database import ApiBase
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class StageConfig(Base):
+class StageConfig(ApiBase):
     """三阶段处理器独立配置：recognize / reason / speak。
 
     每条记录对应一个阶段，支持自定义供应商、API 格式、模型能力等。
@@ -46,7 +46,7 @@ class StageConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
-class LlmProvider(Base):
+class LlmProvider(ApiBase):
     """BYOK 供应商：API 凭证与协议归属级，模型条目继承其凭证。"""
 
     __tablename__ = "llm_providers"
@@ -61,7 +61,7 @@ class LlmProvider(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
-class ModelProfile(Base):
+class ModelProfile(ApiBase):
     """模型条目：能力声明制。
 
     一个条目以中立能力位声明自己能做什么（对话/视觉/语音输入/语音输出/
@@ -91,7 +91,7 @@ class ModelProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
-class TaskBinding(Base):
+class TaskBinding(ApiBase):
     """任务绑定：chat / stt / tts 各自的默认模型条目与（语音）降级策略。"""
 
     __tablename__ = "task_bindings"
@@ -104,7 +104,7 @@ class TaskBinding(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
-class LLMSettings(Base):
+class LLMSettings(ApiBase):
     """BYOK LLM 配置（保留做兼容读；新逻辑优先使用 stage_configs）。"""
 
     __tablename__ = "llm_settings"

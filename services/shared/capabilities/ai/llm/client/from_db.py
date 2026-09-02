@@ -2,7 +2,7 @@
 
 ``from_db`` 走模型条目体系：场景默认 chat 绑定，``profile_id`` 显式覆盖；
 凭证缺失且场景显式指定条目时不静默回落（保留条目信息让请求报错）。
-兼容旧 stage_configs / LLMSettings / 环境变量路径保持原样。
+运行时经 ``get_stage_config_for_runtime`` 单轨解析；仅环境变量作最终兜底。
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session
 from shared.config import get_settings
 from shared.core.constants import DEFAULT_LLM_PROTOCOL
 from shared.core.secrets import LegacySecretFormatError, decrypt_secret
-from shared.models import LLMSettings
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ def build_from_db(
     """从模型条目体系（默认任务绑定或场景级 ``profile_id`` 覆盖）构建客户端。
 
     ``reasoning_effort`` 仅当所选条目声明 ``reasoning_capable`` 时生效；
-    未覆盖时走默认 chat 绑定，再兼容旧 stage_configs / LLMSettings / 环境变量。
+    未覆盖时走默认 chat 绑定，再经 pipeline 回落 stage_configs；环境变量为末级兜底。
     """
     from shared.services.pipeline_config import get_stage_config_for_runtime
 
@@ -45,7 +44,6 @@ def build_from_db(
         model = cfg.get("model") or ""
         max_tokens = cfg.get("max_tokens") or settings.llm_max_tokens
         protocol = cfg.get("protocol") or DEFAULT_LLM_PROTOCOL
-        # 思考强度：条目声明支持才下发（旧 stage_configs 回落路径恒不声明）
         reasoning = (
             reasoning_effort
             if reasoning_effort and cfg.get("reasoning_capable")
@@ -61,10 +59,9 @@ def build_from_db(
                 max_tokens=cfg.get("max_tokens") or settings.llm_max_tokens,
                 protocol=cfg.get("protocol") or DEFAULT_LLM_PROTOCOL,
             )
-        # 兼容旧 LLMSettings / 环境变量
-        row = db.query(LLMSettings).filter(LLMSettings.id == 1).first()
-        api_base = (row.api_base if row and row.api_base else None) or settings.llm_api_base
-        raw_api_key = (row.api_key if row and row.api_key else None) or settings.llm_api_key
+        # pipeline 已含 stage_configs 回落；此处仅补环境变量末级兜底
+        api_base = cfg.get("api_base") or settings.llm_api_base
+        raw_api_key = cfg_api_key or settings.llm_api_key
         try:
             api_key = decrypt_secret(raw_api_key) or ""
         except LegacySecretFormatError as e:
@@ -73,10 +70,10 @@ def build_from_db(
         except ValueError as e:
             logger.error("API Key 解密失败: %s", e)
             api_key = ""
-        model = (row.model if row and row.model else None) or settings.llm_model
-        max_tokens = (row.max_tokens if row else None) or settings.llm_max_tokens
-        protocol = (row.protocol if row and hasattr(row, "protocol") and row.protocol else None) or DEFAULT_LLM_PROTOCOL
-        reasoning = getattr(row, "reasoning_effort", None) if row else None
+        model = cfg.get("model") or settings.llm_model
+        max_tokens = cfg.get("max_tokens") or settings.llm_max_tokens
+        protocol = cfg.get("protocol") or DEFAULT_LLM_PROTOCOL
+        reasoning = None
 
     return cls(
         api_base=api_base,

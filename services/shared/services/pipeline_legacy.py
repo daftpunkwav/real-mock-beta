@@ -18,7 +18,8 @@ from shared.services.pipeline_secrets import _maybe_encrypt
 from shared.services.pipeline_stages import get_or_create_stage_config
 
 
-def legacy_llm_settings(db: Session) -> LLMSettings | None:
+def fetch_llm_settings_row(db: Session) -> LLMSettings | None:
+    """读取 api 库 ``llm_settings`` 单行（迁移前遗留表）。"""
     return db.query(LLMSettings).filter(LLMSettings.id == 1).first()
 
 
@@ -97,7 +98,7 @@ def _speak_config_from_legacy(row: LLMSettings) -> dict[str, Any]:
 
 def migrate_legacy_to_stages(db: Session) -> dict[str, StageConfig]:
     """首次升级：将旧 LLMSettings 拆成三阶段 stage_configs。"""
-    legacy = legacy_llm_settings(db)
+    legacy = fetch_llm_settings_row(db)
     configs: dict[str, StageConfig] = {}
     for stage, builder in [
         (PipelineStage.RECOGNIZE, _recognize_config_from_legacy),
