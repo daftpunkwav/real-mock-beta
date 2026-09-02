@@ -4,6 +4,7 @@
   ``shared.core.config_models``，此处 re-export 保持兼容。
 - Resume / UserProfile：存于 api.db；**写**权归 ``api_service``（上传/解析/档案 CRUD）。
   agent / interview **读**须经 ``shared.services.candidate_read``（见 ``docs/shared-db-read-contract.md``）。
+"""
 
 from __future__ import annotations
 

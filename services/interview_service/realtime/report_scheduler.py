@@ -69,6 +69,7 @@ class ReportSchedulerMixin:
                     self.ctx.session_id,
                     exc_info=True,
                 )
+        except Exception as e:
             logger.exception(
                 "后台报告生成失败 sid=%s: %s", self.ctx.session_id, e
             )
@@ -85,7 +86,12 @@ class ReportSchedulerMixin:
                     self.ctx.session_id,
                     exc_info=True,
                 )
+        finally:
             try:
                 db.close()
             except Exception:
-                pass
+                logger.debug(
+                    "报告后台 DB close 失败 sid=%s",
+                    self.ctx.session_id,
+                    exc_info=True,
+                )
