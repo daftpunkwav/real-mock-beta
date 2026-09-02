@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Interview WebSocket Protocol",
+  "description": "面试 WS 事件类型 SSOT；与 interview_service.constants.WSServerEvent/WSClientEvent 及前端 interview_ws.ts 对齐。",
+  "serverEventTypes": [
+    "turn_state",
+    "assistant_token",
+    "assistant_done",
+    "assistant_audio_start",
+    "assistant_audio_chunk",
+    "assistant_audio_end",
+    "stt_partial",
+    "stt_final",
+    "tts_audio",
+    "tts_failed",
+    "tts_interrupted",
+    "silence_nudge",
+    "reference_hint_loading",
+    "reference_hint",
+    "phase_changed",
+    "interview_complete",
+    "server_ping",
+    "info",
+    "error"
+  ],
+  "clientEventTypes": [
+    "user_text",
+    "user_turn_end",
+    "stt_text",
+    "silence_timeout",
+    "barge_in",
+    "request_hint",
+    "request_finish",
+    "vision_update",
+    "tts_playback_done",
+    "pong"
+  ]
+}
