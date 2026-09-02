@@ -11,34 +11,50 @@
 | 聚合（默认） | `uvicorn services.main:app` | 本地开发、单机部署 |
 | 独立服务 | 各服务 `main.py` + `shared/app_factory` | 调试单域、未来多进程雏形 |
 
-环境变量集中在 `services/shared/.env`（`DATABASE_URL`、`SECRET_KEY`、`CORS_ORIGINS` 等）。
+环境变量集中在 `services/shared/.env`（`API_DATABASE_URL`、`SESSIONS_DATABASE_URL`、`SECRET_KEY`、`CORS_ORIGINS` 等；legacy `DATABASE_URL` 映射 sessions 库）。
 
 ---
 
 ## 2. 已知运行时约束
 
-### 2.1 共享数据库
+### 2.1 双 SQLite 库
 
-- 默认 `sqlite:///{shared/data/app.db}`；三服务 ORM **共库共表**。
-- `UserProfile` / `Resume` 在 `shared.models`，api 写、agent/interview 读——**无服务间 HTTP**，靠共享表隐式耦合。
-- **拆库 / 微服务化前**：任何 `resumes` / `user_profiles` 迁移须跑三服务相关测试 + 前端契约。
+- 默认 **api.db**（档案/简历/处理器配置）+ **sessions.db**（面试/Prep/租约/限流桶）；见 `docs/dual-database.md`。
+- `UserProfile` / `Resume` 在 api 库；agent/interview **读**须经 `candidate_read`（禁止直接 import ORM）。
+- 仅有 legacy `app.db` 时启动会自动拆库；备份须同时复制两个文件。
 
 ### 2.2 WebSocket 单连接租约（单进程）
 
-- `interview_service/realtime/session_registry.py` 使用进程内 `_active_handlers`。
-- **多 Uvicorn worker 或多实例 + LB** 时，同 session 双开互斥 **失效**。
-- 缓解（未默认实现）：Redis/DB 分布式租约；或文档化 **单 worker** 约束。
+- ``interview_service/realtime/core/session_registry.py`` 使用 ``WsConnectionRegistry`` 封装进程内状态；可选 ``ws_lease_backend=database``（``ws_session_leases`` 表）。
+- **多 Uvicorn worker 或多实例 + LB** 时，应启用 ``WS_LEASE_BACKEND=database``；心跳循环会校验 DB 租约 token，失效连接主动断开。
+- 同进程内仍会顶替旧连接。本地单体默认 ``memory`` 即可。
 
-### 2.3 进程内全局态
+### 2.3 限流
+
+- 默认 `RATELIMIT_BACKEND=memory`（进程内）；多 worker 时设 `database` 使用 `rate_limit_buckets` 表。
+
+### 2.4 进程内全局态
 
 | 组件 | 影响 |
 | --- | --- |
-| `session_registry` | 多实例 WS 租约 |
+| `WsConnectionRegistry` | 多实例 WS 租约（可注入/重置，测试友好） |
 | `core/ratelimit` 桶 | 多 worker 限额放大 |
 | `stt/whisper` 模型缓存 | 多 worker 各载一份 |
-| `get_settings()` lru_cache | 测试须 import 前设 env |
+| `get_settings()` lru_cache | 测试须 import 前设 env；避免模块级绑定 |
+| `report_persist_cas._REPORT_LOCKS` | 单会话报告生成互斥；生成结束即释放，非长跑泄漏源 |
 
----
+### 2.5 多 worker / 多实例 Checklist
+
+部署 `uvicorn --workers N` 或水平扩容前确认：
+
+| 变量 | 单进程默认 | 多实例推荐 |
+| --- | --- | --- |
+| `WS_LEASE_BACKEND` | `memory` | `database` |
+| `RATELIMIT_BACKEND` | `memory` | `database` |
+| SQLite 路径 | 本地文件 | 共享存储或迁 PostgreSQL |
+| Whisper 本地 STT | 每 worker 各载模型 | 改用云 STT 或接受内存 × N |
+
+未切换 backend 时：**限流配额放大 N 倍**、**同 session 可能多路 WS**（租约仅进程内有效）。
 
 ## 3. 共享表变更 Checklist
 
@@ -69,4 +85,4 @@
 
 ---
 
-*2026-09-01*
+*2026-09-02*
