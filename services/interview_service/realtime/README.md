@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | ConnectionStack | `connection/auth`, `heartbeat`, `lifecycle` | 鉴权、心跳、连接生命周期 |
 | TurnStack | `turn/coordinator` + `control` + `streaming` | 话轮锁、STT/TTS 流、打断/收尾 |
-| MediaStack | `voice/pipeline`, `voice/tts_queue` | 语音管道与分句 TTS |
+| MediaStack | `voice/pipeline`, `voice/tts_queue`, `control/hint` | STT/TTS 管道、分句 TTS 与参考提纲（`ReferenceHintMixin`） |
 | MessageDispatcher | `core/message_dispatcher` | 客户端事件分发 |
 | ReportScheduler | `report_scheduler` | 后台报告生成 |
 
