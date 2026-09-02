@@ -2,7 +2,7 @@
 
 import { RefreshCw } from "lucide-react";
 import { AvatarStage } from "@/features/avatar/AvatarStage";
-import type { InterviewRoomModel } from "../hooks/useInterviewRoom";
+import type { InterviewRoomModel } from "../hooks/room";
 
 /** 右侧列：AvatarStage + 参考提纲卡片（loading/空态/依据/隐藏态）。 */
 export function InterviewRoomOutline({ room }: { room: InterviewRoomModel }) {

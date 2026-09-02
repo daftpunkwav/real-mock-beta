@@ -2,7 +2,7 @@
 
 import { Send } from "lucide-react";
 import { ChatBubble } from "./ChatBubble";
-import type { InterviewRoomModel } from "../hooks/useInterviewRoom";
+import type { InterviewRoomModel } from "../hooks/room";
 
 /** 聊天列：消息流 + streaming + 空态 + 文字/录音发送行。 */
 export function InterviewRoomChat({ room }: { room: InterviewRoomModel }) {

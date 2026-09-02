@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage, ClientEvent, FaceAnalysis } from "@/types";
-import type { VideoPanelHandle } from "../components/VideoPanel";
+import type { ChatMessage } from "@/lib/api/contract";
+import type { ClientEvent, FaceAnalysis } from "@/types";
+import type { VideoPanelHandle } from "../../components/VideoPanel";
 
 export interface InterviewRoomStateDeps {
   sessionId: number;

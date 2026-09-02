@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useAudioRecorder } from "@/features/media/useAudioRecorder";
+import { useAudioRecorder } from "@/features/media/recorder/useAudioRecorder";
 import type { RecorderBridge } from "./useInterviewRoomActions";
 import type { AnyRef } from "./useInterviewRoomEvents";
 

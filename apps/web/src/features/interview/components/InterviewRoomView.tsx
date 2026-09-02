@@ -6,7 +6,7 @@ import { InterviewRoomGate } from "./InterviewRoomGate";
 import { InterviewRoomChrome } from "./InterviewRoomChrome";
 import { InterviewRoomChat } from "./InterviewRoomChat";
 import { InterviewRoomOutline } from "./InterviewRoomOutline";
-import type { InterviewRoomModel } from "../hooks/useInterviewRoom";
+import type { InterviewRoomModel } from "../hooks/room";
 
 export function InterviewRoomView({ room }: { room: InterviewRoomModel }) {
   const {

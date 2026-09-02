@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { useRouter } from "next/navigation";
 import { toast } from "@/components/Toast";
-import type { ChatMessage, ClientEvent, ServerEvent } from "@/types";
+import type { ChatMessage } from "@/lib/api/contract";
+import type { ClientEvent, ServerEvent } from "@/types";
 
 /** 可写 ref 的最小结构，兼容 React 18/19 useRef 的返回类型。 */
 export type AnyRef<T> = { current: T };

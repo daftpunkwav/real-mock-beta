@@ -3,14 +3,15 @@
 /** 面试配置页左侧表单卡片区：岗位/职级/类型/风格 + 公司 + 性格/严厉 + 人像/场景/简历 + 处理器卡。 */
 
 import type {
-  InterviewStyleId,
-  ModelProfile,
+  InterviewConfig,
   Options,
-  ReasoningEffort,
   ResumePickerItem,
+} from "@/lib/api/contract";
+import type {
+  ModelProfile,
+  ReasoningEffort,
   TaskBindings,
 } from "@/types";
-import type { InterviewConfig } from "@/types/interview";
 import { ChoiceGroup, CompanyGrid, ResumeWarning, Select } from "./controls";
 import { ProcessorCard, ResumeSelect, strictnessLabel } from "./form";
 
@@ -64,14 +65,14 @@ export function SetupFields({
             value={config.workflow_type}
             options={options.workflow_types.map((w) => w.id)}
             labels={options.workflow_types.map((w) => w.name)}
-            onChange={(v) => onConfig({ workflow_type: v })}
+            onChange={(v) => onConfig({ workflow_type: v as InterviewConfig["workflow_type"] })}
           />
           <Select
             label="面试风格"
             value={config.interview_style}
             options={options.interview_styles.map((s) => s.id)}
             labels={options.interview_styles.map((s) => s.name)}
-            onChange={(v) => onConfig({ interview_style: v as InterviewStyleId })}
+            onChange={(v) => onConfig({ interview_style: v as InterviewConfig["interview_style"] })}
           />
         </div>
       </div>
@@ -87,7 +88,7 @@ export function SetupFields({
             label="面试官性格"
             value={config.personality}
             options={options.personalities}
-            onChange={(v) => onConfig({ personality: v })}
+            onChange={(v) => onConfig({ personality: v as InterviewConfig["personality"] })}
           />
           <div className="lg:w-48">
             <label className="field-label !mb-2 !text-xs">

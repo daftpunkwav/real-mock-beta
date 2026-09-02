@@ -3,7 +3,7 @@
 import { Flag, Radio, Volume2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TURN_LABELS } from "../hooks/turnLabels";
-import type { InterviewRoomModel } from "../hooks/useInterviewRoom";
+import type { InterviewRoomModel } from "../hooks/room";
 
 /** 音频解锁遮罩 / 断线条 / 无声条 / 顶栏（会话信息 + 话轮 + 结束按钮）。 */
 export function InterviewRoomChrome({ room }: { room: InterviewRoomModel }) {

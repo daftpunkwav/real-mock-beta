@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { toast } from "@/components/Toast";
 import type { ClientEvent, FaceAnalysis } from "@/types";
-import { isLikelyEchoOfAssistant } from "../echo";
-import type { VideoPanelHandle } from "../components/VideoPanel";
+import { isLikelyEchoOfAssistant } from "../../echo";
+import type { VideoPanelHandle } from "../../components/VideoPanel";
 import type { AnyRef } from "./useInterviewRoomEvents";
 
 /** recorder 产物桥：回调先于 recorder 定义，动作经此读 recorder 状态/能力。 */

@@ -3,8 +3,7 @@
 /** 面试配置页右侧预览：配置摘要 + 公司面经 + 提示。 */
 
 import { Briefcase, Building2, Lightbulb, ListChecks, Mic, UserCircle } from "lucide-react";
-import type { Options, ResumePickerItem } from "@/types";
-import type { InterviewConfig } from "@/types/interview";
+import type { InterviewConfig, Options, ResumePickerItem } from "@/lib/api/contract";
 import { strictnessLabel } from "./form";
 
 export function PreviewRow({
