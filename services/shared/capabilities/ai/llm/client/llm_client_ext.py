@@ -1,7 +1,6 @@
 """LLMClient 出站探测与 embeddings：``test_connection`` / ``embed``。
 
-这两者都是不依赖聊天主路径的独立出站能力（连通性探测 / 向量化），
-从 ``llm_client`` 主文件拆出；SSRF 检查与失败形态与拆前一致。
+运行期单向依赖：``llm_client`` 在类定义后 import 本模块；本模块仅 TYPE_CHECKING 引用 ``LLMClient``。
 """
 
 from __future__ import annotations

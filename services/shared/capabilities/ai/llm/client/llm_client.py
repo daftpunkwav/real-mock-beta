@@ -260,9 +260,7 @@ class LLMClient:
 
     async def test_connection(self) -> tuple[bool, str]:
         """测试 API 连通性（实现见 :mod:`llm_client_ext`）。"""
-        from .llm_client_ext import test_connection as _test_connection
-
-        return await _test_connection(self)
+        return await _llm_ext.test_connection(self)
 
     async def embed(
         self,
@@ -271,11 +269,12 @@ class LLMClient:
         model: str | None = None,
     ) -> list[list[float]]:
         """调用 OpenAI 兼容 /embeddings 端点，返回每段文本的向量（实现见 :mod:`llm_client_ext`）。"""
-        from .llm_client_ext import embed as _embed
-
-        return await _embed(self, texts, model=model)
+        return await _llm_ext.embed(self, texts, model=model)
 
     @classmethod
     def from_stage_config(cls, config: dict[str, Any]) -> "LLMClient":
         """从 stage config 构建客户端（stage_tests 连通性测试用）。"""
         return build_from_stage_config(cls, config)
+
+
+from . import llm_client_ext as _llm_ext  # noqa: E402 — 类定义后导入，运行期单向依赖 ext
