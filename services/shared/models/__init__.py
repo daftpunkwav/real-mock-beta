@@ -1,10 +1,9 @@
-"""共享数据域模型。
+"""共享数据域模型（api.db）。
 
 - StageConfig / LLMSettings：跨服务共享的处理器配置表，已提取到
   ``shared.core.config_models``，此处 re-export 保持兼容。
-- Resume：简历实体，api_service（上传/解析/分析）与 agent_service（prep
-  辅导读取简历文本）共享读写，归属 shared 而非任一业务服务。
-"""
+- Resume / UserProfile：存于 api.db；**写**权归 ``api_service``（上传/解析/档案 CRUD）。
+  agent / interview **读**须经 ``shared.services.candidate_read``（见 ``docs/shared-db-read-contract.md``）。
 
 from __future__ import annotations
 
@@ -13,7 +12,8 @@ from datetime import datetime, timezone
 from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from shared.database import Base
+from shared.database import ApiBase
+from shared.models.rate_limit_bucket import RateLimitBucket
 from shared.core.config_models import (  # noqa: F401  # re-export
     LLMSettings,
     LlmProvider,
@@ -27,7 +27,7 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class Resume(Base):
+class Resume(ApiBase):
     """上传的简历及解析结果。"""
 
     __tablename__ = "resumes"
@@ -44,8 +44,8 @@ class Resume(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
-class UserProfile(Base):
-    """本地用户档案（候选人核心数据，三服务共享读写）。"""
+class UserProfile(ApiBase):
+    """本地用户档案（候选人核心数据，api.db；写权 api_service）。"""
 
     __tablename__ = "user_profiles"
 
@@ -101,4 +101,13 @@ class UserProfile(Base):
         self.tech_domains = json.dumps(domains, ensure_ascii=False)
 
 
-__all__ = ["LLMSettings", "LlmProvider", "ModelProfile", "Resume", "StageConfig", "TaskBinding", "UserProfile"]
+__all__ = [
+    "LLMSettings",
+    "LlmProvider",
+    "ModelProfile",
+    "RateLimitBucket",
+    "Resume",
+    "StageConfig",
+    "TaskBinding",
+    "UserProfile",
+]
