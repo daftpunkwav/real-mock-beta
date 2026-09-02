@@ -1,0 +1,7020 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "RealMock API",
+    "description": "RealMock 模拟面试平台聚合入口（api + agent + interview 三服务）",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/profile": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Get Profile",
+        "operationId": "get_profile_api_v1_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Update Profile",
+        "operationId": "update_profile_api_v1_profile_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resume/upload": {
+      "post": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Upload Resume",
+        "operationId": "upload_resume_api_v1_resume_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_resume_api_v1_resume_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resume/list": {
+      "get": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "List Resumes",
+        "operationId": "list_resumes_api_v1_resume_list_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumeResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Resumes Api V1 Resume List Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resume/{resume_id}": {
+      "get": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Get Resume",
+        "operationId": "get_resume_api_v1_resume__resume_id__get",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Delete Resume",
+        "description": "删除简历及本地文件（若存在）。",
+        "operationId": "delete_resume_api_v1_resume__resume_id__delete",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resume/{resume_id}/activate": {
+      "post": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Activate Resume",
+        "operationId": "activate_resume_api_v1_resume__resume_id__activate_post",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resume/{resume_id}/analyze": {
+      "post": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Analyze Resume",
+        "operationId": "analyze_resume_api_v1_resume__resume_id__analyze_post",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/catalog": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Voice Catalog",
+        "description": "三阶段供应商能力目录。",
+        "operationId": "get_voice_catalog_api_v1_settings_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Voice Catalog Api V1 Settings Catalog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/llm": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Llm Settings",
+        "description": "DEPRECATED: 兼容旧版设置读取（内部仍从 stage_configs 聚合）。请改用 ``/stages``。",
+        "operationId": "get_llm_settings_api_v1_settings_llm_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMSettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Llm Settings",
+        "description": "DEPRECATED: 兼容旧版统一保存：拆分到 stage_configs。请改用 ``/stages/{stage}``。\n\nURL 安全校验使用 ``allow_local_llm``，而不是开发环境字符串判断。",
+        "operationId": "update_llm_settings_api_v1_settings_llm_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LLMSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/v1/settings/stages": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Stage Configs",
+        "description": "新版三阶段配置读取。",
+        "operationId": "get_stage_configs_api_v1_settings_stages_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StageConfigsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/stages/{stage}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Stage",
+        "description": "新版单阶段配置保存。",
+        "operationId": "update_stage_api_v1_settings_stages__stage__put",
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Stage"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StageConfigResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/llm/test": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Llm Connection",
+        "description": "DEPRECATED: 兼容旧入口：等同于测试「面试思考」阶段，客户端遵循 ``allow_local_llm``。请改用 ``/test/reason``。",
+        "operationId": "test_llm_connection_api_v1_settings_llm_test_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMTestResponse"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/v1/settings/test/{stage}": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Pipeline Stage",
+        "description": "三阶段连通性测试：recognize | reason | speak。",
+        "operationId": "test_pipeline_stage_api_v1_settings_test__stage__post",
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Stage"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMTestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/models": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "List Model Options",
+        "description": "场景选择器的扁平模型列表（仅启用条目，含能力位与上下文窗口）。",
+        "operationId": "list_model_options_api_v1_settings_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Model Options Api V1 Settings Models Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/providers": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "List Providers",
+        "operationId": "list_providers_api_v1_settings_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Providers Api V1 Settings Providers Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Create Provider",
+        "operationId": "create_provider_api_v1_settings_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Provider Api V1 Settings Providers Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/providers/{provider_id}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Provider",
+        "operationId": "update_provider_api_v1_settings_providers__provider_id__put",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Provider Api V1 Settings Providers  Provider Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Provider",
+        "operationId": "delete_provider_api_v1_settings_providers__provider_id__delete",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Provider Api V1 Settings Providers  Provider Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/providers/{provider_id}/models": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Create Model",
+        "operationId": "create_model_api_v1_settings_providers__provider_id__models_post",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelProfileCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Model Api V1 Settings Providers  Provider Id  Models Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/models/{model_id}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Model",
+        "operationId": "update_model_api_v1_settings_models__model_id__put",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Model Api V1 Settings Models  Model Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Model",
+        "operationId": "delete_model_api_v1_settings_models__model_id__delete",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Model Api V1 Settings Models  Model Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/bindings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Bindings",
+        "operationId": "get_bindings_api_v1_settings_bindings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Bindings Api V1 Settings Bindings Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/bindings/{task}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Binding",
+        "operationId": "update_binding_api_v1_settings_bindings__task__put",
+        "parameters": [
+          {
+            "name": "task",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Binding Api V1 Settings Bindings  Task  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/test/model/{model_id}": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Model",
+        "description": "按模型条目声明的能力选择测试管线；不改变当前任务绑定。",
+        "operationId": "test_model_api_v1_settings_test_model__model_id__post",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Test Model Api V1 Settings Test Model  Model Id  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prep/resumes": {
+      "get": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "List Resume Picker",
+        "description": "准备页下拉用的简历摘要；不返回解析正文与深度评价。",
+        "operationId": "list_resume_picker_api_v1_prep_resumes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumePickerItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Resume Picker Api V1 Prep Resumes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prep/sessions": {
+      "get": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "List Prep Sessions",
+        "description": "辅导会话列表（前端「对话记录」按简历分组展示）。\n\n仅本机可访问；只返回摘要（首条提问 + 消息数 + 归属简历），\n不含消息正文与能力令牌——打开具体会话仍走原 token 校验。",
+        "operationId": "list_prep_sessions_api_v1_prep_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrepSessionSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Prep Sessions Api V1 Prep Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "Create Prep Session",
+        "operationId": "create_prep_session_api_v1_prep_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrepSessionCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prep/sessions/{session_id}/message": {
+      "post": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "Prep Message",
+        "operationId": "prep_message_api_v1_prep_sessions__session_id__message_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Prep 能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "Prep 能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrepMessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prep/sessions/{session_id}/message/stream": {
+      "post": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "Prep Message Stream",
+        "operationId": "prep_message_stream_api_v1_prep_sessions__session_id__message_stream_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Prep 能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "Prep 能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prep/sessions/{session_id}/messages": {
+      "get": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "Get Prep Messages",
+        "operationId": "get_prep_messages_api_v1_prep_sessions__session_id__messages_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Prep 能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "Prep 能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrepHistoryMessage"
+                  },
+                  "title": "Response Get Prep Messages Api V1 Prep Sessions  Session Id  Messages Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/resumes": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "List Resume Picker",
+        "description": "配置页下拉用的简历摘要；不返回解析正文与深度评价。",
+        "operationId": "list_resume_picker_api_v1_interview_resumes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumePickerItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Resume Picker Api V1 Interview Resumes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/sessions": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "List Sessions",
+        "description": "历史列表：仅返回元数据，不含 access_token（防枚举窃取能力令牌）。",
+        "operationId": "list_sessions_api_v1_interview_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InterviewSessionResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Sessions Api V1 Interview Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Create Session",
+        "operationId": "create_session_api_v1_interview_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Session",
+        "operationId": "get_session_api_v1_interview_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/sessions/{session_id}/messages": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Messages",
+        "operationId": "get_messages_api_v1_interview_sessions__session_id__messages_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/sessions/{session_id}/start": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Start Interview",
+        "operationId": "start_interview_api_v1_interview_sessions__session_id__start_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/sessions/{session_id}/message": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Send Message",
+        "operationId": "send_message_api_v1_interview_sessions__session_id__message_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewMessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/sessions/{session_id}/finish": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Finish Interview",
+        "description": "提前结束面试并生成报告。\n\n若 WS 已落库报告则直接返回；否则触发一次生成（与 WS 后台共用锁防双打）。",
+        "operationId": "finish_interview_api_v1_interview_sessions__session_id__finish_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinishInterviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/{session_id}/stream": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Report Stream",
+        "description": "流式返回报告（单次 LLM；与 finish 共用 persist 语义）。\n\n- 已有 report 则短路，不重复调用 LLM；\n- 否则 ``generate_and_persist_report``（session + 成长副作用）一次完成；\n- JSON 伪流式分片推送 + ``done`` 携带同一份结构。",
+        "operationId": "get_report_stream_api_v1_reports__session_id__stream_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/{session_id}": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Report",
+        "operationId": "get_report_api_v1_reports__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewReportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/growth/history": {
+      "get": {
+        "tags": [
+          "growth"
+        ],
+        "summary": "Get Growth History",
+        "operationId": "get_growth_history_api_v1_growth_history_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/growth/system-insights": {
+      "get": {
+        "tags": [
+          "growth"
+        ],
+        "summary": "Get System Growth Insights",
+        "description": "系统级自我成长洞察（跨面试聚合）。",
+        "operationId": "get_system_growth_insights_api_v1_growth_system_insights_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/options": {
+      "get": {
+        "tags": [
+          "options"
+        ],
+        "summary": "Get Options",
+        "operationId": "get_options_api_v1_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Get Profile",
+        "operationId": "get_profile_api_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Update Profile",
+        "operationId": "update_profile_api_profile_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/upload": {
+      "post": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Upload Resume",
+        "operationId": "upload_resume_api_resume_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_resume_api_resume_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/list": {
+      "get": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "List Resumes",
+        "operationId": "list_resumes_api_resume_list_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumeResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Resumes Api Resume List Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/{resume_id}": {
+      "get": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Get Resume",
+        "operationId": "get_resume_api_resume__resume_id__get",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Delete Resume",
+        "description": "删除简历及本地文件（若存在）。",
+        "operationId": "delete_resume_api_resume__resume_id__delete",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/{resume_id}/activate": {
+      "post": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Activate Resume",
+        "operationId": "activate_resume_api_resume__resume_id__activate_post",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/{resume_id}/analyze": {
+      "post": {
+        "tags": [
+          "resume"
+        ],
+        "summary": "Analyze Resume",
+        "operationId": "analyze_resume_api_resume__resume_id__analyze_post",
+        "parameters": [
+          {
+            "name": "resume_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resume Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/catalog": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Voice Catalog",
+        "description": "三阶段供应商能力目录。",
+        "operationId": "get_voice_catalog_api_settings_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Voice Catalog Api Settings Catalog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/llm": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Llm Settings",
+        "description": "DEPRECATED: 兼容旧版设置读取（内部仍从 stage_configs 聚合）。请改用 ``/stages``。",
+        "operationId": "get_llm_settings_api_settings_llm_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMSettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Llm Settings",
+        "description": "DEPRECATED: 兼容旧版统一保存：拆分到 stage_configs。请改用 ``/stages/{stage}``。\n\nURL 安全校验使用 ``allow_local_llm``，而不是开发环境字符串判断。",
+        "operationId": "update_llm_settings_api_settings_llm_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LLMSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/settings/stages": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Stage Configs",
+        "description": "新版三阶段配置读取。",
+        "operationId": "get_stage_configs_api_settings_stages_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StageConfigsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/stages/{stage}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Stage",
+        "description": "新版单阶段配置保存。",
+        "operationId": "update_stage_api_settings_stages__stage__put",
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Stage"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StageConfigResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/llm/test": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Llm Connection",
+        "description": "DEPRECATED: 兼容旧入口：等同于测试「面试思考」阶段，客户端遵循 ``allow_local_llm``。请改用 ``/test/reason``。",
+        "operationId": "test_llm_connection_api_settings_llm_test_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMTestResponse"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/settings/test/{stage}": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Pipeline Stage",
+        "description": "三阶段连通性测试：recognize | reason | speak。",
+        "operationId": "test_pipeline_stage_api_settings_test__stage__post",
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Stage"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMTestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/models": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "List Model Options",
+        "description": "场景选择器的扁平模型列表（仅启用条目，含能力位与上下文窗口）。",
+        "operationId": "list_model_options_api_settings_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Model Options Api Settings Models Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/providers": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "List Providers",
+        "operationId": "list_providers_api_settings_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Providers Api Settings Providers Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Create Provider",
+        "operationId": "create_provider_api_settings_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Provider Api Settings Providers Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/providers/{provider_id}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Provider",
+        "operationId": "update_provider_api_settings_providers__provider_id__put",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Provider Api Settings Providers  Provider Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Provider",
+        "operationId": "delete_provider_api_settings_providers__provider_id__delete",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Provider Api Settings Providers  Provider Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/providers/{provider_id}/models": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Create Model",
+        "operationId": "create_model_api_settings_providers__provider_id__models_post",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelProfileCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Model Api Settings Providers  Provider Id  Models Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/models/{model_id}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Model",
+        "operationId": "update_model_api_settings_models__model_id__put",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Model Api Settings Models  Model Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Model",
+        "operationId": "delete_model_api_settings_models__model_id__delete",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Model Api Settings Models  Model Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/bindings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Bindings",
+        "operationId": "get_bindings_api_settings_bindings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Bindings Api Settings Bindings Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/bindings/{task}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Binding",
+        "operationId": "update_binding_api_settings_bindings__task__put",
+        "parameters": [
+          {
+            "name": "task",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Binding Api Settings Bindings  Task  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/test/model/{model_id}": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Model",
+        "description": "按模型条目声明的能力选择测试管线；不改变当前任务绑定。",
+        "operationId": "test_model_api_settings_test_model__model_id__post",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Test Model Api Settings Test Model  Model Id  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prep/resumes": {
+      "get": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "List Resume Picker",
+        "description": "准备页下拉用的简历摘要；不返回解析正文与深度评价。",
+        "operationId": "list_resume_picker_api_prep_resumes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumePickerItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Resume Picker Api Prep Resumes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prep/sessions": {
+      "get": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "List Prep Sessions",
+        "description": "辅导会话列表（前端「对话记录」按简历分组展示）。\n\n仅本机可访问；只返回摘要（首条提问 + 消息数 + 归属简历），\n不含消息正文与能力令牌——打开具体会话仍走原 token 校验。",
+        "operationId": "list_prep_sessions_api_prep_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrepSessionSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Prep Sessions Api Prep Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "Create Prep Session",
+        "operationId": "create_prep_session_api_prep_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrepSessionCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prep/sessions/{session_id}/message": {
+      "post": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "Prep Message",
+        "operationId": "prep_message_api_prep_sessions__session_id__message_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Prep 能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "Prep 能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrepMessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prep/sessions/{session_id}/message/stream": {
+      "post": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "Prep Message Stream",
+        "operationId": "prep_message_stream_api_prep_sessions__session_id__message_stream_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Prep 能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "Prep 能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prep/sessions/{session_id}/messages": {
+      "get": {
+        "tags": [
+          "prep"
+        ],
+        "summary": "Get Prep Messages",
+        "operationId": "get_prep_messages_api_prep_sessions__session_id__messages_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Prep 能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "Prep 能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrepHistoryMessage"
+                  },
+                  "title": "Response Get Prep Messages Api Prep Sessions  Session Id  Messages Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/resumes": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "List Resume Picker",
+        "description": "配置页下拉用的简历摘要；不返回解析正文与深度评价。",
+        "operationId": "list_resume_picker_api_interview_resumes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumePickerItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Resume Picker Api Interview Resumes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/sessions": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "List Sessions",
+        "description": "历史列表：仅返回元数据，不含 access_token（防枚举窃取能力令牌）。",
+        "operationId": "list_sessions_api_interview_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InterviewSessionResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Sessions Api Interview Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Create Session",
+        "operationId": "create_session_api_interview_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Session",
+        "operationId": "get_session_api_interview_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/sessions/{session_id}/messages": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Messages",
+        "operationId": "get_messages_api_interview_sessions__session_id__messages_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/sessions/{session_id}/start": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Start Interview",
+        "operationId": "start_interview_api_interview_sessions__session_id__start_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/sessions/{session_id}/message": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Send Message",
+        "operationId": "send_message_api_interview_sessions__session_id__message_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewMessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/sessions/{session_id}/finish": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Finish Interview",
+        "description": "提前结束面试并生成报告。\n\n若 WS 已落库报告则直接返回；否则触发一次生成（与 WS 后台共用锁防双打）。",
+        "operationId": "finish_interview_api_interview_sessions__session_id__finish_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinishInterviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{session_id}/stream": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Report Stream",
+        "description": "流式返回报告（单次 LLM；与 finish 共用 persist 语义）。\n\n- 已有 report 则短路，不重复调用 LLM；\n- 否则 ``generate_and_persist_report``（session + 成长副作用）一次完成；\n- JSON 伪流式分片推送 + ``done`` 携带同一份结构。",
+        "operationId": "get_report_stream_api_reports__session_id__stream_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{session_id}": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Report",
+        "operationId": "get_report_api_reports__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "会话能力令牌（兼容；prod 禁用）",
+              "title": "Token"
+            },
+            "description": "会话能力令牌（兼容；prod 禁用）"
+          },
+          {
+            "name": "X-Interview-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Interview-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewReportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/growth/history": {
+      "get": {
+        "tags": [
+          "growth"
+        ],
+        "summary": "Get Growth History",
+        "operationId": "get_growth_history_api_growth_history_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/growth/system-insights": {
+      "get": {
+        "tags": [
+          "growth"
+        ],
+        "summary": "Get System Growth Insights",
+        "description": "系统级自我成长洞察（跨面试聚合）。",
+        "operationId": "get_system_growth_insights_api_growth_system_insights_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/options": {
+      "get": {
+        "tags": [
+          "options"
+        ],
+        "summary": "Get Options",
+        "operationId": "get_options_api_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AiOverrides": {
+        "properties": {
+          "chat_profile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Profile Id"
+          },
+          "stt_profile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stt Profile Id"
+          },
+          "tts_profile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tts Profile Id"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          }
+        },
+        "type": "object",
+        "title": "AiOverrides",
+        "description": "模拟面试的处理器选择：思考 / 语音输入 / 语音输出 + 思考强度。"
+      },
+      "AvatarOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "voice": {
+            "type": "string",
+            "title": "Voice",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "AvatarOption"
+      },
+      "BindingUpdate": {
+        "properties": {
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id"
+          },
+          "fallback_handler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Handler",
+            "default": ""
+          },
+          "fallback_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Mode",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id"
+        ],
+        "title": "BindingUpdate"
+      },
+      "Body_upload_resume_api_resume_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_resume_api_resume_upload_post"
+      },
+      "Body_upload_resume_api_v1_resume_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_resume_api_v1_resume_upload_post"
+      },
+      "CandidateProfile": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "education": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Education"
+          },
+          "work_experience": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Work Experience"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "projects": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "CandidateProfile",
+        "description": "结构化候选人简历档案。\n\n由 api_service 简历解析产出、interview 面试 Agent 读取构建候选人画像，\n两域共享，故置于 shared 契约层。"
+      },
+      "CareerAnalysis": {
+        "properties": {
+          "trajectory": {
+            "type": "string",
+            "title": "Trajectory",
+            "default": ""
+          },
+          "stability_score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Stability Score"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "stability_score"
+        ],
+        "title": "CareerAnalysis",
+        "description": "职涯轨迹分析。"
+      },
+      "CatalogOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "CatalogOption"
+      },
+      "ChatMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant",
+              "system"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatMessage"
+      },
+      "CompanyFit": {
+        "properties": {
+          "tier": {
+            "type": "string",
+            "title": "Tier",
+            "default": ""
+          },
+          "fit_score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Fit Score"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "fit_score"
+        ],
+        "title": "CompanyFit",
+        "description": "目标公司层级匹配度。"
+      },
+      "CompanyInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "style": {
+            "type": "string",
+            "title": "Style"
+          },
+          "focus_areas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Focus Areas"
+          },
+          "sample_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sample Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "style",
+          "focus_areas",
+          "sample_questions"
+        ],
+        "title": "CompanyInfo"
+      },
+      "DimensionScore": {
+        "properties": {
+          "score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "score"
+        ],
+        "title": "DimensionScore",
+        "description": "简历评价单维度得分。"
+      },
+      "FinishInterviewResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "overall_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "status"
+        ],
+        "title": "FinishInterviewResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InterviewConfig": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Role"
+          },
+          "level": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Level"
+          },
+          "company": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Company"
+          },
+          "workflow_type": {
+            "type": "string",
+            "enum": [
+              "technical",
+              "hr",
+              "management"
+            ],
+            "title": "Workflow Type",
+            "default": "technical"
+          },
+          "personality": {
+            "type": "string",
+            "enum": [
+              "gentle",
+              "professional",
+              "pressure",
+              "hr",
+              "expert"
+            ],
+            "title": "Personality",
+            "default": "professional"
+          },
+          "strictness": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Strictness",
+            "default": 3
+          },
+          "interview_style": {
+            "type": "string",
+            "enum": [
+              "guided",
+              "deep_dive",
+              "continuous",
+              "challenging"
+            ],
+            "title": "Interview Style",
+            "default": "deep_dive"
+          },
+          "resume_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Id"
+          },
+          "avatar_id": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Avatar Id",
+            "default": "professional_male"
+          },
+          "scene_id": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Scene Id",
+            "default": "meeting_room"
+          },
+          "ai_overrides": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiOverrides"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "level",
+          "company"
+        ],
+        "title": "InterviewConfig"
+      },
+      "InterviewMessageRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 16000,
+            "title": "Content"
+          },
+          "face_analysis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Face Analysis"
+          },
+          "image_base64": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Base64"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "InterviewMessageRequest"
+      },
+      "InterviewMessageResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "message": {
+            "$ref": "#/components/schemas/ChatMessage"
+          },
+          "current_phase": {
+            "type": "string",
+            "title": "Current Phase"
+          },
+          "is_complete": {
+            "type": "boolean",
+            "title": "Is Complete",
+            "default": false
+          },
+          "phases_remaining": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Phases Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "message",
+          "current_phase"
+        ],
+        "title": "InterviewMessageResponse"
+      },
+      "InterviewReport": {
+        "properties": {
+          "overall_score": {
+            "type": "integer",
+            "title": "Overall Score"
+          },
+          "score_breakdown": {
+            "$ref": "#/components/schemas/ScoreBreakdown"
+          },
+          "strengths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Strengths"
+          },
+          "weaknesses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Weaknesses"
+          },
+          "improvement_suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Improvement Suggestions"
+          },
+          "resume_suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resume Suggestions"
+          },
+          "interview_suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interview Suggestions"
+          },
+          "training_plan": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Training Plan"
+          },
+          "phase_summary": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Phase Summary"
+          },
+          "face_analysis_summary": {
+            "type": "string",
+            "title": "Face Analysis Summary",
+            "default": ""
+          },
+          "presence_moments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Presence Moments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "overall_score",
+          "score_breakdown"
+        ],
+        "title": "InterviewReport"
+      },
+      "InterviewReportResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "report": {
+            "$ref": "#/components/schemas/InterviewReport"
+          },
+          "messages_count": {
+            "type": "integer",
+            "title": "Messages Count"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "report",
+          "messages_count"
+        ],
+        "title": "InterviewReportResponse"
+      },
+      "InterviewSessionResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "workflow_type": {
+            "type": "string",
+            "title": "Workflow Type"
+          },
+          "personality": {
+            "type": "string",
+            "title": "Personality"
+          },
+          "strictness": {
+            "type": "integer",
+            "title": "Strictness"
+          },
+          "interview_style": {
+            "type": "string",
+            "title": "Interview Style"
+          },
+          "avatar_id": {
+            "type": "string",
+            "title": "Avatar Id",
+            "default": "professional_male"
+          },
+          "scene_id": {
+            "type": "string",
+            "title": "Scene Id",
+            "default": "meeting_room"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "current_phase": {
+            "type": "string",
+            "title": "Current Phase"
+          },
+          "overall_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Score"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "access_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "level",
+          "company",
+          "workflow_type",
+          "personality",
+          "strictness",
+          "interview_style",
+          "status",
+          "current_phase",
+          "created_at"
+        ],
+        "title": "InterviewSessionResponse"
+      },
+      "InterviewStyleOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description"
+        ],
+        "title": "InterviewStyleOption"
+      },
+      "LLMSettingsResponse": {
+        "properties": {
+          "api_base": {
+            "type": "string",
+            "title": "Api Base"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens"
+          },
+          "context_window": {
+            "type": "integer",
+            "title": "Context Window"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol",
+            "default": "openai_chat"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "title": "Reasoning Effort",
+            "default": "medium"
+          },
+          "supports_vision": {
+            "type": "boolean",
+            "title": "Supports Vision",
+            "default": true
+          },
+          "supports_audio": {
+            "type": "boolean",
+            "title": "Supports Audio",
+            "default": false
+          },
+          "stt_model": {
+            "type": "string",
+            "title": "Stt Model",
+            "default": "whisper-1"
+          },
+          "tts_voice": {
+            "type": "string",
+            "title": "Tts Voice",
+            "default": "zh-CN-XiaoxiaoNeural"
+          },
+          "has_api_key": {
+            "type": "boolean",
+            "title": "Has Api Key"
+          },
+          "speech_recognize_handler": {
+            "type": "string",
+            "title": "Speech Recognize Handler",
+            "default": "local"
+          },
+          "speech_recognize_mode": {
+            "type": "string",
+            "title": "Speech Recognize Mode",
+            "default": "transcribe"
+          },
+          "asr_api_base": {
+            "type": "string",
+            "title": "Asr Api Base",
+            "default": ""
+          },
+          "asr_model": {
+            "type": "string",
+            "title": "Asr Model",
+            "default": ""
+          },
+          "asr_app_id": {
+            "type": "string",
+            "title": "Asr App Id",
+            "default": ""
+          },
+          "asr_resource_id": {
+            "type": "string",
+            "title": "Asr Resource Id",
+            "default": ""
+          },
+          "asr_app_key": {
+            "type": "string",
+            "title": "Asr App Key",
+            "default": ""
+          },
+          "has_asr_api_key": {
+            "type": "boolean",
+            "title": "Has Asr Api Key",
+            "default": false
+          },
+          "has_asr_api_secret": {
+            "type": "boolean",
+            "title": "Has Asr Api Secret",
+            "default": false
+          },
+          "has_asr_access_key": {
+            "type": "boolean",
+            "title": "Has Asr Access Key",
+            "default": false
+          },
+          "speech_speak_handler": {
+            "type": "string",
+            "title": "Speech Speak Handler",
+            "default": "edge"
+          },
+          "speech_speak_mode": {
+            "type": "string",
+            "title": "Speech Speak Mode",
+            "default": "tts_from_text"
+          },
+          "tts_api_base": {
+            "type": "string",
+            "title": "Tts Api Base",
+            "default": ""
+          },
+          "tts_model": {
+            "type": "string",
+            "title": "Tts Model",
+            "default": ""
+          },
+          "has_tts_api_key": {
+            "type": "boolean",
+            "title": "Has Tts Api Key",
+            "default": false
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_base",
+          "model",
+          "max_tokens",
+          "context_window",
+          "provider",
+          "has_api_key"
+        ],
+        "title": "LLMSettingsResponse"
+      },
+      "LLMSettingsUpdate": {
+        "properties": {
+          "api_base": {
+            "type": "string",
+            "title": "Api Base"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens",
+            "default": 4096
+          },
+          "context_window": {
+            "type": "integer",
+            "title": "Context Window",
+            "default": 128000
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": ""
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "openai_chat",
+              "anthropic_messages",
+              "openai_responses"
+            ],
+            "title": "Protocol",
+            "default": "openai_chat"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "title": "Reasoning Effort",
+            "default": "medium"
+          },
+          "supports_vision": {
+            "type": "boolean",
+            "title": "Supports Vision",
+            "default": true
+          },
+          "supports_audio": {
+            "type": "boolean",
+            "title": "Supports Audio",
+            "default": false
+          },
+          "stt_model": {
+            "type": "string",
+            "title": "Stt Model",
+            "default": "whisper-1"
+          },
+          "tts_voice": {
+            "type": "string",
+            "title": "Tts Voice",
+            "default": "zh-CN-XiaoxiaoNeural"
+          },
+          "speech_recognize_handler": {
+            "type": "string",
+            "title": "Speech Recognize Handler",
+            "default": "local"
+          },
+          "speech_recognize_mode": {
+            "type": "string",
+            "title": "Speech Recognize Mode",
+            "default": "transcribe"
+          },
+          "asr_api_base": {
+            "type": "string",
+            "title": "Asr Api Base",
+            "default": ""
+          },
+          "asr_api_key": {
+            "type": "string",
+            "title": "Asr Api Key",
+            "default": ""
+          },
+          "asr_model": {
+            "type": "string",
+            "title": "Asr Model",
+            "default": ""
+          },
+          "asr_app_id": {
+            "type": "string",
+            "title": "Asr App Id",
+            "default": ""
+          },
+          "asr_api_secret": {
+            "type": "string",
+            "title": "Asr Api Secret",
+            "default": ""
+          },
+          "asr_access_key": {
+            "type": "string",
+            "title": "Asr Access Key",
+            "default": ""
+          },
+          "asr_resource_id": {
+            "type": "string",
+            "title": "Asr Resource Id",
+            "default": ""
+          },
+          "asr_app_key": {
+            "type": "string",
+            "title": "Asr App Key",
+            "default": ""
+          },
+          "speech_speak_handler": {
+            "type": "string",
+            "title": "Speech Speak Handler",
+            "default": "edge"
+          },
+          "speech_speak_mode": {
+            "type": "string",
+            "title": "Speech Speak Mode",
+            "default": "tts_from_text"
+          },
+          "tts_api_base": {
+            "type": "string",
+            "title": "Tts Api Base",
+            "default": ""
+          },
+          "tts_api_key": {
+            "type": "string",
+            "title": "Tts Api Key",
+            "default": ""
+          },
+          "tts_model": {
+            "type": "string",
+            "title": "Tts Model",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_base",
+          "api_key",
+          "model"
+        ],
+        "title": "LLMSettingsUpdate",
+        "description": "DEPRECATED: 兼容旧版三阶段统一保存；内部会拆到 stage_configs。将在 v2.0 移除。"
+      },
+      "LLMTestResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          },
+          "audio_base64": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Base64"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "LLMTestResponse"
+      },
+      "ModelCapabilitiesIn": {
+        "properties": {
+          "chat": {
+            "type": "boolean",
+            "title": "Chat",
+            "default": false
+          },
+          "vision": {
+            "type": "boolean",
+            "title": "Vision",
+            "default": false
+          },
+          "audio_input": {
+            "type": "boolean",
+            "title": "Audio Input",
+            "default": false
+          },
+          "audio_output": {
+            "type": "boolean",
+            "title": "Audio Output",
+            "default": false
+          },
+          "reasoning": {
+            "type": "boolean",
+            "title": "Reasoning",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ModelCapabilitiesIn"
+      },
+      "ModelProfileCreate": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Display Name",
+            "default": ""
+          },
+          "context_window": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Context Window",
+            "default": 128000
+          },
+          "max_output": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Output",
+            "default": 4096
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/ModelCapabilitiesIn",
+            "default": {
+              "chat": true,
+              "vision": false,
+              "audio_input": false,
+              "audio_output": false,
+              "reasoning": false
+            }
+          },
+          "extras": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Extras"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "model"
+        ],
+        "title": "ModelProfileCreate"
+      },
+      "ModelProfileUpdate": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "max_output": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCapabilitiesIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "extras": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extras"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "title": "ModelProfileUpdate"
+      },
+      "OptionsResponse": {
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Levels"
+          },
+          "experience_years": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Experience Years"
+          },
+          "companies": {
+            "items": {
+              "$ref": "#/components/schemas/CompanyInfo"
+            },
+            "type": "array",
+            "title": "Companies"
+          },
+          "personalities": {
+            "items": {
+              "$ref": "#/components/schemas/PersonalityOption"
+            },
+            "type": "array",
+            "title": "Personalities"
+          },
+          "interview_styles": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewStyleOption"
+            },
+            "type": "array",
+            "title": "Interview Styles"
+          },
+          "workflow_types": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowTypeOption"
+            },
+            "type": "array",
+            "title": "Workflow Types"
+          },
+          "phase_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Phase Labels"
+          },
+          "avatars": {
+            "items": {
+              "$ref": "#/components/schemas/AvatarOption"
+            },
+            "type": "array",
+            "title": "Avatars"
+          },
+          "scenes": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogOption"
+            },
+            "type": "array",
+            "title": "Scenes"
+          },
+          "tts_voices": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogOption"
+            },
+            "type": "array",
+            "title": "Tts Voices"
+          },
+          "silence_nudge_seconds": {
+            "type": "integer",
+            "title": "Silence Nudge Seconds",
+            "default": 25
+          }
+        },
+        "type": "object",
+        "required": [
+          "roles",
+          "levels",
+          "experience_years",
+          "companies",
+          "personalities",
+          "interview_styles",
+          "workflow_types"
+        ],
+        "title": "OptionsResponse"
+      },
+      "PersonalityOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description"
+        ],
+        "title": "PersonalityOption"
+      },
+      "PrepCreateRequest": {
+        "properties": {
+          "resume_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Id"
+          },
+          "target_role": {
+            "type": "string",
+            "title": "Target Role",
+            "default": ""
+          },
+          "target_company": {
+            "type": "string",
+            "title": "Target Company",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "PrepCreateRequest"
+      },
+      "PrepHistoryMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PrepToolStep"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          },
+          "search_groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PrepSearchGroup"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Groups"
+          },
+          "thinking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "PrepHistoryMessage"
+      },
+      "PrepMessageRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 16000,
+            "title": "Content"
+          },
+          "model_profile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Id"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(low|medium|high|max)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "PrepMessageRequest"
+      },
+      "PrepMessageResponse": {
+        "properties": {
+          "reply": {
+            "type": "string",
+            "title": "Reply"
+          },
+          "token_usage": {
+            "type": "integer",
+            "title": "Token Usage",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "reply"
+        ],
+        "title": "PrepMessageResponse"
+      },
+      "PrepSearchGroup": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "default": ""
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/PrepSearchHit"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "title": "PrepSearchGroup"
+      },
+      "PrepSearchHit": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": ""
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "PrepSearchHit"
+      },
+      "PrepSessionCreateResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PrepSessionCreateResponse"
+      },
+      "PrepSessionSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "resume_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Id"
+          },
+          "resume_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Filename"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "active"
+          },
+          "token_usage": {
+            "type": "integer",
+            "title": "Token Usage",
+            "default": 0
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens",
+            "default": 0
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens",
+            "default": 0
+          },
+          "cached_tokens": {
+            "type": "integer",
+            "title": "Cached Tokens",
+            "default": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PrepSessionSummary"
+      },
+      "PrepToolStep": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "PrepToolStep"
+      },
+      "ProjectCard": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "one_line": {
+            "type": "string",
+            "title": "One Line",
+            "default": ""
+          },
+          "highlights": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Highlights"
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Risks"
+          },
+          "deep_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deep Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score"
+        ],
+        "title": "ProjectCard",
+        "description": "单个项目的深挖卡片。"
+      },
+      "ProviderCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "api_base": {
+            "type": "string",
+            "title": "Api Base",
+            "default": ""
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol",
+            "default": "openai_chat"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "default": ""
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ProviderCreate"
+      },
+      "ProviderUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "api_base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Base"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "title": "ProviderUpdate"
+      },
+      "ResumeAnalysis": {
+        "properties": {
+          "score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "strengths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Strengths"
+          },
+          "weaknesses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Weaknesses"
+          },
+          "improvement_suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Improvement Suggestions"
+          },
+          "predicted_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Predicted Questions"
+          },
+          "dimension_scores": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DimensionScore"
+            },
+            "type": "object",
+            "title": "Dimension Scores"
+          },
+          "ats_keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ats Keywords"
+          },
+          "missing_keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Keywords"
+          },
+          "project_deep_dive": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Project Deep Dive"
+          },
+          "red_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Red Flags"
+          },
+          "role_fit_summary": {
+            "type": "string",
+            "title": "Role Fit Summary",
+            "default": ""
+          },
+          "seniority_estimate": {
+            "type": "string",
+            "title": "Seniority Estimate",
+            "default": ""
+          },
+          "rewrite_examples": {
+            "items": {
+              "$ref": "#/components/schemas/RewriteExample"
+            },
+            "type": "array",
+            "title": "Rewrite Examples"
+          },
+          "interview_risk_areas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interview Risk Areas"
+          },
+          "overall_narrative": {
+            "type": "string",
+            "title": "Overall Narrative",
+            "default": ""
+          },
+          "layout_review": {
+            "type": "string",
+            "title": "Layout Review",
+            "default": ""
+          },
+          "typography_review": {
+            "type": "string",
+            "title": "Typography Review",
+            "default": ""
+          },
+          "content_review": {
+            "type": "string",
+            "title": "Content Review",
+            "default": ""
+          },
+          "market_insights": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Market Insights"
+          },
+          "search_queries_used": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Search Queries Used"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline",
+            "default": ""
+          },
+          "first_impression": {
+            "type": "string",
+            "title": "First Impression",
+            "default": ""
+          },
+          "interviewer_comments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interviewer Comments"
+          },
+          "benchmark_percentile": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Percentile"
+          },
+          "section_reviews": {
+            "items": {
+              "$ref": "#/components/schemas/SectionReview"
+            },
+            "type": "array",
+            "title": "Section Reviews"
+          },
+          "project_cards": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectCard"
+            },
+            "type": "array",
+            "title": "Project Cards"
+          },
+          "skill_trust": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillTrust"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "career_analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CareerAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company_fit": {
+            "items": {
+              "$ref": "#/components/schemas/CompanyFit"
+            },
+            "type": "array",
+            "title": "Company Fit"
+          },
+          "salary_positioning": {
+            "type": "string",
+            "title": "Salary Positioning",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "score"
+        ],
+        "title": "ResumeAnalysis",
+        "description": "多维度简历 Agent 评价结果。\n\n兼容旧字段 strengths/weaknesses/…，并扩展 dimension_scores 等。"
+      },
+      "ResumePickerItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": false
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename"
+        ],
+        "title": "ResumePickerItem",
+        "description": "简历下拉只读摘要：prep / interview 配置页共用，不含解析正文与深度评价。"
+      },
+      "ResumeResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "file_type": {
+            "type": "string",
+            "title": "File Type"
+          },
+          "parsed_profile": {
+            "$ref": "#/components/schemas/CandidateProfile"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": false
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "analysis": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Analysis"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "file_type",
+          "parsed_profile",
+          "created_at"
+        ],
+        "title": "ResumeResponse"
+      },
+      "RewriteExample": {
+        "properties": {
+          "before": {
+            "type": "string",
+            "title": "Before",
+            "default": ""
+          },
+          "after": {
+            "type": "string",
+            "title": "After",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "RewriteExample",
+        "description": "简历 bullet 改写对照。"
+      },
+      "ScoreBreakdown": {
+        "properties": {
+          "technical": {
+            "type": "integer",
+            "title": "Technical",
+            "default": 0
+          },
+          "communication": {
+            "type": "integer",
+            "title": "Communication",
+            "default": 0
+          },
+          "project_depth": {
+            "type": "integer",
+            "title": "Project Depth",
+            "default": 0
+          },
+          "problem_solving": {
+            "type": "integer",
+            "title": "Problem Solving",
+            "default": 0
+          },
+          "presence": {
+            "type": "integer",
+            "title": "Presence",
+            "default": 0
+          },
+          "politeness": {
+            "type": "integer",
+            "title": "Politeness",
+            "default": 0
+          },
+          "overall": {
+            "type": "integer",
+            "title": "Overall",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "ScoreBreakdown"
+      },
+      "SectionReview": {
+        "properties": {
+          "section": {
+            "type": "string",
+            "title": "Section",
+            "default": ""
+          },
+          "score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict",
+            "default": ""
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "score"
+        ],
+        "title": "SectionReview",
+        "description": "简历单分区审阅（教育/工作/项目/技能/排版）。"
+      },
+      "SkillTrust": {
+        "properties": {
+          "solid": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Solid"
+          },
+          "claimed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Claimed"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          }
+        },
+        "type": "object",
+        "title": "SkillTrust",
+        "description": "技能可信度三分层：有证据 / 仅罗列 / 目标岗缺失。"
+      },
+      "StageConfigResponse": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "api_base": {
+            "type": "string",
+            "title": "Api Base"
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens"
+          },
+          "context_window": {
+            "type": "integer",
+            "title": "Context Window"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/StageModelCapability"
+          },
+          "fallback": {
+            "$ref": "#/components/schemas/StageFallbackConfig"
+          },
+          "extras": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Extras"
+          },
+          "has_api_key": {
+            "type": "boolean",
+            "title": "Has Api Key"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "provider",
+          "api_base",
+          "protocol",
+          "model",
+          "max_tokens",
+          "context_window",
+          "capabilities",
+          "fallback",
+          "extras",
+          "has_api_key"
+        ],
+        "title": "StageConfigResponse",
+        "description": "单个阶段处理器返回。"
+      },
+      "StageConfigUpdate": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": ""
+          },
+          "api_base": {
+            "type": "string",
+            "title": "Api Base",
+            "default": ""
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "default": ""
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "openai_chat",
+              "anthropic_messages",
+              "openai_responses"
+            ],
+            "title": "Protocol",
+            "default": "openai_chat"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": ""
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Tokens",
+            "default": 4096
+          },
+          "context_window": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Context Window",
+            "default": 128000
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/StageModelCapability"
+          },
+          "fallback": {
+            "$ref": "#/components/schemas/StageFallbackConfig"
+          },
+          "extras": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Extras"
+          }
+        },
+        "type": "object",
+        "title": "StageConfigUpdate",
+        "description": "单个阶段处理器保存请求。"
+      },
+      "StageConfigsResponse": {
+        "properties": {
+          "recognize": {
+            "$ref": "#/components/schemas/StageConfigResponse"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/StageConfigResponse"
+          },
+          "speak": {
+            "$ref": "#/components/schemas/StageConfigResponse"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recognize",
+          "reason",
+          "speak"
+        ],
+        "title": "StageConfigsResponse",
+        "description": "新版三阶段配置返回。"
+      },
+      "StageFallbackConfig": {
+        "properties": {
+          "handler": {
+            "type": "string",
+            "title": "Handler",
+            "default": ""
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "StageFallbackConfig",
+        "description": "阶段降级处理配置。"
+      },
+      "StageModelCapability": {
+        "properties": {
+          "supports_vision": {
+            "type": "boolean",
+            "title": "Supports Vision",
+            "default": false
+          },
+          "supports_audio_input": {
+            "type": "boolean",
+            "title": "Supports Audio Input",
+            "default": false
+          },
+          "supports_audio_output": {
+            "type": "boolean",
+            "title": "Supports Audio Output",
+            "default": false
+          },
+          "supports_video_input": {
+            "type": "boolean",
+            "title": "Supports Video Input",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "StageModelCapability",
+        "description": "单个模型能力开关。"
+      },
+      "UserProfileResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender",
+            "default": ""
+          },
+          "identity": {
+            "type": "string",
+            "title": "Identity",
+            "default": ""
+          },
+          "school": {
+            "type": "string",
+            "title": "School",
+            "default": ""
+          },
+          "major": {
+            "type": "string",
+            "title": "Major",
+            "default": ""
+          },
+          "graduation_year": {
+            "type": "string",
+            "title": "Graduation Year",
+            "default": ""
+          },
+          "job_direction": {
+            "type": "string",
+            "title": "Job Direction"
+          },
+          "experience_years": {
+            "type": "string",
+            "title": "Experience Years"
+          },
+          "work_years_detail": {
+            "type": "string",
+            "title": "Work Years Detail",
+            "default": ""
+          },
+          "current_company": {
+            "type": "string",
+            "title": "Current Company",
+            "default": ""
+          },
+          "expected_salary": {
+            "type": "string",
+            "title": "Expected Salary",
+            "default": ""
+          },
+          "self_intro": {
+            "type": "string",
+            "title": "Self Intro",
+            "default": ""
+          },
+          "tech_domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tech Domains"
+          },
+          "target_role": {
+            "type": "string",
+            "title": "Target Role"
+          },
+          "github_username": {
+            "type": "string",
+            "title": "Github Username",
+            "default": ""
+          },
+          "portfolio_url": {
+            "type": "string",
+            "title": "Portfolio Url",
+            "default": ""
+          },
+          "linkedin_url": {
+            "type": "string",
+            "title": "Linkedin Url",
+            "default": ""
+          },
+          "city": {
+            "type": "string",
+            "title": "City",
+            "default": ""
+          },
+          "preferred_languages": {
+            "type": "string",
+            "title": "Preferred Languages",
+            "default": ""
+          },
+          "career_highlights": {
+            "type": "string",
+            "title": "Career Highlights",
+            "default": ""
+          },
+          "open_to_remote": {
+            "type": "string",
+            "title": "Open To Remote",
+            "default": ""
+          },
+          "notice_period": {
+            "type": "string",
+            "title": "Notice Period",
+            "default": ""
+          },
+          "education_level": {
+            "type": "string",
+            "title": "Education Level",
+            "default": ""
+          },
+          "expected_city": {
+            "type": "string",
+            "title": "Expected City",
+            "default": ""
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone",
+            "default": ""
+          },
+          "certificates": {
+            "type": "string",
+            "title": "Certificates",
+            "default": ""
+          },
+          "english_level": {
+            "type": "string",
+            "title": "English Level",
+            "default": ""
+          },
+          "signature_projects": {
+            "type": "string",
+            "title": "Signature Projects",
+            "default": ""
+          },
+          "strengths": {
+            "type": "string",
+            "title": "Strengths",
+            "default": ""
+          },
+          "weaknesses": {
+            "type": "string",
+            "title": "Weaknesses",
+            "default": ""
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "job_direction",
+          "experience_years",
+          "tech_domains",
+          "target_role"
+        ],
+        "title": "UserProfileResponse"
+      },
+      "UserProfileUpdate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "求职者"
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender",
+            "default": ""
+          },
+          "identity": {
+            "type": "string",
+            "title": "Identity",
+            "default": ""
+          },
+          "school": {
+            "type": "string",
+            "title": "School",
+            "default": ""
+          },
+          "major": {
+            "type": "string",
+            "title": "Major",
+            "default": ""
+          },
+          "graduation_year": {
+            "type": "string",
+            "title": "Graduation Year",
+            "default": ""
+          },
+          "job_direction": {
+            "type": "string",
+            "title": "Job Direction",
+            "default": ""
+          },
+          "experience_years": {
+            "type": "string",
+            "title": "Experience Years",
+            "default": ""
+          },
+          "work_years_detail": {
+            "type": "string",
+            "title": "Work Years Detail",
+            "default": ""
+          },
+          "current_company": {
+            "type": "string",
+            "title": "Current Company",
+            "default": ""
+          },
+          "expected_salary": {
+            "type": "string",
+            "title": "Expected Salary",
+            "default": ""
+          },
+          "self_intro": {
+            "type": "string",
+            "title": "Self Intro",
+            "default": ""
+          },
+          "tech_domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tech Domains"
+          },
+          "target_role": {
+            "type": "string",
+            "title": "Target Role",
+            "default": ""
+          },
+          "github_username": {
+            "type": "string",
+            "title": "Github Username",
+            "default": ""
+          },
+          "portfolio_url": {
+            "type": "string",
+            "title": "Portfolio Url",
+            "default": ""
+          },
+          "linkedin_url": {
+            "type": "string",
+            "title": "Linkedin Url",
+            "default": ""
+          },
+          "city": {
+            "type": "string",
+            "title": "City",
+            "default": ""
+          },
+          "preferred_languages": {
+            "type": "string",
+            "title": "Preferred Languages",
+            "default": ""
+          },
+          "career_highlights": {
+            "type": "string",
+            "title": "Career Highlights",
+            "default": ""
+          },
+          "open_to_remote": {
+            "type": "string",
+            "title": "Open To Remote",
+            "default": ""
+          },
+          "notice_period": {
+            "type": "string",
+            "title": "Notice Period",
+            "default": ""
+          },
+          "education_level": {
+            "type": "string",
+            "title": "Education Level",
+            "default": ""
+          },
+          "expected_city": {
+            "type": "string",
+            "title": "Expected City",
+            "default": ""
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone",
+            "default": ""
+          },
+          "certificates": {
+            "type": "string",
+            "title": "Certificates",
+            "default": ""
+          },
+          "english_level": {
+            "type": "string",
+            "title": "English Level",
+            "default": ""
+          },
+          "signature_projects": {
+            "type": "string",
+            "title": "Signature Projects",
+            "default": ""
+          },
+          "strengths": {
+            "type": "string",
+            "title": "Strengths",
+            "default": ""
+          },
+          "weaknesses": {
+            "type": "string",
+            "title": "Weaknesses",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "UserProfileUpdate"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorkflowTypeOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "phases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Phases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "phases"
+        ],
+        "title": "WorkflowTypeOption"
+      }
+    }
+  }
+}

@@ -32,6 +32,12 @@ services/
 **推荐（当前采用）**：按**业务子域**平铺模块，**不再套一层目录**：
 
 ```
+shared/schemas/
+├── __init__.py    # re-export，import shared.schemas 路径不变
+├── pipeline.py    # 三阶段 / LLM 处理器配置
+├── errors.py      # API 错误 envelope
+└── candidate.py   # CandidateProfile / ResumePickerItem / CompanyInfo
+
 api_service/schemas/
 ├── __init__.py    # 仅 re-export，对外 import 路径不变
 ├── profile.py     # 档案 CRUD
@@ -52,19 +58,32 @@ interview_service/schemas/
 
 ### 2.2 与前端类型的关系
 
-前端 `apps/web/src/types/` 仍为手写 TS；跨边界字段变更时同步更新，或后续引入 OpenAPI 生成。后端 `schemas` 拆分 **不改变** HTTP JSON 形状。
+前端 `apps/web/src/types/`：
+
+```
+types/
+├── domains/           # 手写域类型（interview WS、prep、api 配置等）
+├── generated/api.d.ts # OpenAPI 生成（npm run generate:api-types）
+└── index.ts           # barrel；`@/types/interview` 保留兼容 re-export
+```
+
+`openapi.json` 由 `scripts/export_openapi.py` 导出；字段变更时运行 `npm run generate:api-types`。后端 `schemas` 拆分 **不改变** HTTP JSON 形状。
 
 ---
 
 ## 3. ORM（models）放哪？
 
-| 实体 | 位置 | 说明 |
-| --- | --- | --- |
-| `UserProfile`、`Resume` | `shared/models` | 模块化单体共库；变更需三服务契约测试 |
-| `PrepSession` | `agent_service/models` | Prep 专有 |
-| `InterviewSession` | `interview_service/models/session.py` | 面试会话 |
-| `GrowthRecord` | `interview_service/models/growth.py` | 成长记录 |
-| 处理器配置表 | `shared/core/config_models` + `shared.models` re-export | 平台配置 |
+物理库拆分见 ``docs/dual-database.md``：**api.db**（档案/简历/处理器配置）与 **sessions.db**（面试/Prep/租约/限流桶）。
+
+| 实体 | 位置 | 库 | 说明 |
+| --- | --- | --- | --- |
+| `UserProfile`、`Resume` | `shared/models` | api.db | 跨服务读门面 ``candidate_read`` |
+| `PrepSession` | `agent_service/models` | sessions.db | Prep 专有 |
+| `InterviewSession` | `interview_service/models/session.py` | sessions.db | 面试会话 |
+| `GrowthRecord` | `interview_service/models/growth.py` | sessions.db | 成长记录 |
+| `WsSessionLease` | `interview_service/models/ws_lease.py` | sessions.db | WS 分布式租约 |
+| `RateLimitBucket` | `shared/models/rate_limit_bucket.py` | sessions.db | 多 worker 限流 |
+| 处理器配置表 | `shared/core/config_models` + `shared.models` re-export | api.db | 平台配置 |
 
 **不要**在 `api_service/models/` 再 re-export `shared.models`——新代码直接 `from shared.models import Resume`。
 
@@ -90,4 +109,4 @@ interview_service/schemas/
 
 ---
 
-*2026-09-01 · 与架构审查修复第二阶段同步*
+*2026-09-02 · 与双库拆分及架构审查修复同步*
