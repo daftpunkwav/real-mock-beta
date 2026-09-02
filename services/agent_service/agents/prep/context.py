@@ -10,9 +10,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from shared.database import api_db_session
 from shared.core.prompts import with_agent_output_rules
-from shared.models import Resume, UserProfile
 from shared.catalogs.company import get_company_context
+from shared.services.candidate_read import format_profile_summary, format_resume_summary
 from shared.capabilities.ai.agent import WorkingMemory
 from shared.capabilities.ai.context_manager import (
     compact_with_summary,
@@ -37,64 +38,13 @@ PREP_SYSTEM = with_agent_output_rules("""你是本模拟面试系统的面试准
 - 出练习题时直接以 Markdown 文本写题目，禁止在正文里输出 <tool_call>/<invoke>/<question> 等任何工具调用 XML 或 JSON 结构
 - 工具返回含「SEARCH_UNAVAILABLE / 搜索暂时不可用 / 未找到」时：禁止编造搜索结果列表、具体链接或引用编号；可基于通用知识继续并标注「基于通用知识整理，非实时检索」""")
 
-_PROFILE_FIELDS: list[tuple[str, str]] = [
-    ("name", "姓名"),
-    ("identity", "身份"),
-    ("school", "学校"),
-    ("major", "专业"),
-    ("education_level", "学历"),
-    ("graduation_year", "毕业年份"),
-    ("job_direction", "求职方向"),
-    ("target_role", "目标岗位"),
-    ("experience_years", "工作年限"),
-    ("current_company", "当前公司"),
-    ("tech_domains", "技术栈"),
-    ("strengths", "自评优势"),
-    ("weaknesses", "自评短板"),
-    ("career_highlights", "亮点经历"),
-    ("signature_projects", "代表项目"),
-    ("certificates", "证书"),
-    ("english_level", "英语水平"),
-    ("expected_city", "期望城市"),
-]
-
-
-def get_resume_context(db: Session, resume_id: int | None) -> str:
-    if not resume_id:
-        return ""
-    r = db.query(Resume).filter(Resume.id == resume_id).first()
-    if not r:
-        return ""
-    return f"简历：{r.filename}\n{r.parsed_profile[:3000]}"
-
-
-def get_profile_context(db: Session) -> str:
-    """个人档案摘要：优先 id=1，否则取第一条。空档案返回空串。"""
-    p = db.query(UserProfile).filter(UserProfile.id == 1).first()
-    if p is None:
-        p = db.query(UserProfile).first()
-    if p is None:
-        return ""
-    lines: list[str] = []
-    for key, label in _PROFILE_FIELDS:
-        value = getattr(p, key, "")
-        if key == "tech_domains":
-            domains = p.tech_domains_list
-            value = "、".join(domains) if domains else ""
-        value = str(value or "").strip()
-        if value:
-            lines.append(f"{label}：{value[:80]}")
-    if not lines:
-        return ""
-    return "求职者档案：\n" + "\n".join(lines[:18])
-
-
 def build_system_message(
     db: Session, *, resume_id: int | None, target_company: str
 ) -> str:
-    """组装首轮 system 消息：系统提示 + 公司上下文 + 简历 + 档案。"""
-    ctx = get_resume_context(db, resume_id)
-    profile = get_profile_context(db)
+    """组装首轮 system 消息：系统提示 + 公司上下文 + 简历 + 档案（读 api 库）。"""
+    with api_db_session() as api_db:
+        ctx = format_resume_summary(api_db, resume_id)
+        profile = format_profile_summary(api_db)
     company = get_company_context(target_company or "")
     return f"{PREP_SYSTEM}\n\n{company}\n{ctx}\n{profile}"
 

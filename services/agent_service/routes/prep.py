@@ -14,7 +14,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from agent_service.routes import prep_chat, prep_create, prep_lists
-from agent_service.schemas import ResumePickerItem
+from agent_service.schemas import (
+    PrepHistoryMessage,
+    PrepMessageRequest,
+    PrepMessageResponse,
+    PrepSessionCreateResponse,
+    PrepSessionSummary,
+    ResumePickerItem,
+)
 from shared.core.constants import (
     DEFAULT_LLM_RATE_LIMIT_PER_MINUTE,
     DEFAULT_SESSION_CREATE_RATE_LIMIT_PER_MINUTE,
@@ -35,12 +42,14 @@ router.add_api_route(
     "/sessions",
     prep_lists.list_prep_sessions,
     methods=["GET"],
+    response_model=list[PrepSessionSummary],
     dependencies=[Depends(require_local_peer)],
 )
 router.add_api_route(
     "/sessions",
     prep_create.create_prep_session,
     methods=["POST"],
+    response_model=PrepSessionCreateResponse,
     dependencies=[
         Depends(require_local_peer),
         Depends(
@@ -55,6 +64,7 @@ router.add_api_route(
     "/sessions/{session_id}/message",
     prep_chat.prep_message,
     methods=["POST"],
+    response_model=PrepMessageResponse,
     dependencies=[
         Depends(
             rate_limit_dep(
@@ -81,4 +91,5 @@ router.add_api_route(
     "/sessions/{session_id}/messages",
     prep_chat.get_prep_messages,
     methods=["GET"],
+    response_model=list[PrepHistoryMessage],
 )

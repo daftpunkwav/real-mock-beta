@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from interview_service.realtime import ws_handler
-from interview_service.realtime.voice_pipeline import _pick_stt_text, _should_skip_whisper
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.voice.pipeline import _pick_stt_text, _should_skip_whisper
+from interview_service.realtime.core.events import TurnState
 from shared.capabilities.voice.stt.cloud import is_local_stt_model, resolve_cloud_stt_model
 
 
@@ -69,7 +69,7 @@ class TestCloudSttPath:
         h.ctx.agent = None
         h._process_user_text = AsyncMock()
         with patch(
-            "interview_service.realtime.turn_coordinator.transcribe_utterance_result",
+            "interview_service.realtime.turn.coordinator.transcribe_utterance_result",
             new_callable=AsyncMock,
             return_value=SttResult(text="你好面试官都能听到的", provider="local"),
         ) as mock_tr:

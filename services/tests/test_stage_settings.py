@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from shared.database import Base
+from shared.database import ApiBase
 from shared.models import LLMSettings, StageConfig
 from shared.schemas import StageConfigUpdate
 from shared.capabilities.ai.llm.unified_client import UnifiedLLMClient
@@ -18,7 +18,7 @@ from shared.services.pipeline_config import (
 
 def _db():
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
+    ApiBase.metadata.create_all(engine)
     return sessionmaker(bind=engine)()
 
 

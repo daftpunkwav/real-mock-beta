@@ -18,10 +18,11 @@ def _seed(db, rows: list[PrepSession], resume: Resume | None = None) -> None:
     db.commit()
 
 
-def test_list_prep_sessions_groups_by_resume(db) -> None:
+def test_list_prep_sessions_groups_by_resume(db, api_db) -> None:
     resume = Resume(filename="Resume_TwoPage.pdf", file_type="pdf")
-    db.add(resume)
-    db.flush()  # 先取自增 id：同库 fixture 下 resume 表可能已有行（如 test_resume_picker 先插入的 cv.pdf），勿硬编码 1
+    api_db.add(resume)
+    api_db.commit()
+    api_db.refresh(resume)
     older = PrepSession(
         resume_id=None,
         messages=json.dumps(
@@ -47,7 +48,7 @@ def test_list_prep_sessions_groups_by_resume(db) -> None:
         ),
         token_usage=55,
     )
-    _seed(db, [older, newer], resume)
+    _seed(db, [older, newer])
 
     with TestClient(app) as client:
         res = client.get("/api/v1/prep/sessions")

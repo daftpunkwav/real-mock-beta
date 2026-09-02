@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from api_service.routes import resume_analyze, resume_crud, resume_upload
+from api_service.routes.resume import analyze, crud, upload
 from api_service.schemas import ResumeAnalysis, ResumeResponse
 from shared.core.constants import (
     DEFAULT_LLM_RATE_LIMIT_PER_MINUTE,
@@ -25,7 +25,7 @@ router = APIRouter(dependencies=[Depends(require_local_peer)])
 
 router.add_api_route(
     "/upload",
-    resume_upload.upload_resume,
+    upload.upload_resume,
     methods=["POST"],
     response_model=ResumeResponse,
     dependencies=[
@@ -39,30 +39,30 @@ router.add_api_route(
 )
 router.add_api_route(
     "/list",
-    resume_crud.list_resumes,
+    crud.list_resumes,
     methods=["GET"],
     response_model=list[ResumeResponse],
 )
 router.add_api_route(
     "/{resume_id}",
-    resume_crud.get_resume,
+    crud.get_resume,
     methods=["GET"],
     response_model=ResumeResponse,
 )
 router.add_api_route(
     "/{resume_id}/activate",
-    resume_crud.activate_resume,
+    crud.activate_resume,
     methods=["POST"],
     response_model=ResumeResponse,
 )
 router.add_api_route(
     "/{resume_id}",
-    resume_crud.delete_resume,
+    crud.delete_resume,
     methods=["DELETE"],
 )
 router.add_api_route(
     "/{resume_id}/analyze",
-    resume_analyze.analyze_resume,
+    analyze.analyze_resume,
     methods=["POST"],
     response_model=ResumeAnalysis,
     dependencies=[

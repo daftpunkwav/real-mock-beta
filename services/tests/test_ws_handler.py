@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from interview_service.realtime.events import SessionEvent, TurnState
+from interview_service.realtime.core.events import SessionEvent, TurnState
 
 
 def _make_mock_ws() -> MagicMock:
@@ -199,10 +199,10 @@ class TestTraceId:
 
         monkeypatch.setattr(LLMClient, "from_db", classmethod(lambda cls, db: MagicMock(api_key="")))
         monkeypatch.setattr(
-            "interview_service.realtime.context.InterviewOrchestrator", MagicMock()
+            "interview_service.realtime.core.context.InterviewOrchestrator", MagicMock()
         )
         monkeypatch.setattr(
-            "interview_service.realtime.connection_auth.InterviewRunner",
+            "interview_service.realtime.connection.auth.InterviewRunner",
             lambda *a, **kw: _StubRunner(),
         )
         # 模拟 db.query 拿到 session
@@ -214,7 +214,7 @@ class TestTraceId:
         mock_db.query.return_value.filter.return_value.first.return_value = _StubSession()
         # handle() 定义在 connection_lifecycle 模块，须 patch 该模块的 SessionLocal
         monkeypatch.setattr(
-            "interview_service.realtime.connection_lifecycle.SessionLocal", lambda: mock_db
+            "interview_service.realtime.connection.lifecycle.SessionLocal", lambda: mock_db
         )
 
         ws = _make_mock_ws()
@@ -241,7 +241,7 @@ class TestFailAndClose:
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.first.return_value = session
         monkeypatch.setattr(
-            "interview_service.realtime.connection_lifecycle.SessionLocal", lambda: mock_db
+            "interview_service.realtime.connection.lifecycle.SessionLocal", lambda: mock_db
         )
         return mock_db
 

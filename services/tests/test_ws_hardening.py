@@ -9,11 +9,11 @@ import pytest
 
 from shared.core.ratelimit import reset_rate_limit, try_rate_limit_by_id
 from interview_service.realtime import ws_handler
-from interview_service.realtime.voice_pipeline import (
+from interview_service.realtime.voice.pipeline import (
     _pick_stt_text,
     _should_skip_whisper,
 )
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.core.events import TurnState
 from interview_service.services.interview.events import EventKind, StreamEvent
 
 
@@ -164,7 +164,7 @@ class TestSttAlwaysRuns:
         )
         h._process_user_text = AsyncMock()
         with patch(
-            "interview_service.realtime.turn_coordinator.transcribe_utterance_result",
+            "interview_service.realtime.turn.coordinator.transcribe_utterance_result",
             new_callable=AsyncMock,
             return_value=SttResult(text="这是一段足够长的中文技术回答内容", provider="local"),
         ) as mock_tr:
@@ -194,7 +194,7 @@ class TestSttAlwaysRuns:
         )
         h._process_user_text = AsyncMock()
         with patch(
-            "interview_service.realtime.turn_coordinator.transcribe_utterance_result",
+            "interview_service.realtime.turn.coordinator.transcribe_utterance_result",
             new_callable=AsyncMock,
             return_value=SttResult(text="I used React hooks", provider="local"),
         ) as mock_tr:

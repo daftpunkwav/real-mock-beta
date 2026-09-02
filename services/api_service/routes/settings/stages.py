@@ -11,7 +11,7 @@ DB 读写见 ``api_service.services.model_registry``。
 
 职责拆分：
 - URL 格式与阶段 provider 校验见 :mod:`api_service.services.settings_validation`；
-- 旧版 /llm 聚合读写见 :mod:`api_service.services.legacy_llm_settings`；
+- 旧版 /llm 聚合读写见 :mod:`api_service.services.llm_stages_compat`；
 - 三阶段连通性测试见 :mod:`api_service.services.stage_tests`。
 """
 
@@ -41,9 +41,9 @@ from shared.services.pipeline_config import (
     stage_to_response,
     update_stage_config,
 )
-from api_service.services.legacy_llm_settings import (
-    read_legacy_llm_settings,
-    write_legacy_llm_settings,
+from api_service.services.llm_stages_compat import (
+    read_aggregated_llm_settings,
+    write_aggregated_llm_settings,
 )
 from api_service.services.route_timing import run_timed_stage_test
 from api_service.services.settings_validation import safe_base, validate_stage_config
@@ -58,19 +58,19 @@ def get_voice_catalog() -> dict[str, Any]:
     return catalog_payload()
 
 
-@router.get("/llm", response_model=LLMSettingsResponse)
+@router.get("/llm", response_model=LLMSettingsResponse, deprecated=True)
 def get_llm_settings(db: Session = Depends(get_db)):
-    """DEPRECATED: 兼容旧版设置读取（内部仍从 stage_configs 聚合）。将在 v2.0 移除。"""
-    return read_legacy_llm_settings(db)
+    """DEPRECATED: 兼容旧版设置读取（内部仍从 stage_configs 聚合）。请改用 ``/stages``。"""
+    return read_aggregated_llm_settings(db)
 
 
-@router.put("/llm", response_model=LLMSettingsResponse)
+@router.put("/llm", response_model=LLMSettingsResponse, deprecated=True)
 def update_llm_settings(body: LLMSettingsUpdate, db: Session = Depends(get_db)):
-    """DEPRECATED: 兼容旧版统一保存：拆分到 stage_configs。将在 v2.0 移除。
+    """DEPRECATED: 兼容旧版统一保存：拆分到 stage_configs。请改用 ``/stages/{stage}``。
 
     URL 安全校验使用 ``allow_local_llm``，而不是开发环境字符串判断。
     """
-    return write_legacy_llm_settings(db, body)
+    return write_aggregated_llm_settings(db, body)
 
 
 @router.get("/stages", response_model=StageConfigsResponse)
@@ -106,10 +106,11 @@ def update_stage(
 @router.post(
     "/llm/test",
     response_model=LLMTestResponse,
+    deprecated=True,
     dependencies=[Depends(rate_limit_dep(key="llm", limit=DEFAULT_LLM_RATE_LIMIT_PER_MINUTE))],
 )
 async def test_llm_connection(db: Session = Depends(get_db)):
-    """DEPRECATED: 兼容旧入口：等同于测试「面试思考」阶段，客户端遵循 ``allow_local_llm``。将在 v2.0 移除。"""
+    """DEPRECATED: 兼容旧入口：等同于测试「面试思考」阶段，客户端遵循 ``allow_local_llm``。请改用 ``/test/reason``。"""
     result = await run_timed_stage_test(test_reason(db))
     return LLMTestResponse(
         success=bool(result.get("success")),

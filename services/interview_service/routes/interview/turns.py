@@ -17,10 +17,10 @@ from sqlalchemy.orm import Session
 from shared.core.constants import SessionStatus
 from shared.core.errors import ApiBusinessError, raise_error
 from shared.core.session_auth import assert_session_token, extract_token
-from shared.database import get_db
+from shared.database import get_sessions_db
 from interview_service.ai import session_llm
 from interview_service.models import InterviewSession
-from interview_service.schemas import ChatMessage, InterviewMessageRequest, InterviewMessageResponse
+from interview_service.schemas import ChatMessage, FinishInterviewResponse, InterviewMessageRequest, InterviewMessageResponse
 from interview_service.services.interview.events import EventKind
 from interview_service.services.interview.report import generate_and_persist_report
 from interview_service.services.interview.runner import InterviewRunner
@@ -64,7 +64,7 @@ async def _collect_turn_result(stream) -> tuple[str, bool]:
 
 async def start_interview(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
     access: str | None = Depends(extract_token),
 ):
     session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()
@@ -92,7 +92,7 @@ async def start_interview(
 async def send_message(
     session_id: int,
     body: InterviewMessageRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
     access: str | None = Depends(extract_token),
 ):
     session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()
@@ -119,7 +119,7 @@ async def send_message(
 
     if is_complete:
         try:
-            await generate_and_persist_report(session, llm, db)
+            report = await generate_and_persist_report(session, llm, db)
         except Exception as e:
             # 对外通用文案，细节仅日志（防上游异常泄漏）
             logger.exception("报告生成失败 sid=%s", session_id)
@@ -137,9 +137,9 @@ async def send_message(
 
 async def finish_interview(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
     access: str | None = Depends(extract_token),
-):
+) -> FinishInterviewResponse:
     """提前结束面试并生成报告。
 
     若 WS 已落库报告则直接返回；否则触发一次生成（与 WS 后台共用锁防双打）。
@@ -153,7 +153,7 @@ async def finish_interview(
         and session.report
         and session.report != "{}"
     ):
-        return {"session_id": session_id, "status": "already_completed"}
+        return FinishInterviewResponse(session_id=session_id, status="already_completed")
 
     # 口头收尾可能已把 status 标 completed 但 report 仍空：补生成
     llm = session_llm(db, session)
@@ -162,8 +162,8 @@ async def finish_interview(
     except Exception as e:
         logger.exception("报告生成失败 sid=%s", session_id)
         raise_error("C1001", cause=e)
-    return {
-        "session_id": session_id,
-        "status": SessionStatus.COMPLETED.value,
-        "overall_score": session.overall_score,
-    }
+    return FinishInterviewResponse(
+        session_id=session_id,
+        status=SessionStatus.COMPLETED.value,
+        overall_score=session.overall_score,
+    )

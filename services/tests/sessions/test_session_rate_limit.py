@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from fastapi.routing import APIRoute
 
-from interview_service.routes import interview, reports
-from api_service.routes import resume, settings
+from interview_service.routes.interview import router as interview_router
+from interview_service.routes.reports import router as reports_router
+from api_service.routes.resume import router as resume_router
+from api_service.routes.settings import router as settings_router
 from agent_service.routes import prep
 from shared.core.ratelimit import check_rate_limit, rate_limit_dep, reset_rate_limit
 
@@ -36,14 +38,14 @@ def test_interview_expensive_routes_have_rate_limit() -> None:
         ("/message", {"POST"}),
         ("/finish", {"POST"}),
     ]:
-        names = _route_dependency_names(interview.router, suffix, methods)
+        names = _route_dependency_names(interview_router, suffix, methods)
         assert any("rate_limit" in n or n == "_dep" for n in names), (
             f"interview {suffix} 缺少限流 Depends，got {names}"
         )
 
 
 def test_report_stream_has_rate_limit() -> None:
-    names = _route_dependency_names(reports.router, "/stream", {"GET"})
+    names = _route_dependency_names(reports_router, "/stream", {"GET"})
     assert names, "reports stream 应有 dependencies"
 
 
@@ -53,12 +55,12 @@ def test_prep_stream_has_rate_limit() -> None:
 
 
 def test_resume_analyze_has_rate_limit() -> None:
-    names = _route_dependency_names(resume.router, "/analyze", {"POST"})
+    names = _route_dependency_names(resume_router, "/analyze", {"POST"})
     assert names, "resume analyze 应有 dependencies"
 
 
 def test_settings_test_has_rate_limit() -> None:
-    names = _route_dependency_names(settings.router, "/test", {"POST"})
+    names = _route_dependency_names(settings_router, "/test", {"POST"})
     assert names, "settings llm/test 应有 dependencies"
 
 

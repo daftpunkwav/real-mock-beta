@@ -16,7 +16,9 @@ from interview_service.models import InterviewSession
 from shared.capabilities.ai.agent import WorkingMemory
 from shared.capabilities.ai.context_manager import compress_messages
 from interview_service.services.interview.session_state import InterviewSessionState
+from shared.database import api_db_session
 from shared.services.pipeline_config import get_stage_config_for_runtime
+from shared.core.config_models import LLMSettings
 
 logger = logging.getLogger(__name__)
 
@@ -109,20 +111,18 @@ class PromptAssembler:
     def get_context_window(self, db: Session) -> int:
         """读取当前 LLM 设置中的 context window。
 
-        0 或未设置视为无限制（不压缩）。
+        0 或未设置视为无限制（不压缩）。配置表在 api 库。
         """
-        config = get_stage_config_for_runtime(db, "reason")
-        context_window = config.get("context_window")
-        if (config.get("extras") or {}).get("source") == "environment":
-            # 环境变量只是兼容回退；旧接口仍可能在启动后更新 LLMSettings。
-            from interview_service.models import LLMSettings
-
-            legacy = db.query(LLMSettings).filter(LLMSettings.id == 1).first()
-            if legacy and legacy.context_window:
-                context_window = legacy.context_window
-        if not context_window:
-            return 0
-        return int(context_window)
+        with api_db_session() as api_db:
+            config = get_stage_config_for_runtime(api_db, "reason")
+            context_window = config.get("context_window")
+            if (config.get("extras") or {}).get("source") == "environment":
+                legacy = api_db.query(LLMSettings).filter(LLMSettings.id == 1).first()
+                if legacy and legacy.context_window:
+                    context_window = legacy.context_window
+            if not context_window:
+                return 0
+            return int(context_window)
 
 
 __all__ = ["PromptAssembler"]

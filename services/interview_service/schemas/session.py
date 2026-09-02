@@ -72,3 +72,9 @@ class InterviewMessageResponse(BaseModel):
     current_phase: str
     is_complete: bool = False
     phases_remaining: list[str] = Field(default_factory=list)
+
+
+class FinishInterviewResponse(BaseModel):
+    session_id: int
+    status: str
+    overall_score: int | None = None

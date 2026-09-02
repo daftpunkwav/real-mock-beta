@@ -11,21 +11,21 @@ import logging
 
 from fastapi import Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from agent_service.agents.prep.agent import PrepAgent
 from agent_service.models import PrepSession
+from agent_service.schemas import PrepHistoryMessage, PrepMessageRequest, PrepMessageResponse
 from shared.capabilities.ai.llm.client import LLMClient
 from shared.capabilities.ai.llm.stream_filters import sanitize_special_tokens
-from shared.core.constants import MAX_USER_TEXT_CHARS, SessionStatus
+from shared.core.constants import SessionStatus
 from shared.core.errors import raise_error
 from shared.core.security import redact_api_key
 from shared.core.session_auth import (
     assert_session_token,
     extract_prep_token,
 )
-from shared.database import get_db
+from shared.database import get_api_db, get_sessions_db
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +34,10 @@ _SSE_ERR_GENERIC = "辅导生成失败，请稍后重试"
 _PREP_FORBIDDEN = "无权访问该辅导会话"
 
 
-class PrepMessageRequest(BaseModel):
-    content: str = Field(..., max_length=MAX_USER_TEXT_CHARS)
-    # 场景级覆盖：所选模型条目与思考强度（缺省用默认 chat 绑定、不发思考参数）
-    model_profile_id: int | None = None
-    reasoning_effort: str | None = Field(default=None, pattern="^(low|medium|high|max)$")
-
-
-def _build_prep_llm(db: Session, body: PrepMessageRequest) -> LLMClient:
-    """按请求覆盖（可选）构建思考客户端。"""
+def _build_prep_llm(api_db: Session, body: PrepMessageRequest) -> LLMClient:
+    """按请求覆盖（可选）构建思考客户端（读 api 库配置）。"""
     return LLMClient.from_db(
-        db,
+        api_db,
         profile_id=body.model_profile_id,
         reasoning_effort=body.reasoning_effort,
     )
@@ -53,7 +46,8 @@ def _build_prep_llm(db: Session, body: PrepMessageRequest) -> LLMClient:
 async def prep_message(
     session_id: int,
     body: PrepMessageRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
+    api_db: Session = Depends(get_api_db),
     access: str | None = Depends(extract_prep_token),
 ):
     session = db.query(PrepSession).filter(PrepSession.id == session_id).first()
@@ -62,16 +56,17 @@ async def prep_message(
     assert_session_token(session, access, detail=_PREP_FORBIDDEN)
     if getattr(session, "status", None) == SessionStatus.COMPLETED.value:
         raise_error("A3002")
-    llm = _build_prep_llm(db, body)
+    llm = _build_prep_llm(api_db, body)
     agent = PrepAgent(session, llm)
     reply = await agent.chat(body.content, db)
-    return {"reply": reply, "token_usage": session.token_usage}
+    return PrepMessageResponse(reply=reply, token_usage=session.token_usage or 0)
 
 
 async def prep_message_stream(
     session_id: int,
     body: PrepMessageRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
+    api_db: Session = Depends(get_api_db),
     access: str | None = Depends(extract_prep_token),
 ):
     session = db.query(PrepSession).filter(PrepSession.id == session_id).first()
@@ -80,7 +75,7 @@ async def prep_message_stream(
     assert_session_token(session, access, detail=_PREP_FORBIDDEN)
     if getattr(session, "status", None) == SessionStatus.COMPLETED.value:
         raise_error("A3002")
-    llm = _build_prep_llm(db, body)
+    llm = _build_prep_llm(api_db, body)
     agent = PrepAgent(session, llm)
 
     async def event_stream():
@@ -108,7 +103,7 @@ async def prep_message_stream(
 
 def get_prep_messages(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
     access: str | None = Depends(extract_prep_token),
 ):
     session = db.query(PrepSession).filter(PrepSession.id == session_id).first()
@@ -120,4 +115,4 @@ def get_prep_messages(
     for m in messages:
         if m.get("role") == "assistant" and isinstance(m.get("content"), str):
             m["content"] = sanitize_special_tokens(m["content"])
-    return messages
+    return [PrepHistoryMessage.model_validate(m) for m in messages]

@@ -7,14 +7,14 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from shared.database import Base
+from shared.database import SessionsBase
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class GrowthRecord(Base):
+class GrowthRecord(SessionsBase):
     """用户成长记录。"""
 
     __tablename__ = "growth_records"

@@ -8,7 +8,7 @@ from services.main import app
 from shared.models import Resume
 
 
-def test_interview_resume_picker_omits_analysis(db) -> None:
+def test_interview_resume_picker_omits_analysis(api_db) -> None:
     row = Resume(
         filename="cv.pdf",
         file_type="pdf",
@@ -18,8 +18,8 @@ def test_interview_resume_picker_omits_analysis(db) -> None:
         score=88,
         analysis='{"score":99,"overall_narrative":"secret"}',
     )
-    db.add(row)
-    db.commit()
+    api_db.add(row)
+    api_db.commit()
 
     with TestClient(app) as client:
         resp = client.get("/api/v1/interview/resumes")
@@ -34,7 +34,7 @@ def test_interview_resume_picker_omits_analysis(db) -> None:
     assert "raw_text" not in item
 
 
-def test_prep_resume_picker_omits_analysis(db) -> None:
+def test_prep_resume_picker_omits_analysis(api_db) -> None:
     row = Resume(
         filename="prep.docx",
         file_type="docx",
@@ -44,8 +44,8 @@ def test_prep_resume_picker_omits_analysis(db) -> None:
         score=None,
         analysis='{"score":12}',
     )
-    db.add(row)
-    db.commit()
+    api_db.add(row)
+    api_db.commit()
 
     with TestClient(app) as client:
         resp = client.get("/api/v1/prep/resumes")

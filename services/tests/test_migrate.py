@@ -13,7 +13,7 @@ from __future__ import annotations
 from sqlalchemy import create_engine, inspect, text
 
 from shared.core.migrate import _column_name_from_stmt, run_migrations
-from shared.database import Base
+from shared.database import ApiBase
 
 
 def _fresh_engine():
@@ -23,7 +23,7 @@ def _fresh_engine():
         connect_args={"check_same_thread": False},
         future=True,
     )
-    Base.metadata.create_all(eng)
+    ApiBase.metadata.create_all(eng)
     return eng
 
 

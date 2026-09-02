@@ -1,7 +1,6 @@
-"""旧版 /llm 聚合读写（DEPRECATED 兼容层，将在 v2.0 移除）。
+"""DEPRECATED /llm 路由兼容：从 stage_configs 聚合读写（与 /stages 同数据源）。
 
-内部仍从 stage_configs 聚合三阶段字段，与新版 /stages 共享同一份数据；
-密钥不回显明文（``has_api_key`` 一类布尔标记）。
+命名避免 ``legacy`` 筐；路由层仍保留 /llm 别名直至 v2.0 移除。
 """
 
 from __future__ import annotations
@@ -24,8 +23,8 @@ from shared.services.pipeline_config import (
 from api_service.services.settings_validation import safe_base
 
 
-def read_legacy_llm_settings(db: Session) -> LLMSettingsResponse:
-    """从 stage_configs 聚合旧版设置响应（reason/recognize/speak 三阶段）。"""
+def read_aggregated_llm_settings(db: Session) -> LLMSettingsResponse:
+    """从 stage_configs 聚合三阶段字段为旧版 LLMSettingsResponse 形状。"""
     cfg_map = get_stage_config_map(db)
     reason = cfg_map.get("reason", {})
     recognize = cfg_map.get("recognize", {})
@@ -66,7 +65,7 @@ def read_legacy_llm_settings(db: Session) -> LLMSettingsResponse:
     )
 
 
-def write_legacy_llm_settings(db: Session, body: LLMSettingsUpdate) -> LLMSettingsResponse:
+def write_aggregated_llm_settings(db: Session, body: LLMSettingsUpdate) -> LLMSettingsResponse:
     """旧版统一保存：拆分到 stage_configs，保存后聚合返回。"""
     safe_base(body.api_base, label="LLM API")
     safe_base(body.asr_api_base, label="ASR API")
@@ -133,4 +132,4 @@ def write_legacy_llm_settings(db: Session, body: LLMSettingsUpdate) -> LLMSettin
             },
         ),
     )
-    return read_legacy_llm_settings(db)
+    return read_aggregated_llm_settings(db)

@@ -8,10 +8,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from interview_service.routes import interview, options, reports, ws_interview
+from interview_service.routes import options
+from interview_service.routes.interview import router as interview_router
+from interview_service.routes.growth import router as growth_router
+from interview_service.routes.reports import router as reports_router
+from interview_service.routes.ws import router as ws_router
 
 service_router = APIRouter()
-service_router.include_router(interview.router, prefix="/interview", tags=["interview"])
-service_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+service_router.include_router(interview_router, prefix="/interview", tags=["interview"])
+service_router.include_router(reports_router, prefix="/reports", tags=["reports"])
+service_router.include_router(growth_router, prefix="/growth", tags=["growth"])
 service_router.include_router(options.router, prefix="/options", tags=["options"])
-service_router.include_router(ws_interview.router, tags=["realtime"])
+service_router.include_router(ws_router, tags=["realtime"])

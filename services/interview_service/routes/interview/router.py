@@ -17,7 +17,7 @@ from shared.core.constants import (
 from shared.core.local_only import require_local_peer
 from shared.core.ratelimit import rate_limit_dep
 from shared.schemas import ResumePickerItem
-from interview_service.routes import sessions, turns
+from interview_service.routes.interview import sessions, turns
 
 router = APIRouter()
 
@@ -92,6 +92,7 @@ router.add_api_route(
     "/sessions/{session_id}/finish",
     turns.finish_interview,
     methods=["POST"],
+    response_model=turns.FinishInterviewResponse,
     dependencies=[
         Depends(
             rate_limit_dep(

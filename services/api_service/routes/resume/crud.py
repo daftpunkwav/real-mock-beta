@@ -21,7 +21,6 @@ from shared.database import get_db
 from shared.schemas import CandidateProfile
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 def list_resumes(db: Session = Depends(get_db)):
@@ -97,7 +96,7 @@ def delete_resume(resume_id: int, db: Session = Depends(get_db)):
         raise_error("A1005")
     # 尝试删除上传文件（文件名含 uuid 前缀，与落盘规则一致时）
     try:
-        upload_dir = Path(settings.upload_dir).resolve()
+        upload_dir = Path(get_settings().upload_dir).resolve()
         for p in upload_dir.glob(f"*_{sanitize_filename(r.filename)}"):
             try:
                 assert_within_dir(p, upload_dir)

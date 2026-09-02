@@ -21,7 +21,7 @@ from shared.core.session_auth import (
     new_access_token,
     set_session_cookie,
 )
-from shared.database import get_db
+from shared.database import get_api_db, get_sessions_db
 from interview_service.models import InterviewSession
 from interview_service.schemas import (
     ChatMessage,
@@ -35,7 +35,7 @@ from shared.services.resume_picker import list_resume_picker_items
 _CHAT_MSG_ADAPTER: TypeAdapter[list[ChatMessage]] = TypeAdapter(list[ChatMessage])
 
 
-def list_resume_picker(db: Session = Depends(get_db)):
+def list_resume_picker(db: Session = Depends(get_api_db)):
     """配置页下拉用的简历摘要；不返回解析正文与深度评价。"""
     return list_resume_picker_items(db)
 
@@ -44,7 +44,7 @@ def create_session(
     config: InterviewConfig,
     request: Request,
     response: Response,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
 ):
     token = new_access_token()
     session = InterviewSession(
@@ -81,7 +81,7 @@ def create_session(
     return _to_response(session, include_token=False)
 
 
-def list_sessions(db: Session = Depends(get_db)):
+def list_sessions(db: Session = Depends(get_sessions_db)):
     """历史列表：仅返回元数据，不含 access_token（防枚举窃取能力令牌）。"""
     sessions = db.query(InterviewSession).order_by(InterviewSession.created_at.desc()).all()
     return [_to_response(s, include_token=False) for s in sessions]
@@ -89,7 +89,7 @@ def list_sessions(db: Session = Depends(get_db)):
 
 def get_session(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
     access: str | None = Depends(extract_token),
 ):
     session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()
@@ -101,7 +101,7 @@ def get_session(
 
 def get_messages(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
     access: str | None = Depends(extract_token),
 ):
     session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()

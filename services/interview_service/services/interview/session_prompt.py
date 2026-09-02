@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from sqlalchemy.orm import Session
 
-from shared.models import Resume, UserProfile
-from shared.schemas import CandidateProfile
+from shared.database import api_db_session
+from shared.services.candidate_read import get_candidate_profile, get_user_profile
 from interview_service.schemas import InterviewConfig
 from shared.catalogs.company import get_company_context
 from shared.capabilities.ai.agent import WorkingMemory
@@ -57,19 +57,13 @@ class SessionPromptMixin:
             resume_id=self.session.resume_id,
         )
 
-    def get_user_profile(self, db: Session) -> UserProfile | None:
-        return db.query(UserProfile).filter(UserProfile.id == self.session.profile_id).first()
+    def get_user_profile(self, db: Session):
+        with api_db_session() as api_db:
+            return get_user_profile(api_db, self.session.profile_id)
 
-    def get_candidate(self, db: Session) -> CandidateProfile | None:
-        if not self.session.resume_id:
-            return None
-        resume = db.query(Resume).filter(Resume.id == self.session.resume_id).first()
-        if not resume:
-            return None
-        try:
-            return CandidateProfile(**json.loads(resume.parsed_profile))
-        except (json.JSONDecodeError, Exception):
-            return None
+    def get_candidate(self, db: Session):
+        with api_db_session() as api_db:
+            return get_candidate_profile(api_db, self.session.resume_id)
 
     def _system_learning_section(self) -> str:
         """从跨面试积累的系统学习数据中提取供本场面试参考的摘要。

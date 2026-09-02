@@ -16,7 +16,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from shared.models import Resume, UserProfile
+from shared.database import api_db_session
+from shared.services.candidate_read import get_resume_detail, get_user_profile
 from shared.catalogs.company import get_company_context
 from shared.capabilities.integrations.github.tools import GITHUB_TOOL_DEFINITIONS, execute_github_tool
 from shared.capabilities.ai.llm.tool_args import parse_tool_arguments  # noqa: F401 — 兼容旧引用
@@ -107,10 +108,11 @@ async def execute_interview_tool(
         args = dict(arguments or {})
         if name in ("github_get_user", "github_list_repos") and not args.get("username"):
             if profile_id:
-                p = db.query(UserProfile).filter(UserProfile.id == profile_id).first()
-                gh_user = getattr(p, "github_username", None) if p else None
-                if gh_user:
-                    args["username"] = gh_user
+                with api_db_session() as api_db:
+                    p = get_user_profile(api_db, profile_id)
+                    gh_user = getattr(p, "github_username", None) if p else None
+                    if gh_user:
+                        args["username"] = gh_user
         result = await execute_github_tool(name, args)
         # 写入结构化记忆
         if agent_state is not None:
@@ -129,13 +131,11 @@ async def execute_interview_tool(
     if name == "lookup_resume_projects":
         if not resume_id:
             return json.dumps({"error": "no_resume_bound"}, ensure_ascii=False)
-        r = db.query(Resume).filter(Resume.id == resume_id).first()
-        if not r:
-            return json.dumps({"error": "resume_not_found"}, ensure_ascii=False)
-        try:
-            profile = json.loads(r.parsed_profile or "{}")
-        except json.JSONDecodeError:
-            profile = {}
+        with api_db_session() as api_db:
+            detail = get_resume_detail(api_db, resume_id)
+            if not detail:
+                return json.dumps({"error": "resume_not_found"}, ensure_ascii=False)
+            filename, profile = detail
         focus = (arguments.get("focus") or "").lower()
         projects = profile.get("projects") or []
         skills = profile.get("skills") or []
@@ -146,7 +146,7 @@ async def execute_interview_tool(
             ]
             skills = [s for s in skills if focus in str(s).lower()]
         payload = {
-            "filename": r.filename,
+            "filename": filename,
             "name": profile.get("name"),
             "skills": skills[:40],
             "projects": projects[:15],

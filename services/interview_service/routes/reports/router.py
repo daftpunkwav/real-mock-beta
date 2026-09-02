@@ -21,8 +21,8 @@ from shared.core.local_only import require_local_peer
 from shared.core.ratelimit import rate_limit_dep
 from shared.core.security import redact_api_key
 from shared.core.session_auth import assert_session_token, extract_token
-from shared.database import get_db
-from interview_service.models import GrowthRecord, InterviewSession
+from shared.database import get_api_db, get_sessions_db
+from interview_service.models import InterviewSession
 from interview_service.schemas import InterviewReport, InterviewReportResponse
 from interview_service.services.interview.report import generate_and_persist_report
 from shared.capabilities.ai.llm.client import LLMClient
@@ -34,46 +34,6 @@ router = APIRouter()
 _SSE_ERR_GENERIC = "报告生成失败，请稍后重试"
 # 伪流式分片大小（字符），兼顾首包延迟与事件数量
 _PSEUDO_STREAM_CHUNK = 48
-
-
-def _safe_json_list(raw: str | None, *, field: str, record_id: int) -> list:
-    """解析成长记录 JSON 列表；坏数据降级为 []，避免整列表 500。"""
-    if not raw:
-        return []
-    try:
-        data = json.loads(raw)
-        return data if isinstance(data, list) else []
-    except (json.JSONDecodeError, TypeError):
-        logger.warning(
-            "GrowthRecord.%s 解析失败 id=%s，已降级为空列表", field, record_id
-        )
-        return []
-
-
-@router.get("/growth/history", dependencies=[Depends(require_local_peer)])
-def get_growth_history(db: Session = Depends(get_db)):
-    records = db.query(GrowthRecord).order_by(GrowthRecord.created_at.desc()).limit(20).all()
-    return [
-        {
-            "id": r.id,
-            "session_id": r.session_id,
-            "weak_skills": _safe_json_list(r.weak_skills, field="weak_skills", record_id=r.id),
-            "training_plan": _safe_json_list(
-                r.training_plan, field="training_plan", record_id=r.id
-            ),
-            "created_at": r.created_at,
-        }
-        for r in records
-    ]
-
-
-@router.get("/growth/system-insights", dependencies=[Depends(require_local_peer)])
-def get_system_growth_insights():
-    """系统级自我成长洞察（跨面试聚合，非候选人个人隐私外泄）。"""
-    from interview_service.services.growth.learning import get_system_insights
-
-    return get_system_insights(limit=15)
-
 
 @router.get(
     "/{session_id}/stream",
@@ -89,13 +49,14 @@ def get_system_growth_insights():
 )
 async def get_report_stream(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
+    api_db: Session = Depends(get_api_db),
     access: str | None = Depends(extract_token),
 ):
     """流式返回报告（单次 LLM；与 finish 共用 persist 语义）。
 
     - 已有 report 则短路，不重复调用 LLM；
-    - 否则 ``generate_and_persist_report``（含 GrowthRecord）一次完成；
+    - 否则 ``generate_and_persist_report``（session + 成长副作用）一次完成；
     - JSON 伪流式分片推送 + ``done`` 携带同一份结构。
     """
     session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()
@@ -105,7 +66,7 @@ async def get_report_stream(
     if session.status != SessionStatus.COMPLETED.value:
         raise_error("A2003")
 
-    llm = LLMClient.from_db(db)
+    llm = LLMClient.from_db(api_db)
 
     async def event_stream():
         try:
@@ -147,7 +108,7 @@ async def get_report_stream(
 )
 def get_report(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
     access: str | None = Depends(extract_token),
 ):
     session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()

@@ -20,16 +20,16 @@ def _auth_headers(token: str = _TOKEN) -> dict[str, str]:
     return {"X-Interview-Token": token}
 
 
-def _make_completed_session(db) -> int:
-    settings = db.query(LLMSettings).filter(LLMSettings.id == 1).first()
+def _make_completed_session(db, api_db) -> int:
+    settings = api_db.query(LLMSettings).filter(LLMSettings.id == 1).first()
     if settings is None:
         settings = LLMSettings(id=1, api_key="x", api_base="http://x", model="m")
-        db.add(settings)
+        api_db.add(settings)
     else:
         settings.api_base = "http://x"
         settings.api_key = "x"
         settings.model = "m"
-    db.flush()
+    api_db.flush()
     s = InterviewSession(
         profile_id=1,
         role="后端工程师",
@@ -51,9 +51,9 @@ def _make_completed_session(db) -> int:
     return s.id
 
 
-def test_report_stream_emits_token_and_done(db) -> None:
+def test_report_stream_emits_token_and_done(db, api_db) -> None:
     """单次 LLM（chat_json）：token 为 JSON 伪流分片，done 与落库同一份报告。"""
-    sid = _make_completed_session(db)
+    sid = _make_completed_session(db, api_db)
     fake = FakeLLMClient(
         tokens=["should-not-be-used"],
         json_payload={
@@ -114,8 +114,8 @@ def test_report_stream_404_when_session_missing(db) -> None:
         assert resp.status_code == 404
 
 
-def test_report_stream_403_without_token(db) -> None:
-    sid = _make_completed_session(db)
+def test_report_stream_403_without_token(db, api_db) -> None:
+    sid = _make_completed_session(db, api_db)
     with TestClient(app) as client:
         resp = client.get(f"/api/reports/{sid}/stream")
         assert resp.status_code == 403

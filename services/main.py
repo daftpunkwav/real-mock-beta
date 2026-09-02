@@ -50,15 +50,13 @@ from shared.core.error_handlers import (
     on_unhandled_exception,
 )
 from shared.core.constants import TRACE_ID_HEADER
-from shared.core.migrate import run_migrations
 from shared.core.security import UnsafeURLError
-from shared.database import engine, init_db, SessionLocal
+from shared.database import dispose_all_engines
 from shared.router_mount import include_with_legacy_api_alias
-from shared.services.seed import seed_llm_settings
+from shared.services.db_bootstrap import bootstrap_databases_and_seed
 
 configure_logging()
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 # 三服务纯路由（无前缀）；聚合入口统一挂载 /api/v1 与 /api 兼容别名
 SERVICE_ROUTERS = (api_router, agent_router, interview_router)
@@ -85,13 +83,17 @@ async def lifespan(app: FastAPI):
     避免阻塞事件循环导致心跳/WS 抖动。
     """
     # 启动：建表 + 迁移 + 处理器配置 seed + 企业知识库 RAG 索引
-    await asyncio.to_thread(_bootstrap_db_and_seed)
+    if os.environ.get("TEST_MODE") == "1":
+        _bootstrap_db_and_seed()
+    else:
+        await asyncio.to_thread(_bootstrap_db_and_seed)
     await ensure_rag_index()
-    logger.info("RealMock 后端已启动 env=%s", settings.env)
+    cfg = get_settings()
+    logger.info("RealMock 后端已启动 env=%s", cfg.env)
     try:
         yield
     finally:
-        if not settings.is_prod and os.environ.get("TEST_MODE") == "1":
+        if not cfg.is_prod and os.environ.get("TEST_MODE") == "1":
             logger.debug("测试模式：跳过 engine dispose")
         else:
             try:
@@ -102,26 +104,20 @@ async def lifespan(app: FastAPI):
 
 
 def _bootstrap_db_and_seed() -> None:
-    """同步初始化：建表 + 迁移 + 处理器配置 seed。"""
-    init_db()
-    run_migrations(engine)
-    db = SessionLocal()
-    try:
-        seed_llm_settings(db)
-    finally:
-        db.close()
+    bootstrap_databases_and_seed()
 
 
 def _shutdown_engine() -> None:
-    """关闭阶段 dispose 当前引擎（下次 get_engine 会重新构造）。"""
+    """关闭阶段 dispose 双引擎。"""
     try:
-        engine.dispose()
+        dispose_all_engines()
     except Exception:
         logger.exception("engine.dispose 失败")
 
 
 def create_app() -> FastAPI:
     """构造聚合 FastAPI app：三服务路由 + 统一中间件/异常处理。"""
+    cfg = get_settings()
     app = FastAPI(
         title="RealMock API",
         description="RealMock 模拟面试平台聚合入口（api + agent + interview 三服务）",
@@ -146,10 +142,10 @@ def create_app() -> FastAPI:
         return response
 
     # ── CORS 严格策略 ────────────────────────────────────────
-    _check_cors_policy(settings)
+    _check_cors_policy(cfg)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origin_list,
+        allow_origins=cfg.cors_origin_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
         allow_headers=[
@@ -164,7 +160,7 @@ def create_app() -> FastAPI:
     )
 
     # ── master key 生产门禁 ────────────────────────────────────────
-    _check_secret_key_policy(settings)
+    _check_secret_key_policy(cfg)
 
     include_with_legacy_api_alias(app, SERVICE_ROUTERS)
 
@@ -212,4 +208,5 @@ app = create_app()
 
 if __name__ == "__main__":
     # 无参启动入口：`python -m services.main` 自动读取 .env 的 HOST / PORT。
-    uvicorn.run(app, host=settings.host, port=settings.port)
+    boot = get_settings()
+    uvicorn.run(app, host=boot.host, port=boot.port)

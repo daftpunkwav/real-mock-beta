@@ -34,7 +34,6 @@ from shared.database import get_db
 from shared.schemas import CandidateProfile
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 ALLOWED_EXTENSIONS = RESUME_ALLOWED_EXTENSIONS
 
@@ -66,7 +65,7 @@ async def upload_resume(
     if ext not in ALLOWED_EXTENSIONS:
         raise_error("A1002", exts=", ".join(ALLOWED_EXTENSIONS))
 
-    upload_dir = Path(settings.upload_dir).resolve()
+    upload_dir = Path(get_settings().upload_dir).resolve()
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     # 流式读取并按上限截断，超过立即拒绝

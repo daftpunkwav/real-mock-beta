@@ -7,7 +7,9 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[3]  # 仓库根
 # 前端 0c14d0c 按域收口后，hook 从 features/media/ 移至 features/interview/hooks/
 _WS_HOOK = _ROOT / "apps" / "web" / "src" / "features" / "interview" / "hooks" / "useInterviewWS.ts"
-_ROOM = _ROOT / "apps" / "web" / "src" / "features" / "interview" / "hooks" / "useInterviewRoom.ts"
+_ROOM = _ROOT / "apps" / "web" / "src" / "features" / "interview" / "hooks" / "room" / "useInterviewRoom.ts"
+_ACTIONS = _ROOT / "apps" / "web" / "src" / "features" / "interview" / "hooks" / "room" / "useInterviewRoomActions.ts"
+_EVENTS = _ROOT / "apps" / "web" / "src" / "features" / "interview" / "hooks" / "room" / "useInterviewRoomEvents.ts"
 
 
 def test_retry_now_uses_reconnect_key() -> None:
@@ -22,14 +24,16 @@ def test_retry_now_uses_reconnect_key() -> None:
 
 
 def test_handle_finish_requests_closing_then_navigates() -> None:
-    text = _ROOM.read_text(encoding="utf-8")
-    assert "handleFinish" in text
-    assert "request_finish" in text
-    assert "toast.error" in text
-    assert "router.push" in text
+    room = _ROOM.read_text(encoding="utf-8")
+    actions = _ACTIONS.read_text(encoding="utf-8")
+    events = _EVENTS.read_text(encoding="utf-8")
+    assert "handleFinish" in room or "handleFinish" in actions
+    assert "request_finish" in actions
+    assert "toast.error" in actions
+    assert "router.push" in events
     # 报告由 WS 后台生成，interview 页直接跳转报告页轮询承接（不再 await finishInterview）
-    assert "router.push(`/report/${sessionId}`)" in text
-    assert "is_complete" in text
+    assert "router.push(`/report/${d.sessionId}`)" in events
+    assert "is_complete" in events
 
 
 def test_constants_encryption_version_v2() -> None:

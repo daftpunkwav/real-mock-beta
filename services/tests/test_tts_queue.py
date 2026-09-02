@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 
-from interview_service.realtime.tts_queue import _SentenceTTSQueue
+from interview_service.realtime.voice.tts_queue import _SentenceTTSQueue
 
 
 async def _fake_synth(sentence: str, *, creds=None, rate="+0%", pitch="+0Hz") -> str:
@@ -16,7 +16,7 @@ async def _fake_synth(sentence: str, *, creds=None, rate="+0%", pitch="+0Hz") ->
 
 async def test_enqueue_processes_in_order(monkeypatch) -> None:
     monkeypatch.setattr(
-        "interview_service.realtime.tts_queue.synthesize_speech", _fake_synth,
+        "interview_service.realtime.voice.tts_queue.synthesize_speech", _fake_synth,
     )
 
     sent: list[tuple[str, str]] = []
@@ -39,7 +39,7 @@ async def test_enqueue_processes_in_order(monkeypatch) -> None:
 
 async def test_enqueue_skips_empty(monkeypatch) -> None:
     monkeypatch.setattr(
-        "interview_service.realtime.tts_queue.synthesize_speech", _fake_synth,
+        "interview_service.realtime.voice.tts_queue.synthesize_speech", _fake_synth,
     )
     sent: list[str] = []
 
@@ -64,7 +64,7 @@ async def test_enqueue_does_not_block_producer(monkeypatch) -> None:
         return f"audio:{sentence}"
 
     monkeypatch.setattr(
-        "interview_service.realtime.tts_queue.synthesize_speech", slow_synth,
+        "interview_service.realtime.voice.tts_queue.synthesize_speech", slow_synth,
     )
 
     sent: list[str] = []

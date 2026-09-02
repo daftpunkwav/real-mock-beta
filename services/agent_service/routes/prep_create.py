@@ -3,30 +3,24 @@
 from __future__ import annotations
 
 from fastapi import Depends, Request, Response
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from agent_service.models import PrepSession
+from agent_service.schemas import PrepCreateRequest, PrepSessionCreateResponse
 from shared.core.constants import SessionStatus
 from shared.core.session_auth import (
     cookie_should_be_secure,
     new_access_token,
     set_session_cookie,
 )
-from shared.database import get_db
-
-
-class PrepCreateRequest(BaseModel):
-    resume_id: int | None = None
-    target_role: str = ""
-    target_company: str = ""
+from shared.database import get_sessions_db
 
 
 async def create_prep_session(
     body: PrepCreateRequest,
     request: Request,
     response: Response,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sessions_db),
 ):
     token = new_access_token()
     # status 列由模型 + migrate 保证；构造时显式写入 active
@@ -50,4 +44,4 @@ async def create_prep_session(
         token=token,
         secure=cookie_should_be_secure(request),
     )
-    return {"id": session.id}
+    return PrepSessionCreateResponse(id=session.id)

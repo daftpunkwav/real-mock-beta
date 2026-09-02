@@ -329,7 +329,7 @@ def test_stream_turn_no_followup_probe_when_solid(db) -> None:
     assert not any("追问引导" in s for s in system_msgs)
 
 
-def test_stream_turn_applies_context_compression(db) -> None:
+def test_stream_turn_applies_context_compression(db, api_db) -> None:
     """context_window 较小时应触发上下文压缩。"""
     session = _make_session(db)
     # 写入 200 条 user/assistant 对话，迫使压缩
@@ -340,13 +340,14 @@ def test_stream_turn_applies_context_compression(db) -> None:
         for i in range(40)
     ]
     session.messages = json.dumps(base, ensure_ascii=False)
-    settings = db.query(LLMSettings).filter(LLMSettings.id == 1).first()
+    settings = api_db.query(LLMSettings).filter(LLMSettings.id == 1).first()
     if settings is None:
         settings = LLMSettings(id=1, api_key="x", api_base="http://x", model="m",
                                 context_window=500, max_tokens=100)
-        db.add(settings)
+        api_db.add(settings)
     else:
         settings.context_window = 500
+    api_db.commit()
     db.commit()
     db.refresh(session)
 

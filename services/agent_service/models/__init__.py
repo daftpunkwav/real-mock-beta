@@ -7,14 +7,14 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from shared.database import Base
+from shared.database import SessionsBase
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class PrepSession(Base):
+class PrepSession(SessionsBase):
     """面试准备辅导会话。"""
 
     __tablename__ = "prep_sessions"

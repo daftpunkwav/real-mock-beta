@@ -10,7 +10,30 @@ from shared.schemas import CompanyInfo
 class WorkflowTypeOption(BaseModel):
     id: str
     name: str
-    phases: list[str] = Field(default_factory=list)
+    phases: list[str]
+
+
+class PersonalityOption(BaseModel):
+    id: str
+    name: str
+    description: str
+
+
+class InterviewStyleOption(BaseModel):
+    id: str
+    name: str
+    description: str
+
+
+class CatalogOption(BaseModel):
+    id: str
+    name: str
+
+
+class AvatarOption(BaseModel):
+    id: str
+    name: str
+    voice: str = ""
 
 
 class OptionsResponse(BaseModel):
@@ -18,11 +41,11 @@ class OptionsResponse(BaseModel):
     levels: list[str]
     experience_years: list[str]
     companies: list[CompanyInfo]
-    personalities: list[dict[str, str]]
-    interview_styles: list[dict[str, str]]
+    personalities: list[PersonalityOption]
+    interview_styles: list[InterviewStyleOption]
     workflow_types: list[WorkflowTypeOption]
     phase_labels: dict[str, str] = Field(default_factory=dict)
-    avatars: list[dict[str, str]] = Field(default_factory=list)
-    scenes: list[dict[str, str]] = Field(default_factory=list)
-    tts_voices: list[dict[str, str]] = Field(default_factory=list)
+    avatars: list[AvatarOption] = Field(default_factory=list)
+    scenes: list[CatalogOption] = Field(default_factory=list)
+    tts_voices: list[CatalogOption] = Field(default_factory=list)
     silence_nudge_seconds: int = 25

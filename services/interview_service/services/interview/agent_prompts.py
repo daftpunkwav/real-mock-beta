@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 
+from typing import Any
+
 from shared.core.prompts import with_agent_output_rules
-from shared.models import UserProfile
 from shared.schemas import CandidateProfile
 from interview_service.schemas import InterviewConfig
 from interview_service.services.interview.workflows import (
@@ -22,7 +23,7 @@ def build_system_prompt(
     company_context: str,
     workflow: Workflow,
     current_phase: InterviewPhase,
-    profile: UserProfile | None = None,
+    profile: Any | None = None,
     followup_probe: str | None = None,
 ) -> str:
     """组装面试官系统提示。

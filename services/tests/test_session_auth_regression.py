@@ -100,7 +100,7 @@ async def test_ws_bad_token_does_not_claim_lease(monkeypatch: pytest.MonkeyPatch
     mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.return_value = _StubSession()
     # handle() 定义在 connection_lifecycle 模块，须 patch 该模块的 SessionLocal
-    monkeypatch.setattr("interview_service.realtime.connection_lifecycle.SessionLocal", lambda: mock_db)
+    monkeypatch.setattr("interview_service.realtime.connection.lifecycle.SessionLocal", lambda: mock_db)
 
     good_ws = MagicMock()
     good_ws.accept = AsyncMock()

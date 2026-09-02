@@ -12,6 +12,7 @@ from .report import InterviewReport, InterviewReportResponse, ScoreBreakdown
 from .session import (
     AiOverrides,
     ChatMessage,
+    FinishInterviewResponse,
     InterviewConfig,
     InterviewMessageRequest,
     InterviewMessageResponse,
@@ -26,6 +27,7 @@ __all__ = [
     "ResumePickerItem",
     "InterviewMessageRequest",
     "InterviewMessageResponse",
+    "FinishInterviewResponse",
     "InterviewReport",
     "InterviewReportResponse",
     "InterviewSessionResponse",

@@ -14,16 +14,16 @@ from shared.capabilities.ai.llm.client import LLMClient
 from tests.fakes import FakeLLMClient
 
 
-def _completed_session(db) -> tuple[int, str]:
-    settings = db.query(LLMSettings).filter(LLMSettings.id == 1).first()
+def _completed_session(db, api_db) -> tuple[int, str]:
+    settings = api_db.query(LLMSettings).filter(LLMSettings.id == 1).first()
     if settings is None:
         settings = LLMSettings(id=1, api_key="x", api_base="http://x", model="m")
-        db.add(settings)
+        api_db.add(settings)
     else:
         settings.api_base = "http://x"
         settings.api_key = "x"
         settings.model = "m"
-    db.flush()
+    api_db.flush()
     token = "report-test-token-" + ("a" * 16)
     s = InterviewSession(
         profile_id=1,
@@ -48,8 +48,8 @@ def _completed_session(db) -> tuple[int, str]:
     return s.id, token
 
 
-def test_report_stream_single_llm_no_stream_calls(db) -> None:
-    sid, token = _completed_session(db)
+def test_report_stream_single_llm_no_stream_calls(db, api_db) -> None:
+    sid, token = _completed_session(db, api_db)
     fake = FakeLLMClient(
         tokens=["MUST_NOT_APPEAR"],
         json_payload={

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 
-from interview_service.routes import interview as interview_api
+from interview_service.routes.interview import turns as interview_api
 from interview_service.services.interview import session_state as agent_mod
 
 
