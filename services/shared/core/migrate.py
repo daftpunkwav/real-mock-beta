@@ -178,7 +178,12 @@ def apply_column_migrations(engine: Engine) -> dict[str, list[str]]:
 
 
 def stamp_alembic_head(engine: Engine, revision: str = ALEMBIC_HEAD_REVISION) -> None:
-    """确保 alembic_version 指向当前 head（兼容已有库首次接入 Alembic）。"""
+    """首次接入 Alembic 的库写入 head 版本戳。
+
+    仅当 ``alembic_version`` 为空时插入；已有版本与 head 不一致时**保留原
+    记录并告警**——无条件覆盖会让未来 ``alembic upgrade`` 的增量 revision
+    被跳过，使版本追踪失去意义。
+    """
     with engine.begin() as conn:
         conn.execute(
             text(
@@ -194,9 +199,11 @@ def stamp_alembic_head(engine: Engine, revision: str = ALEMBIC_HEAD_REVISION) ->
                 {"v": revision},
             )
         elif row[0] != revision:
-            conn.execute(
-                text("UPDATE alembic_version SET version_num = :v"),
-                {"v": revision},
+            logger.warning(
+                "alembic_version=%s 与代码 head=%s 不一致：保留原版本记录；"
+                "如需对齐请显式执行 alembic upgrade head 或 alembic stamp",
+                row[0],
+                revision,
             )
 
 

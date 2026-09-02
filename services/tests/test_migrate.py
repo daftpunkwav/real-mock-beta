@@ -148,3 +148,31 @@ def test_run_migrations_stamps_alembic_version() -> None:
     assert row is not None
     assert row[0] == ALEMBIC_HEAD_REVISION
 
+
+
+def test_stamp_alembic_head_keeps_mismatched_version() -> None:
+    """已有版本与 head 不一致时保留原记录（不覆盖，告警即可）。"""
+    from sqlalchemy import text
+
+    from shared.core.migrate import ALEMBIC_HEAD_REVISION, stamp_alembic_head
+
+    eng = _fresh_engine()
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"))
+        conn.execute(text("INSERT INTO alembic_version (version_num) VALUES ('legacy_0000')"))
+
+    stamp_alembic_head(eng)
+
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
+    assert row is not None
+    # 保留原版本而非覆盖为 head
+    assert row[0] == "legacy_0000"
+    assert row[0] != ALEMBIC_HEAD_REVISION
+
+    # 空表场景仍写入 head（首次接入兼容）
+    eng2 = _fresh_engine()
+    stamp_alembic_head(eng2)
+    with eng2.connect() as conn:
+        row2 = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
+    assert row2 is not None and row2[0] == ALEMBIC_HEAD_REVISION
