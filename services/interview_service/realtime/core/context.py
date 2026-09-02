@@ -7,13 +7,14 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import WebSocket
 
 from interview_service.agents.orchestrator import InterviewOrchestrator
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.core.events import TurnState
 from interview_service.services.interview.session_state import InterviewSessionState
 from interview_service.services.interview.runner import InterviewRunner
 from shared.capabilities.ai.llm.client import LLMClient
@@ -36,6 +37,7 @@ class ConnectionContext:
     client_access_token: str = ""
     ws_subprotocol: str | None = None
     superseded: bool = False
+    lease_token: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     # ── 话轮状态 ──────────────────────────────────
     turn_state: TurnState = TurnState.IDLE

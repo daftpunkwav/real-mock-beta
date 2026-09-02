@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.orm import Session
 
 from interview_service.models import InterviewSession
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.core.events import TurnState
 from interview_service.services.interview.events import EventKind
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 
 class UserTextControlMixin:

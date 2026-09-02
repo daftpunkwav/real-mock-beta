@@ -87,7 +87,7 @@ class VoicePipelineMixin:
     """短句 TTS；依赖 ctx.tts_voice / ctx.session_prosody / ctx.tts_creds / send。"""
 
     if TYPE_CHECKING:
-        from interview_service.realtime.context import ConnectionContext
+        from interview_service.realtime.core.context import ConnectionContext
 
     ctx: "ConnectionContext"
 

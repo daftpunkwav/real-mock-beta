@@ -10,10 +10,10 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.core.events import TurnState
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 

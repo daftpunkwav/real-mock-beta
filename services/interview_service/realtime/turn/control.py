@@ -11,12 +11,12 @@
 
 from __future__ import annotations
 
-from interview_service.realtime.event_dispatch import EventDispatchMixin
-from interview_service.realtime.finish_control import FinishControlMixin
-from interview_service.realtime.interrupt_control import InterruptControlMixin
-from interview_service.realtime.silence_nudge import SilenceNudgeMixin
-from interview_service.realtime.silence_probe import SilenceProbeMixin
-from interview_service.realtime.user_text_control import UserTextControlMixin
+from interview_service.realtime.core.event_dispatch import EventDispatchMixin
+from interview_service.realtime.control.finish import FinishControlMixin
+from interview_service.realtime.control.interrupt import InterruptControlMixin
+from interview_service.realtime.control.silence_nudge import SilenceNudgeMixin
+from interview_service.realtime.control.silence_probe import SilenceProbeMixin
+from interview_service.realtime.control.user_text import UserTextControlMixin
 
 
 class TurnControlMixin(

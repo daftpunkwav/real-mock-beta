@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from interview_service.services.interview.agent_text import strip_think_blocks
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 

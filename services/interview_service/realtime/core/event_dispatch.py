@@ -8,7 +8,7 @@ from interview_service.services.interview.agent_text import strip_markers
 from interview_service.services.interview.events import EventKind, StreamEvent
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 
 class EventDispatchMixin:

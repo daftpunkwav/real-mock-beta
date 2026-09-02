@@ -32,5 +32,5 @@ class SessionEvent:
 __all__ = ["TurnState", "SessionEvent", "SessionSnapshot"]
 
 # SessionSnapshot 已迁移至 interview_service.agents.snapshot；此处 re-export 仅为向后兼容。
-# 旧调用方 from interview_service.realtime.events import SessionSnapshot 仍可用，新代码应直接
+# 旧调用方 from interview_service.realtime.core.events import SessionSnapshot 仍可用，新代码应直接
 # 从 interview_service.agents.snapshot 引用（解耦方向：realtime → agents 单向）。

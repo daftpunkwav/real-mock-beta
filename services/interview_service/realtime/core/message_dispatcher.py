@@ -10,12 +10,12 @@ from sqlalchemy.orm import Session
 
 from interview_service.agents.vision.agent import VisionAgent
 from interview_service.models import InterviewSession
-from interview_service.realtime.events import TurnState
+from interview_service.realtime.core.events import TurnState
 from shared.core.constants import DEFAULT_LLM_RATE_LIMIT_PER_MINUTE, MAX_USER_TEXT_CHARS
 from shared.core.ratelimit import try_rate_limit_by_id
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 

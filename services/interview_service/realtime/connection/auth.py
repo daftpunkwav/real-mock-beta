@@ -10,10 +10,12 @@ from sqlalchemy.orm import Session
 from shared.config import get_settings
 from shared.core.constants import SessionStatus
 from shared.core.session_auth import tokens_match
+from shared.database import api_db_session
 from interview_service.ai import session_llm, session_stt_credentials, session_tts_credentials
-from interview_service.models import InterviewSession, LLMSettings
-from interview_service.realtime.events import TurnState
-from interview_service.realtime.session_registry import claim_session_connection
+from interview_service.models import InterviewSession
+from shared.models import LLMSettings
+from interview_service.realtime.core.events import TurnState
+from interview_service.realtime.core.session_registry import claim_session_connection
 from interview_service.services.interview.session_state import InterviewSessionState
 from interview_service.services.interview.runner import InterviewRunner
 from shared.capabilities.voice.stt import warmup_whisper
@@ -22,10 +24,9 @@ from shared.capabilities.voice.tts.voice_resolve import VoiceProsody, resolve_pr
 from shared.capabilities.voice.config.catalog import find_provider
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 class ConnectionAuthMixin:
@@ -74,10 +75,15 @@ class ConnectionAuthMixin:
         Returns:
             True 表示装配完成；失败时已发送 error 并关闭，返回 False。
         """
-        self.ctx.llm = session_llm(db, session)
-        if not self.ctx.llm.api_key:
-            await self._fail_and_close("请先配置面试思考处理器的 API Key")
-            return False
+        config_row = None
+        with api_db_session() as api_db:
+            self.ctx.llm = session_llm(api_db, session)
+            if not self.ctx.llm.api_key:
+                await self._fail_and_close("请先配置面试思考处理器的 API Key")
+                return False
+            config_row = api_db.query(LLMSettings).filter(LLMSettings.id == 1).first()
+            self.ctx.stt_creds = session_stt_credentials(api_db, session, row=config_row)
+            self.ctx.tts_creds = session_tts_credentials(api_db, session, row=config_row)
         self.ctx.agent = InterviewSessionState(session, self.ctx.llm)
 
         rag = None
@@ -90,18 +96,19 @@ class ConnectionAuthMixin:
 
         self.ctx.runner = InterviewRunner(session, self.ctx.llm, self.ctx.agent, rag=rag)
 
-        row = db.query(LLMSettings).filter(LLMSettings.id == 1).first()
-        # 必须先从 DB/stage 构建凭证，再取音色；否则会用 dataclass 默认值覆盖用户配置
-        self.ctx.stt_creds = session_stt_credentials(db, session, row=row)
-        self.ctx.tts_creds = session_tts_credentials(db, session, row=row)
-        settings_voice = self.ctx.tts_creds.voice or settings.tts_voice
-        if row:
+        cfg = get_settings()
+        settings_voice = self.ctx.tts_creds.voice or cfg.tts_voice
+        if config_row:
             self.ctx.tts_voice = settings_voice
-            asr_model = self.ctx.stt_creds.model or getattr(row, "asr_model", None) or row.stt_model
-            self.ctx.whisper_model = asr_model or settings.whisper_model
+            asr_model = (
+                self.ctx.stt_creds.model
+                or getattr(config_row, "asr_model", None)
+                or config_row.stt_model
+            )
+            self.ctx.whisper_model = asr_model or cfg.whisper_model
             await self._announce_fallbacks()
         else:
-            self.ctx.whisper_model = settings.whisper_model
+            self.ctx.whisper_model = cfg.whisper_model
 
         await self._bind_prosody()
         await self._warmup_stt()

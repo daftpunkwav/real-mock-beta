@@ -13,20 +13,20 @@
 
 from __future__ import annotations
 
-# 测试 patch 目标：测试 patch "interview_service.realtime.turn_coordinator.
+# 测试 patch 目标：测试 patch "interview_service.realtime.turn.coordinator.
 # transcribe_utterance_result"（改写本模块的模块级名字）。turn_stt_finish 的
 # 调用点从本模块动态读取同名属性，patch 后随之命中。
 from shared.capabilities.voice.stt import transcribe_utterance_result  # noqa: F401 — 测试 patch 目标
 
-from interview_service.realtime.turn_control import TurnControlMixin
-from interview_service.realtime.turn_lock import TurnLockMixin
-from interview_service.realtime.turn_playback import TurnPlaybackMixin
-from interview_service.realtime.turn_stt_finish import (
+from interview_service.realtime.turn.control import TurnControlMixin
+from interview_service.realtime.turn.lock import TurnLockMixin
+from interview_service.realtime.turn.playback import TurnPlaybackMixin
+from interview_service.realtime.turn.stt_finish import (
     TurnSttFinishMixin,
     _AUDIO_BUFFER_MAX_BYTES,
 )
-from interview_service.realtime.turn_streaming import TurnStreamingMixin, _IMAGE_BASE64_MAX_LEN
-from interview_service.realtime.turn_text_entry import TurnTextEntryMixin
+from interview_service.realtime.turn.streaming import TurnStreamingMixin, _IMAGE_BASE64_MAX_LEN
+from interview_service.realtime.turn.text_entry import TurnTextEntryMixin
 
 
 class TurnCoordinatorMixin(

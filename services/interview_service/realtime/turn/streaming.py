@@ -16,7 +16,7 @@ from shared.capabilities.voice.tts.edge import (
 )
 
 if TYPE_CHECKING:
-    from interview_service.realtime.context import ConnectionContext
+    from interview_service.realtime.core.context import ConnectionContext
 
 logger = logging.getLogger(__name__)
 
