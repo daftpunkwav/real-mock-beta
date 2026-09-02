@@ -1,6 +1,6 @@
 /** prep 历史消息 → 聊天消息 的归一化（形状校验，坏数据直接丢弃）。 */
 
-import type { PrepHistoryMessage, PrepSearchGroup, PrepToolStep } from "@/types";
+import type { PrepHistoryMessage, PrepSearchGroup, PrepToolStep } from "@/lib/api/contract";
 import type { PrepChatMessage } from "./types";
 
 /** 历史消息里的执行步骤做形状校验,坏数据直接丢弃 */

@@ -2,7 +2,7 @@
 
 import { memo, useMemo } from "react";
 import { MessageSquare, Plus } from "lucide-react";
-import type { PrepSessionSummary } from "@/types";
+import type { PrepSessionSummary } from "@/lib/api/contract";
 
 /** 相对时间:刚刚 / N 分钟前 / … / 超过 7 天显示 M-D */
 function relativeTime(iso: string): string {

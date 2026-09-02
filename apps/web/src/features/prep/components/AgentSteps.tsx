@@ -2,7 +2,7 @@
 
 import { memo, useState } from "react";
 import { ChevronRight, Wrench } from "lucide-react";
-import type { PrepToolStep } from "@/types";
+import type { PrepToolStep } from "@/lib/api/contract";
 
 const TOOL_LABELS: Record<string, string> = {
   web_search: "搜索面经",

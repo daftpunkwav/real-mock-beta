@@ -1,4 +1,4 @@
-import type { UserProfile } from "@/types";
+import type { UserProfileResponse as UserProfile } from "@/lib/api/contract";
 
 /** 必填字段:保存时校验,并计入完整度核心项 */
 export const REQUIRED_KEYS = [

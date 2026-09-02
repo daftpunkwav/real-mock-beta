@@ -3,7 +3,7 @@
 import { memo, useState } from "react";
 import { ChevronRight, ExternalLink, Search } from "lucide-react";
 import { safeAbsoluteHttpUrl } from "@/components/markdownSafeUrl";
-import type { PrepSearchGroup } from "@/types";
+import type { PrepSearchGroup } from "@/lib/api/contract";
 
 function hostOf(url: string): string {
   try {
@@ -22,8 +22,8 @@ export const SearchResultCards = memo(function SearchResultCards({
   defaultExpanded?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const visible = groups.filter((g) => g.results?.length > 0);
-  const total = visible.reduce((acc, g) => acc + g.results.length, 0);
+  const visible = groups.filter((g) => (g.results?.length ?? 0) > 0);
+  const total = visible.reduce((acc, g) => acc + (g.results?.length ?? 0), 0);
   if (visible.length === 0) return null;
 
   return (
@@ -51,14 +51,14 @@ export const SearchResultCards = memo(function SearchResultCards({
       {expanded && (
         <div className="space-y-3 border-t border-surface-border px-3 py-2.5">
           {visible.map((group) => (
-            <div key={group.query || group.results[0]?.url} className="space-y-1.5">
+            <div key={group.query || group.results?.[0]?.url} className="space-y-1.5">
               {group.query ? (
                 <p className="truncate text-[11px] text-ink-subtle" title={group.query}>
                   查询:{group.query}
                 </p>
               ) : null}
               <ul className="space-y-1.5">
-                {group.results.map((hit) => {
+                {(group.results ?? []).map((hit) => {
                   const href = safeAbsoluteHttpUrl(hit.url);
                   const inner = (
                     <div className="flex items-start gap-2">

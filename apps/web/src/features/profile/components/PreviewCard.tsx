@@ -10,7 +10,7 @@ import {
   MapPin,
   Phone,
 } from "lucide-react";
-import type { UserProfile } from "@/types";
+import type { UserProfileResponse as UserProfile } from "@/lib/api/contract";
 import { PreviewRow } from "./PreviewRow";
 
 export function PreviewCard({

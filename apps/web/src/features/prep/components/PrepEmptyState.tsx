@@ -3,7 +3,7 @@
 /** prep 空态:未开会话时选简历 + 开始辅导。 */
 
 import { Sparkles } from "lucide-react";
-import type { ResumePickerItem } from "@/types";
+import type { ResumePickerItem } from "@/lib/api/contract";
 
 interface PrepEmptyStateProps {
   resumeLoadError: string;

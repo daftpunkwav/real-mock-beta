@@ -1,6 +1,6 @@
 import { BarChart3, Play } from "lucide-react";
 import Link from "next/link";
-import type { InterviewSession } from "@/types";
+import type { InterviewSession } from "@/lib/api/contract";
 import { StatusBadge } from "./StatusBadge";
 
 /** 全部场次列表：标题 + 总数 chip + 空态（链到 /interview）或可选中列表。 */

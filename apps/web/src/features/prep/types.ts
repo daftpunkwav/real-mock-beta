@@ -1,6 +1,7 @@
 /** 面试准备（prep）域的聊天视图类型。 */
 
-import type { PrepSearchGroup, PrepToolStep, PrepUsageStats } from "@/types";
+import type { PrepSearchGroup, PrepToolStep } from "@/lib/api/contract";
+import type { PrepUsageStats } from "@/types";
 
 export interface PrepChatMessage {
   id: string;

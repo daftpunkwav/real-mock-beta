@@ -1,4 +1,4 @@
-import type { UserProfile } from "@/types";
+import type { UserProfileResponse as UserProfile } from "@/lib/api/contract";
 import type { RequiredKey } from "./profileRules";
 
 /** 局部更新档案的补丁函数:命中必填键时同时清除对应缺失标记 */

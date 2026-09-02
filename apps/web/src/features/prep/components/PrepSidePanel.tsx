@@ -4,7 +4,7 @@
 
 import { FileText, Zap } from "lucide-react";
 import { PREP_QUICK_PROMPTS } from "@/config/prepPrompts";
-import type { PrepSessionSummary, ResumePickerItem } from "@/types";
+import type { PrepSessionSummary, ResumePickerItem } from "@/lib/api/contract";
 import { PrepSessionList } from "./PrepSessionList";
 
 const QUICK_PROMPTS = PREP_QUICK_PROMPTS;

@@ -3,7 +3,8 @@
 /** prep 会话主 hook：组装资源 / 会话生命周期 / 滚动 / token 批量 / 发送。 */
 
 import { useCallback, useRef, useState } from "react";
-import type { PrepSessionSummary, PrepUsageStats } from "@/types";
+import type { PrepSessionSummary } from "@/lib/api/contract";
+import type { PrepUsageStats } from "@/types";
 import type { PrepChatMessage } from "./types";
 import { usePrepResources } from "./usePrepResources";
 import { usePrepScroll } from "./usePrepScroll";

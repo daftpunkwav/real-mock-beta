@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ExternalLink, FileText, Play, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import type { InterviewSession } from "@/types";
+import type { InterviewSession } from "@/lib/api/contract";
 import { StatusBadge } from "./StatusBadge";
 import { StatCell } from "./StatCell";
 
