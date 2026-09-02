@@ -21,6 +21,8 @@
 from __future__ import annotations
 
 import ipaddress
+import json
+import logging
 import threading
 import time
 from collections import deque
@@ -30,6 +32,10 @@ from fastapi import HTTPException, Request
 
 from shared.config import get_settings
 from shared.core.errors import ApiBusinessError, get_spec
+from shared.database import SessionsSessionLocal
+from shared.models import RateLimitBucket
+
+logger = logging.getLogger(__name__)
 
 
 # 桶空闲回收时间窗。超过该时间无访问视为可回收。
@@ -115,6 +121,53 @@ def _ensure_cleanup_thread() -> None:
     t.start()
 
 
+def _use_db_ratelimit() -> bool:
+    return get_settings().ratelimit_backend == "database"
+
+
+def _check_rate_limit_db(
+    *,
+    bucket_key: tuple[str, str],
+    limit: int,
+    window_seconds: int,
+) -> None:
+    key_str = f"{bucket_key[0]}:{bucket_key[1]}"
+    now = time.monotonic()
+    db = SessionsSessionLocal()
+    try:
+        row = db.query(RateLimitBucket).filter(RateLimitBucket.bucket_key == key_str).first()
+        if row is None:
+            row = RateLimitBucket(bucket_key=key_str, timestamps_json="[]")
+            db.add(row)
+        try:
+            stamps = json.loads(row.timestamps_json or "[]")
+            if not isinstance(stamps, list):
+                stamps = []
+        except (json.JSONDecodeError, TypeError):
+            stamps = []
+        stamps = [float(t) for t in stamps if isinstance(t, (int, float))]
+        stamps = [t for t in stamps if t > now - window_seconds]
+        if len(stamps) >= limit:
+            retry_after = max(1, int(window_seconds - (now - stamps[0])))
+            raise ApiBusinessError(
+                get_spec("A0002"),
+                message=f"请求过于频繁，请在 {retry_after}s 后重试",
+                headers={"Retry-After": str(retry_after)},
+            )
+        stamps.append(now)
+        row.timestamps_json = json.dumps(stamps)
+        db.commit()
+    except ApiBusinessError:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.debug("数据库限流写入失败 key=%s", key_str, exc_info=True)
+        raise
+    finally:
+        db.close()
+
+
 def check_rate_limit(
     request: Request,
     *,
@@ -123,9 +176,12 @@ def check_rate_limit(
     window_seconds: int,
 ) -> None:
     """检查限流，越界抛 ``HTTPException(429)``。"""
-    _ensure_cleanup_thread()
     ip = _resolve_client_ip(request)
     bucket_key = (key, ip)
+    if _use_db_ratelimit():
+        _check_rate_limit_db(bucket_key=bucket_key, limit=limit, window_seconds=window_seconds)
+        return
+    _ensure_cleanup_thread()
     now = time.monotonic()
     with _LOCK:
         bucket = _BUCKETS.get(bucket_key)
@@ -157,8 +213,13 @@ def check_rate_limit_by_id(
 
     供 WebSocket 等无 ``Request`` 的路径复用同一滑动窗口实现。
     """
-    _ensure_cleanup_thread()
     bucket_key = (key, client_id or "unknown")
+    if _use_db_ratelimit():
+        _check_rate_limit_db(
+            bucket_key=bucket_key, limit=limit, window_seconds=window_seconds
+        )
+        return
+    _ensure_cleanup_thread()
     now = time.monotonic()
     with _LOCK:
         bucket = _BUCKETS.get(bucket_key)
