@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-FORBIDDEN_PREFIXES = ("api_service", "agent_service", "interview_service")
+FORBIDDEN_PREFIXES = ("api_service", "agent_service", "interview_service", "bootstrap")
 SCAN_ROOT = Path("shared")
 
 

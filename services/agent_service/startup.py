@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from shared.services.db_bootstrap import bootstrap_databases_and_seed
+from bootstrap.db_bootstrap import bootstrap_databases_and_seed
 
 logger = logging.getLogger(__name__)
 

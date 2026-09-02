@@ -53,7 +53,7 @@ from shared.core.constants import TRACE_ID_HEADER
 from shared.core.security import UnsafeURLError
 from shared.database import dispose_all_engines
 from shared.router_mount import include_with_legacy_api_alias
-from shared.services.db_bootstrap import bootstrap_databases_and_seed
+from bootstrap.db_bootstrap import bootstrap_databases_and_seed
 
 configure_logging()
 logger = logging.getLogger(__name__)

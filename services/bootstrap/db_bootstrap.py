@@ -1,4 +1,9 @@
-"""聚合入口数据库引导（双库 + legacy 拆库）。"""
+"""聚合入口数据库引导（双库 + legacy 拆库）。
+
+归属组合根（``bootstrap`` 包）：建表前须注册业务 ORM，本编排函数依赖
+``bootstrap.sessions_orm`` 与各业务包，故不得放在 ``shared`` 平台层
+（守卫见 ``tests/test_shared_no_service_imports.py``）。
+"""
 
 from __future__ import annotations
 
