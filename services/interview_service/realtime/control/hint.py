@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class HintServiceMixin:
+class ReferenceHintMixin:
     """参考提纲生成。依赖 ctx.session_id / ctx.llm / ctx.agent / ctx.hint_inflight / send。"""
 
     ctx: ConnectionContext
