@@ -4,14 +4,31 @@
 而不是走 tools 通道。此类块对用户是纯噪音：整体移除；其中 quiz 的
 ``<question>`` 是有效内容，转换为题目正文放行，避免"说要出题却没有题"。
 流式安全：进入块后缓冲到闭合（或流结束）再处理；超长未闭合按正文放行。
+
+块渲染策略经 :class:`InlineToolCallCleaner` 构造参数 ``quiz_renderer``
+注入；缺省渲染器服务于当前唯一的已知漂移形态（prep 域 quiz 工具），
+业务侧可传入自有实现覆盖——机制层本身不承载业务文案。
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 # 文本内联 XML 工具调用块的提取（quiz 题目转换用）
 _INLINE_QUESTION_RE = re.compile(r"<question>(.*?)</question>", re.S)
+
+# 缺省 quiz 块渲染（prep 域产品文案的当前归属声明处；覆盖见 ``quiz_renderer``）
+DEFAULT_QUIZ_BLOCK_TEMPLATE = "**练习题**：{question}\n\n请直接作答，我会逐句点评。"
+
+QuizBlockRenderer = Callable[[str], str]
+
+
+def _default_quiz_renderer(question: str) -> str:
+    """缺省渲染：有题目时输出练习题文案；无题目返回空（整体移除）。"""
+    if not question:
+        return ""
+    return DEFAULT_QUIZ_BLOCK_TEMPLATE.format(question=question)
 
 
 class InlineToolCallCleaner:
@@ -30,9 +47,10 @@ class InlineToolCallCleaner:
     # 正文合法讨论 <tool_call>(如教学示例)不含 invoke,按正文放行
     _INVOKE_WINDOW = 64
 
-    def __init__(self) -> None:
+    def __init__(self, *, quiz_renderer: QuizBlockRenderer | None = None) -> None:
         self._buf = ""
         self._in_block = False
+        self._quiz_renderer: QuizBlockRenderer = quiz_renderer or _default_quiz_renderer
 
     def feed(self, chunk: str) -> str:
         if not chunk:
@@ -46,9 +64,7 @@ class InlineToolCallCleaner:
     def _convert_block(self, block: str) -> str:
         m = _INLINE_QUESTION_RE.search(block)
         question = m.group(1).strip() if m else ""
-        if not question:
-            return ""
-        return f"**练习题**：{question}\n\n请直接作答，我会逐句点评。"
+        return self._quiz_renderer(question)
 
     def _drain(self, final: bool) -> str:
         out: list[str] = []
