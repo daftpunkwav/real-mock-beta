@@ -1,7 +1,7 @@
 """共享数据域模型（api.db）。
 
 - StageConfig / LLMSettings：跨服务共享的处理器配置表，已提取到
-  ``shared.core.config_models``，此处 re-export 保持兼容。
+  ``shared.models.config_models``，此处 re-export 保持兼容。
 - Resume / UserProfile：存于 api.db；**写**权归 ``api_service``（上传/解析/档案 CRUD）。
   agent / interview **读**须经 ``shared.services.candidate_read``（见 ``docs/shared-db-read-contract.md``）。
 """
@@ -15,7 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.database import ApiBase
 from shared.models.rate_limit_bucket import RateLimitBucket
-from shared.core.config_models import (  # noqa: F401  # re-export
+from shared.models.config_models import (  # noqa: F401  # re-export
     LLMSettings,
     LlmProvider,
     ModelProfile,

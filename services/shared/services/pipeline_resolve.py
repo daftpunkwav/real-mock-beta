@@ -11,7 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from shared.core.config_models import LlmProvider, ModelProfile, TaskBinding
+from shared.models.config_models import LlmProvider, ModelProfile, TaskBinding
 from shared.core.constants import DEFAULT_LLM_PROTOCOL
 from shared.core.secrets import decrypt_secret
 from shared.models import StageConfig

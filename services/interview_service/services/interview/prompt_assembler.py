@@ -18,7 +18,7 @@ from shared.capabilities.ai.context_manager import compress_messages
 from interview_service.services.interview.session_state import InterviewSessionState
 from shared.database import api_db_session
 from shared.services.pipeline_config import get_stage_config_for_runtime
-from shared.core.config_models import LLMSettings
+from shared.models.config_models import LLMSettings
 
 logger = logging.getLogger(__name__)
 
