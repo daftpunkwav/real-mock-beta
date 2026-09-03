@@ -13,7 +13,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from shared.config import get_settings
-from shared.database import ApiBase, SessionsBase
+from shared.database import ApiBase
 
 # 确保三服务全部模型注册到 metadata（共享库单库聚合）
 import shared.models  # noqa: F401

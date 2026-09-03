@@ -2,15 +2,6 @@
 
 from __future__ import annotations
 
-# 各家厂商前缀集合
-_API_KEY_PREFIXES = (
-    "sk-",        # OpenAI / StepFun / 通用
-    "sk_",        # 部分国内供应商
-    "sk-ant-",    # Anthropic
-    "aiza",       # Google (AIza...)
-    "step-",      # StepFun
-)
-
 
 def _looks_like_api_key(v: str) -> bool:
     lowered = v.lower()

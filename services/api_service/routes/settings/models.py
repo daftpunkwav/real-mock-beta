@@ -22,7 +22,6 @@ from shared.services.pipeline_config import (
 )
 from api_service.services.model_registry import (
     BindingUpdate,
-    ModelCapabilitiesIn,
     ModelProfileCreate,
     ModelProfileUpdate,
     ProviderCreate,

@@ -11,7 +11,6 @@ from shared.core.ratelimit import reset_rate_limit, try_rate_limit_by_id
 from interview_service.realtime import ws_handler
 from interview_service.realtime.voice.pipeline import (
     _pick_stt_text,
-    _should_skip_whisper,
 )
 from interview_service.realtime.core.events import TurnState
 from interview_service.services.interview.events import EventKind, StreamEvent
@@ -31,12 +30,6 @@ def test_try_rate_limit_by_id_blocks_after_limit():
         key="llm_test_ws", client_id="s1", limit=3, window_seconds=60
     )
     reset_rate_limit("llm_test_ws")
-
-
-def test_should_skip_whisper_disabled():
-    # 准确率优先：不再跳过 ASR
-    assert _should_skip_whisper("这是一段足够长的中文回答内容") is False
-    assert _should_skip_whisper("短") is False
 
 
 def test_pick_stt_prefers_whisper_on_english():

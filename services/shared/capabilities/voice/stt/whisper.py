@@ -8,21 +8,11 @@ from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-_whisper_model = None
-_model_name = "base"
-
 # 技术面试常见中英混说，帮助模型保留英文术语
 _BILINGUAL_PROMPT = (
     "以下是中英文技术面试对话，可能包含 API、Python、JavaScript、React、"
     "Agent、GitHub、Docker、Kubernetes、SQL、HTTP、REST 等英文术语。"
 )
-
-
-def set_whisper_model(name: str) -> None:
-    global _model_name, _whisper_model
-    if name != _model_name:
-        _model_name = name
-        _whisper_model = None
 
 
 @lru_cache(maxsize=1)

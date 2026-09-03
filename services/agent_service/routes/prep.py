@@ -16,7 +16,6 @@ from fastapi import APIRouter, Depends
 from agent_service.routes import prep_chat, prep_create, prep_lists
 from agent_service.schemas import (
     PrepHistoryMessage,
-    PrepMessageRequest,
     PrepMessageResponse,
     PrepSessionCreateResponse,
     PrepSessionSummary,

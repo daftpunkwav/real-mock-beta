@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from interview_service.realtime import ws_handler
-from interview_service.realtime.voice.pipeline import _pick_stt_text, _should_skip_whisper
+from interview_service.realtime.voice.pipeline import _pick_stt_text
 from interview_service.realtime.core.events import TurnState
 from shared.capabilities.voice.stt.cloud import is_local_stt_model, resolve_cloud_stt_model
 
@@ -30,10 +30,6 @@ def test_pick_stt_prefers_asr_over_browser_chinese():
     )
     assert "面试官" in got
     assert "美食馆" not in got
-
-
-def test_should_skip_whisper_always_false():
-    assert _should_skip_whisper("这是一段足够长的中文回答内容") is False
 
 
 def test_pick_stt_prefers_whisper_on_english():

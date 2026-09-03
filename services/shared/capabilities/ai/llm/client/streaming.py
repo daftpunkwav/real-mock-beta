@@ -11,7 +11,6 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-import httpx
 
 from shared.core.prompts import strip_emojis
 from shared.core.security import make_pinned_async_client

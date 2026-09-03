@@ -52,11 +52,6 @@ def _pick_stt_text(browser_text: str, asr_text: str) -> str:
     return browser
 
 
-def _should_skip_whisper(browser_text: str) -> bool:
-    """已废弃：始终跑云端/本地 ASR。保留函数名以免外部引用断裂。"""
-    return False
-
-
 def _normalize_echo_text(text: str) -> str:
     import re
 

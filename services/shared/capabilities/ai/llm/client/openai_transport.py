@@ -6,7 +6,6 @@ LLMClient 在 ``protocol == openai_chat`` 时使用本模块；SSRF 检查在调
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 

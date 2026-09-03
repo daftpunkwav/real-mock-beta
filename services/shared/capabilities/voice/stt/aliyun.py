@@ -4,23 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 
 from shared.core.security import make_pinned_async_client
 from shared.capabilities.voice.stt.base import SttCredentials
 from shared.capabilities.voice.stt.whisper import pcm_base64_to_wav_bytes
 
 logger = logging.getLogger(__name__)
-
-
-async def _get_token(access_key_id: str, access_key_secret: str) -> str:
-    """用阿里云 CreateToken（简化：若用户直接填 Token 则跳过）。"""
-    # 多数 BYOK 用户会填 AppKey + Token；若填了 AK/SK 则调 nls-meta
-    url = "https://nls-meta.cn-shanghai.aliyuncs.com/"
-    # 为降低复杂度：要求 asr_api_key 字段直接存 Token（或 AccessKeySecret 搭配）
-    # 这里若无法签名完整 OpenAPI，则返回空由上层提示。
-    _ = (url, access_key_id, access_key_secret, time.time())
-    return ""
 
 
 class AliyunProvider:

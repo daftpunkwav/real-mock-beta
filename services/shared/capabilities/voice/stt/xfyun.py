@@ -14,7 +14,6 @@ from wsgiref.handlers import format_date_time
 
 
 from shared.capabilities.voice.stt.base import SttCredentials
-from shared.capabilities.voice.stt.whisper import pcm_base64_to_wav_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +53,9 @@ class XfyunProvider:
             logger.warning("讯飞 ASR 缺少 AppId/APIKey/APISecret")
             return ""
 
+        # 帧内直接发送 raw PCM；此处仅校验 base64 合法性（无 wav 容器用途）
         try:
-            wav = pcm_base64_to_wav_bytes(pcm_b64, sample_rate)
-            # 讯飞 iat 要 raw audio；用 wav 的 data chunk 或直接 pcm
-            audio_b64 = base64.b64encode(wav).decode("ascii")
+            base64.b64decode(pcm_b64)
         except Exception as e:
             logger.warning("讯飞 ASR 音频准备失败: %s", e)
             return ""
@@ -96,8 +94,6 @@ class XfyunProvider:
                         ).decode("ascii"),
                     },
                 }
-                # 若是 wav 容器则仍用 pcm；上面已用原始 pcm
-                _ = audio_b64
                 await ws.send(json.dumps(frame))
                 while True:
                     raw = await ws.recv()

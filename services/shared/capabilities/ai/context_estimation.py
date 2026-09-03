@@ -87,9 +87,9 @@ def _omitted_digest(omitted: list[dict[str, Any]], *, max_lines: int = 16) -> st
         return kept[:head] + [f"（…中间省略 {skipped} 条…）"] + kept[head:]
 
     if user_lines:
-        sections.append("用户诉求（早期）：\n" + "\n".join(f"- {l}" for l in _window(user_lines, 2, 3)))
+        sections.append("用户诉求（早期）：\n" + "\n".join(f"- {line}" for line in _window(user_lines, 2, 3)))
     if assistant_lines:
-        sections.append("已给结论（早期）：\n" + "\n".join(f"- {l}" for l in _window(assistant_lines, 0, 2)))
+        sections.append("已给结论（早期）：\n" + "\n".join(f"- {line}" for line in _window(assistant_lines, 0, 2)))
     if not sections:
         return ""
     return "\n".join(sections)[: max_lines * 90]

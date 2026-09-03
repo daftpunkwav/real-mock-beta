@@ -119,7 +119,7 @@ async def send_message(
 
     if is_complete:
         try:
-            report = await generate_and_persist_report(session, llm, db)
+            await generate_and_persist_report(session, llm, db)
         except Exception as e:
             # 对外通用文案，细节仅日志（防上游异常泄漏）
             logger.exception("报告生成失败 sid=%s", session_id)

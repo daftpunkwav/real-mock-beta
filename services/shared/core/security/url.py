@@ -267,7 +267,8 @@ def is_localhost_family(host: str) -> bool:
 
 
 # pin 部分拆至 url_pin.py；保持 ``shared.core.security.url.*`` 两条 import 路径均可
-from .url_pin import (  # noqa: E402
+# （有意再导出：security/__init__ 与测试经本模块取这些符号）
+from .url_pin import (  # noqa: E402, F401
     PinnedHostTransport,
     PinnedHttpTarget,
     make_pinned_async_client,

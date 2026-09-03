@@ -22,7 +22,6 @@ from shared.services.pipeline_config import (
     SECRET_KEEP,
     STAGE_BY_TASK,
     parse_json,
-    get_provider_model_rows,
     migrate_stages_to_profiles,
     profile_to_response,
 )
