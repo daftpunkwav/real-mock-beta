@@ -11,7 +11,7 @@ from shared.config import get_settings
 from shared.core.constants import SessionStatus
 from shared.core.session_auth import tokens_match
 from shared.database import api_db_session
-from interview_service.ai import session_llm, session_stt_credentials, session_tts_credentials
+from interview_service.session_overrides import session_llm, session_stt_credentials, session_tts_credentials
 from interview_service.models import InterviewSession
 from shared.models import LLMSettings
 from interview_service.realtime.core.events import TurnState

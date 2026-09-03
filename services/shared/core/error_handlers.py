@@ -117,7 +117,12 @@ def _envelope_from_http_exception(exc: HTTPException) -> JSONResponse:
 # ── 5 个 handler 路由 ──
 
 async def on_request_validation(request: Request, exc: RequestValidationError) -> JSONResponse:
-    logger.info("请求校验失败: %s path=%s", exc.errors(), request.url.path)
+    # 仅记录 loc 与 msg：errors() 内含用户输入原文（input 字段），不落日志
+    brief = [
+        {"loc": ".".join(str(x) for x in e.get("loc", ())), "msg": e.get("msg", "")}
+        for e in exc.errors()
+    ]
+    logger.info("请求校验失败: %s path=%s", brief, request.url.path)
     return _envelope_spec(CATALOG["A0001"])
 
 

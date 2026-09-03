@@ -112,11 +112,16 @@ async def transcribe_with_handler(
                 protocol="openai_chat" if fallback_handler == "local" else creds.protocol,
                 model="base" if fallback_handler == "local" else creds.model,
             )
-            fallback_text = await fallback_impl.transcribe(
-                pcm_b64,
-                sample_rate=sample_rate,
-                creds=fallback_creds,
-            )
+            try:
+                fallback_text = await fallback_impl.transcribe(
+                    pcm_b64,
+                    sample_rate=sample_rate,
+                    creds=fallback_creds,
+                )
+            except Exception as fe:
+                # 主供应商已失败，降级路径异常也不向上抛（与主路径容错语义一致）
+                logger.error("ASR fallback provider=%s 异常: %s", fallback_handler, fe)
+                fallback_text = ""
             return SttResult(
                 text=fallback_text,
                 provider=fallback_handler,

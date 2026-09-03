@@ -12,7 +12,7 @@
 from .file import assert_within_dir, sanitize_filename
 from .redact import redact_api_key
 from .url import (
-    MIMO_TRUSTED_HOSTS,
+    FAKEIP_ALLOWED_HOSTS,
     PinnedHostTransport,
     PinnedHttpTarget,
     UnsafeURLError,
@@ -24,7 +24,7 @@ from .url import (
 )
 
 __all__ = [
-    "MIMO_TRUSTED_HOSTS",
+    "FAKEIP_ALLOWED_HOSTS",
     "PinnedHostTransport",
     "PinnedHttpTarget",
     "UnsafeURLError",

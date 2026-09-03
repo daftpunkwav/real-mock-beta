@@ -106,8 +106,8 @@ class SafeFormatter(logging.Formatter):
 def configure_logging(level: int = logging.INFO) -> None:
     """替换默认 handler，安装脱敏过滤器。
 
-    - 生产环境默认输出 JSON，方便被 Loki / ES 采集；
-    - 开发环境同时保留 stdout 文本输出（最简明）。
+    所有环境统一输出 JSON 结构化日志（含 trace_id），便于本地排查
+    与日志采集（Loki / ES）使用同一格式。
     """
     root = logging.getLogger()
     # 清掉 uvicorn / 默认安装

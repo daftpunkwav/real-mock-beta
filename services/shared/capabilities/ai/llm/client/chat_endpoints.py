@@ -17,7 +17,7 @@ from shared.core.security import (
     redact_api_key,
 )
 
-from .base import _is_local_allowed, _require_https
+from .base import _is_local_allowed, _require_https, _retry_request
 from .protocol_utils import _headers
 from .response_extract import extract_reasoning, extract_text, extract_tool_calls
 
@@ -43,8 +43,11 @@ async def chat(
         client.api_base, allow_local=_is_local_allowed(), require_https=_require_https(), timeout=180.0
     ) as http:
         try:
-            resp = await http.post(
-                url, headers=_headers(client.api_key, client.protocol), json=payload
+            # 429/5xx 指数退避重试，与非流式 openai_chat 路径语义一致
+            resp = await _retry_request(
+                lambda: http.post(
+                    url, headers=_headers(client.api_key, client.protocol), json=payload
+                )
             )
             resp.raise_for_status()
             data = resp.json()

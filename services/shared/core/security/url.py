@@ -48,7 +48,8 @@ _DEFAULT_ALLOWED_PORTS = frozenset({80, 443})
 # 198.18.0.0/15（RFC 2544 benchmark 保留段）：代理 TUN fake-ip 模式会把公网域名
 # 解析到该段，TCP 连接由代理接管转发至真实目标，并非真实内网，全局放行。
 _PROVIDER_NETWORKS = (ipaddress.ip_network("198.18.0.0/15"),)
-MIMO_TRUSTED_HOSTS = frozenset(
+# 允许落在 fake-ip 段的供应商主机清单（按域名单列，不做前缀通配）
+FAKEIP_ALLOWED_HOSTS = frozenset(
     {
         "api.xiaomimimo.com",
         "token-plan-cn.xiaomimimo.com",
@@ -165,7 +166,7 @@ def is_safe_http_url(
         ips = _resolve_all(parsed.hostname)
     except ValueError:
         return False
-    trusted = trusted_hosts if trusted_hosts is not None else MIMO_TRUSTED_HOSTS
+    trusted = trusted_hosts if trusted_hosts is not None else FAKEIP_ALLOWED_HOSTS
     hostname = parsed.hostname.lower()
     if hostname in trusted:
         return all(
@@ -230,7 +231,7 @@ def pin_safe_http_url(
         raise UnsafeURLError(str(e)) from e
     if not ips:
         raise UnsafeURLError(f"无法解析主机: {hostname!r}")
-    trusted = trusted_hosts if trusted_hosts is not None else MIMO_TRUSTED_HOSTS
+    trusted = trusted_hosts if trusted_hosts is not None else FAKEIP_ALLOWED_HOSTS
     hostname_key = hostname.lower()
     ips_safe = _all_ips_safe(ips, allow_local=allow_local)
     if hostname_key in trusted:

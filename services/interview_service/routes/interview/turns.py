@@ -18,7 +18,7 @@ from shared.core.constants import SessionStatus
 from shared.core.errors import ApiBusinessError, raise_error
 from shared.core.session_auth import assert_session_token, extract_token
 from shared.database import get_sessions_db
-from interview_service.ai import session_llm
+from interview_service.session_overrides import session_llm
 from interview_service.models import InterviewSession
 from interview_service.schemas import ChatMessage, FinishInterviewResponse, InterviewMessageRequest, InterviewMessageResponse
 from interview_service.services.interview.events import EventKind
