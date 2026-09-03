@@ -253,3 +253,60 @@ def test_create_session_ok_via_testclient():
     assert "id" in r.json()
     listed = client.get("/api/v1/interview/sessions")
     assert listed.status_code == 200, listed.text
+
+
+def test_db_ratelimit_uses_epoch_timestamps() -> None:
+    """DB 限流时间戳须为 wall-clock epoch 秒（跨重启可读），而非 monotonic。"""
+    import time as _time
+
+    from shared.core import ratelimit
+    from shared.core.errors import ApiBusinessError
+
+    stored: dict[str, str] = {}
+
+    class _Row:
+        bucket_key = "k:ip"
+        timestamps_json = "[]"
+
+    class _Query:
+        def filter(self, *a, **kw):
+            return self
+
+        def first(self):
+            return None
+
+    class _DB:
+        def query(self, model):
+            return _Query()
+
+        def add(self, row):
+            self._row = row
+
+        def commit(self):
+            stored["json"] = self._row.timestamps_json
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    db = _DB()
+    orig_factory = ratelimit.SessionsSessionLocal
+    ratelimit.SessionsSessionLocal = lambda: db
+    try:
+        before = _time.time()
+        try:
+            ratelimit._check_rate_limit_db(
+                bucket_key=("llm", "1.2.3.4"), limit=5, window_seconds=60
+            )
+        except ApiBusinessError:
+            raise AssertionError("首次请求不应触发限流")
+        after = _time.time()
+    finally:
+        ratelimit.SessionsSessionLocal = orig_factory
+
+    stamps = __import__("json").loads(stored["json"])
+    assert len(stamps) == 1
+    # epoch 语义：与 wall-clock 同量级（monotonic 开机计数通常远小于 1e9）
+    assert before - 5 <= stamps[0] <= after + 5, stamps[0]

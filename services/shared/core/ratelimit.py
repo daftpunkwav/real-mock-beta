@@ -102,22 +102,29 @@ def _resolve_client_ip(request: Request) -> str:
 
 
 def _ensure_cleanup_thread() -> None:
-    """惰性启动后台清理线程，单进程内仅启动一次。"""
+    """惰性启动后台清理线程，单进程内仅启动一次。
+
+    标志位检查与置位在 ``_LOCK`` 内完成，避免并发首调各自启动一个 sweeper。
+    """
     global _cleanup_started
     if _cleanup_started:
         return
-    _cleanup_started = True
+    with _LOCK:
+        if _cleanup_started:
+            return
+        _cleanup_started = True
 
-    def _sweep() -> None:
-        while True:
-            time.sleep(_CLEANUP_INTERVAL_SECONDS)
-            cutoff = time.monotonic() - _BUCKET_TTL_SECONDS
-            with _LOCK:
-                stale = [k for k, b in _BUCKETS.items() if b.last_access < cutoff]
-                for k in stale:
-                    _BUCKETS.pop(k, None)
+        def _sweep() -> None:
+            while True:
+                time.sleep(_CLEANUP_INTERVAL_SECONDS)
+                cutoff = time.monotonic() - _BUCKET_TTL_SECONDS
+                with _LOCK:
+                    stale = [k for k, b in _BUCKETS.items() if b.last_access < cutoff]
+                    for k in stale:
+                        _BUCKETS.pop(k, None)
 
-    t = threading.Thread(target=_sweep, name="ratelimit-sweeper", daemon=True)
+        t = threading.Thread(target=_sweep, name="ratelimit-sweeper", daemon=True)
+    # 持锁外启动线程，缩短临界区
     t.start()
 
 
@@ -132,7 +139,9 @@ def _check_rate_limit_db(
     window_seconds: int,
 ) -> None:
     key_str = f"{bucket_key[0]}:{bucket_key[1]}"
-    now = time.monotonic()
+    # DB 后端须跨进程/整机重启读取（memory 后端单进程用 monotonic），
+    # 时间戳必须用 wall-clock epoch；monotonic 在重启后与新时钟无对齐基准
+    now = time.time()
     db = SessionsSessionLocal()
     try:
         row = db.query(RateLimitBucket).filter(RateLimitBucket.bucket_key == key_str).first()

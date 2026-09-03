@@ -15,7 +15,11 @@ def _utcnow() -> datetime:
 
 
 class RateLimitBucket(SessionsBase):
-    """滑动窗口时间戳 JSON：``{key}:{client_id}`` -> ``[monotonic, ...]``。"""
+    """滑动窗口时间戳 JSON：``{key}:{client_id}`` -> ``[epoch_s, ...]``。
+
+    时间戳为 wall-clock epoch 秒（``time.time()``）：DB 后端须跨进程与整机
+    重启读取，monotonic 时钟无跨重启基准。
+    """
 
     __tablename__ = "rate_limit_buckets"
 
