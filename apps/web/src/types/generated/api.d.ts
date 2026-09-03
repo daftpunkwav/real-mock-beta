@@ -1582,6 +1582,16 @@ export interface components {
             focus_areas: string[];
             /** Sample Questions */
             sample_questions: string[];
+            /**
+             * Interview Flow
+             * @default
+             */
+            interview_flow: string;
+            /**
+             * Pressure Level
+             * @default
+             */
+            pressure_level: string;
         };
         /**
          * DimensionScore

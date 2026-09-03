@@ -110,6 +110,8 @@ def get_all_companies() -> list[CompanyInfo]:
                 style=c["style"],
                 focus_areas=c["focus_areas"],
                 sample_questions=c["sample_questions"],
+                interview_flow=c["interview_flow"],
+                pressure_level=c["pressure_level"],
             )
         )
     return companies

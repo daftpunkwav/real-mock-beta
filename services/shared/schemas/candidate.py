@@ -13,6 +13,9 @@ class CompanyInfo(BaseModel):
     style: str
     focus_areas: list[str]
     sample_questions: list[str]
+    # 目录原始数据同时携带以下两字段；契约层补齐避免同源双视图不一致
+    interview_flow: str = ""
+    pressure_level: str = ""
 
 
 class CandidateProfile(BaseModel):

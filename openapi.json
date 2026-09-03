@@ -4369,6 +4369,16 @@
             },
             "type": "array",
             "title": "Sample Questions"
+          },
+          "interview_flow": {
+            "type": "string",
+            "title": "Interview Flow",
+            "default": ""
+          },
+          "pressure_level": {
+            "type": "string",
+            "title": "Pressure Level",
+            "default": ""
           }
         },
         "type": "object",
