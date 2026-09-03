@@ -249,3 +249,20 @@ def test_anthropic_payload_converts_openai_image_blocks() -> None:
         "type": "image",
         "source": {"type": "url", "url": "https://img.example.com/a.jpg"},
     }
+
+
+def test_non_reasoning_provider_ids_derived_from_catalog() -> None:
+    """reason 黑名单由目录派生：语音专用 id 入选，可思考 id 排除。"""
+    from shared.capabilities.voice.config.catalog import (
+        REASONING_PROVIDERS,
+        non_reasoning_provider_ids,
+    )
+
+    ids = non_reasoning_provider_ids()
+    # 语音/仅转写供应商必须入选
+    for expected in ("openai_compat", "xfyun", "volcengine", "aliyun", "tencent", "baidu", "local", "edge", "minimax_speech", "none", "mimo_audio"):
+        assert expected in ids, expected
+    # reasoning 目录中声明可思考的 id 必须排除（custom / mimo 等）
+    for p in REASONING_PROVIDERS:
+        if p.get("can_interview_reason"):
+            assert p["id"] not in ids, p["id"]

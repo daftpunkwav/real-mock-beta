@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 from shared.config import get_settings
 from shared.core.constants import PipelineStage
 from shared.core.errors import ApiBusinessError, get_spec, raise_error
-from shared.capabilities.voice.config.catalog import find_provider
+from shared.capabilities.voice.config.catalog import find_provider, non_reasoning_provider_ids
 from shared.schemas import StageConfigUpdate
 
 
@@ -48,7 +48,8 @@ def validate_stage_config(stage: str, data: StageConfigUpdate) -> None:
         if meta and meta.get("status") == "coming_soon":
             raise ApiBusinessError(get_spec("A4003"), message="识别处理者尚未接通")
     elif stage == PipelineStage.REASON:
-        if data.provider in ("openai_compat", "xfyun", "volcengine", "aliyun", "tencent", "baidu", "local", "edge", "minimax_speech", "none", "mimo_audio"):
+        # 黑名单由目录表派生（单一真相）：新增语音供应商无需改此处
+        if data.provider in non_reasoning_provider_ids():
             raise ApiBusinessError(
                 get_spec("A4001"),
                 message="面试思考处理者必须是文本 LLM，不能选择仅 ASR/仅 TTS 供应商",
