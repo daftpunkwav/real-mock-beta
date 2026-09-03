@@ -38,7 +38,13 @@ class MessageDispatcherMixin:
             return True
         return False
 
-    async def _dispatch(self, data: dict[str, Any], db: Session, session: InterviewSession) -> None:
+    async def _dispatch(
+        self,
+        data: dict[str, Any],
+        db: Session | None = None,
+        session: InterviewSession | None = None,
+    ) -> None:
+        """按消息类型分发；回合路径自建短生命周期 db，本方法不使用 db/session。"""
         msg_type = data.get("type", "")
         if msg_type == "audio_chunk":
             await self._on_audio_chunk(data)

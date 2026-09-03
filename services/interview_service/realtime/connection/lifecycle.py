@@ -97,11 +97,16 @@ class ConnectionLifecycleMixin:
             if not await self.bind_pipeline(db, session):
                 return
             await self.start_session_flow(session, db)
+            # 开场完成后即关闭主循环 db：消息循环各回合自建短生命周期 db 并
+            # rebind_runtime_session（见 ConnectionAuthMixin），长持连接在
+            # SQLite WAL 下会延缓 checkpoint
+            db.close()
+            db = None
             while True:
                 data = await self.next_message()
                 if data is None:
                     break
-                await self._dispatch(data, db, session)
+                await self._dispatch(data)
         except WebSocketDisconnect:
             logger.info("WS 断开 session=%s", self.ctx.session_id)
         except Exception as e:
@@ -132,7 +137,7 @@ class ConnectionLifecycleMixin:
             await self._teardown(db)
 
     async def _teardown(self, db: Any) -> None:
-        """释放租约、取消后台任务、关闭 TTS 队列与 DB 会话。"""
+        """释放租约、取消后台任务、关闭 TTS 队列与 DB 会话（db 可能为 None，已提前关闭）。"""
         try:
             await release_session_connection(self)
         except Exception:
@@ -145,10 +150,11 @@ class ConnectionLifecycleMixin:
             await asyncio.wait_for(self.ctx.tts_queue.stop(), timeout=5.0)
         except Exception:
             logger.exception("TTS queue 关闭失败")
-        try:
-            db.close()
-        except Exception:
-            logger.exception("DB 关闭失败")
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                logger.exception("DB 关闭失败")
 
 
 __all__ = ["ConnectionLifecycleMixin"]
