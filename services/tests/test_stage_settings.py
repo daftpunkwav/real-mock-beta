@@ -266,3 +266,21 @@ def test_non_reasoning_provider_ids_derived_from_catalog() -> None:
     for p in REASONING_PROVIDERS:
         if p.get("can_interview_reason"):
             assert p["id"] not in ids, p["id"]
+
+
+def test_legacy_stage_config_defaults_on_empty_db() -> None:
+    """空库回落解析：内存默认实例的 max_tokens/context_window 须兜底为默认值（非 None）。
+
+    column default 仅在 INSERT 时生效；load_stage_configs 的内存补齐实例
+    不落库，_legacy_stage_config 必须自行兜底。
+    """
+    from shared.models.config_models import StageConfig
+    from shared.services.pipeline_resolve import _legacy_stage_config
+
+    db = _db()
+    cfg = _legacy_stage_config(db, "reason")
+    assert cfg["max_tokens"] == 4096
+    assert cfg["context_window"] == 128000
+    assert cfg["protocol"] == "openai_chat"
+    # 数据库无写入副作用（读路径语义）
+    assert db.query(StageConfig).count() == 0

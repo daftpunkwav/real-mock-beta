@@ -124,14 +124,18 @@ def _legacy_stage_config(db: Session, stage: str) -> dict[str, Any]:
     if not row:
         return stage_to_response(StageConfig(stage=stage))
     extras = runtime_extras(parse_json(row.extras))
+    # 内存默认实例（load_stage_configs 补齐的缺行）的 column default 不生效，
+    # max_tokens/context_window 为 None——此处显式兜底，勿依赖下游 or 链
+    max_tokens = row.max_tokens if row.max_tokens is not None else 4096
+    context_window = row.context_window if row.context_window is not None else 128000
     return {
         "provider": row.provider or extras.get("provider") or "",
         "api_base": row.api_base or "",
         "api_key": _dec(row, "api_key"),
         "protocol": row.protocol or DEFAULT_LLM_PROTOCOL,
         "model": row.model or "",
-        "max_tokens": row.max_tokens,
-        "context_window": row.context_window,
+        "max_tokens": max_tokens,
+        "context_window": context_window,
         "supports_vision": bool(row.supports_vision),
         "supports_audio_input": bool(row.supports_audio_input),
         "supports_audio_output": bool(row.supports_audio_output),

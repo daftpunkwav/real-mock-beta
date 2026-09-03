@@ -63,6 +63,11 @@ def load_stage_configs(db: Session) -> dict[str, StageConfig]:
     供运行时回落解析（`_legacy_stage_config`）等读路径使用，避免隐式
     ``get_or_create`` + commit 的写副作用；需要落库种子语义时仍用
     :func:`get_all_stage_configs`。
+
+    .. warning::
+
+        内存补齐实例**未经 flush，column default（max_tokens 等）不生效**，
+        访问得到 None；消费方须自行兜底（见 ``_legacy_stage_config``）。
     """
     rows = {row.stage: row for row in db.query(StageConfig).all()}
     for stage in STAGES:
