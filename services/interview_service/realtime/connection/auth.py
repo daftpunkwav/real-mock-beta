@@ -179,6 +179,22 @@ class ConnectionAuthMixin:
     # 连接建立后推进（开场 / 续接）
     # ------------------------------------------------------------------
 
+    def rebind_runtime_session(self, session: InterviewSession) -> None:
+        """把 runner/agent 运行时持有的会话对象重绑到本回合 db 的 attached 实例。
+
+        bind_pipeline 用主循环 db 加载的会话对象构造 runner/agent；回合路径
+        自建短生命周期 db 后，对原（已不属于本回合 db）对象的修改不会随
+        本回合 ``save_state`` 写库（实测：回合状态丢失）。各回合/收尾入口
+        加载会话后必须先调用本方法，保证状态变更随本回合 db 落库。
+        """
+        if self.ctx.agent is not None:
+            self.ctx.agent.session = session
+        if self.ctx.runner is not None:
+            self.ctx.runner.session = session
+            self.ctx.runner.agent.session = session
+            self.ctx.runner.prompter.session = session
+            self.ctx.runner.tools.session = session
+
     async def start_session_flow(self, session: InterviewSession, db: Session) -> None:
         """PENDING 开场白；ACTIVE 等待候选人继续。"""
         if session.status == SessionStatus.PENDING.value:

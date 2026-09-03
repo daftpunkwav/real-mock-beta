@@ -37,6 +37,7 @@ class TurnTextEntryMixin:
             session = self._load_session(db)
             if not session:
                 return
+            self.rebind_runtime_session(session)
             await self.set_turn(TurnState.PROCESSING)
             await self.send("stt_final", text=text)
             await self._process_user_text(text, data, db, session)

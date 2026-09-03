@@ -35,6 +35,7 @@ class FinishControlMixin:
                     code="A2001",
                 )
                 return
+            self.rebind_runtime_session(session)
             if session.status == SessionStatus.COMPLETED.value:
                 await self.send(
                     "assistant_done",

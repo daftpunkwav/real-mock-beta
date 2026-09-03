@@ -24,13 +24,20 @@ class InterruptControlMixin:
     ctx: "ConnectionContext"
 
     def _persist_interrupt_stats(self, session: InterviewSession, db: Session) -> None:
-        """把打断计数写入 agent_state，供报告礼貌分使用。"""
+        """把打断计数并入 agent 内存态后落库（单一真相，防回合 save_state 覆盖回退）。"""
         try:
-            state = json.loads(session.agent_state or "{}")
-            if not isinstance(state, dict):
-                state = {}
+            state: dict = {}
+            if self.ctx.agent is not None:
+                state = dict(self.ctx.agent.agent_state)
+            elif session.agent_state:
+                loaded = json.loads(session.agent_state)
+                state = loaded if isinstance(loaded, dict) else {}
             state["candidate_interrupts"] = self.ctx.candidate_interrupts
             state["ai_interrupts"] = self.ctx.ai_interrupts
+            if self.ctx.agent is not None:
+                # 内存态与库同步，后续回合 save_state 序列化时计数不丢
+                self.ctx.agent.agent_state["candidate_interrupts"] = self.ctx.candidate_interrupts
+                self.ctx.agent.agent_state["ai_interrupts"] = self.ctx.ai_interrupts
             session.agent_state = json.dumps(state, ensure_ascii=False)
             db.add(session)
             db.commit()

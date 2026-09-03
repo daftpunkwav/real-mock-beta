@@ -44,6 +44,7 @@ class TurnSttFinishMixin:
             session = self._load_session(db)
             if not session:
                 return
+            self.rebind_runtime_session(session)
             await self._on_user_turn_end(data, db, session)
         except Exception:
             logger.exception("user_turn_end 失败 sid=%s", self.ctx.session_id)
