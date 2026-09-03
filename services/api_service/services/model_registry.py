@@ -81,14 +81,14 @@ class BindingUpdate(BaseModel):
 def get_provider(db: Session, provider_id: int) -> LlmProvider:
     row = db.query(LlmProvider).filter(LlmProvider.id == provider_id).first()
     if not row:
-        raise_error("A3001", message="供应商不存在")
+        raise_error("A4005", message="供应商不存在")
     return row
 
 
 def get_profile(db: Session, model_id: int) -> ModelProfile:
     row = db.query(ModelProfile).filter(ModelProfile.id == model_id).first()
     if not row:
-        raise_error("A3001", message="模型条目不存在")
+        raise_error("A4005", message="模型条目不存在")
     return row
 
 
