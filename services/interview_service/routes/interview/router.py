@@ -17,22 +17,38 @@ from shared.core.constants import (
 from shared.core.local_only import require_local_peer
 from shared.core.ratelimit import rate_limit_dep
 from shared.schemas import ResumePickerItem
-from interview_service.routes.interview import sessions, turns
+# 直接 import 子模块：不经过父包命名空间，避免与 __init__ 的 router
+# 再导出形成包初始化回环（sessions/turns 不反向引用 router，天然无环）
+from interview_service.routes.interview.sessions import (
+    InterviewSessionResponse,
+    create_session,
+    get_messages,
+    get_session,
+    list_resume_picker,
+    list_sessions,
+)
+from interview_service.routes.interview.turns import (
+    FinishInterviewResponse,
+    InterviewMessageResponse,
+    finish_interview,
+    send_message,
+    start_interview,
+)
 
 router = APIRouter()
 
 router.add_api_route(
     "/resumes",
-    sessions.list_resume_picker,
+    list_resume_picker,
     methods=["GET"],
     response_model=list[ResumePickerItem],
     dependencies=[Depends(require_local_peer)],
 )
 router.add_api_route(
     "/sessions",
-    sessions.create_session,
+    create_session,
     methods=["POST"],
-    response_model=sessions.InterviewSessionResponse,
+    response_model=InterviewSessionResponse,
     dependencies=[
         Depends(require_local_peer),
         Depends(
@@ -45,25 +61,25 @@ router.add_api_route(
 )
 router.add_api_route(
     "/sessions",
-    sessions.list_sessions,
+    list_sessions,
     methods=["GET"],
-    response_model=list[sessions.InterviewSessionResponse],
+    response_model=list[InterviewSessionResponse],
     dependencies=[Depends(require_local_peer)],
 )
 router.add_api_route(
     "/sessions/{session_id}",
-    sessions.get_session,
+    get_session,
     methods=["GET"],
-    response_model=sessions.InterviewSessionResponse,
+    response_model=InterviewSessionResponse,
 )
 router.add_api_route(
     "/sessions/{session_id}/messages",
-    sessions.get_messages,
+    get_messages,
     methods=["GET"],
 )
 router.add_api_route(
     "/sessions/{session_id}/start",
-    turns.start_interview,
+    start_interview,
     methods=["POST"],
     dependencies=[
         Depends(
@@ -76,9 +92,9 @@ router.add_api_route(
 )
 router.add_api_route(
     "/sessions/{session_id}/message",
-    turns.send_message,
+    send_message,
     methods=["POST"],
-    response_model=turns.InterviewMessageResponse,
+    response_model=InterviewMessageResponse,
     dependencies=[
         Depends(
             rate_limit_dep(
@@ -90,9 +106,9 @@ router.add_api_route(
 )
 router.add_api_route(
     "/sessions/{session_id}/finish",
-    turns.finish_interview,
+    finish_interview,
     methods=["POST"],
-    response_model=turns.FinishInterviewResponse,
+    response_model=FinishInterviewResponse,
     dependencies=[
         Depends(
             rate_limit_dep(
@@ -102,7 +118,4 @@ router.add_api_route(
         )
     ],
 )
-
-# 兼容再导出：测试与下游仍从 interview 模块取这两个公开入口
-start_interview = turns.start_interview
-send_message = turns.send_message
+# start_interview / send_message 即顶层具名 import，兼容再导出语义保持
