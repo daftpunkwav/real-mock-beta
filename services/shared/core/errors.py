@@ -1,4 +1,4 @@
-"""全站错误码注册表（本 CATALOG 即权威目录；新增错误码先在此登记）。"
+"""全站错误码注册表（本 CATALOG 即权威目录；新增错误码先在此登记）。
 
 用法：
     from shared.core.errors import raise_error
