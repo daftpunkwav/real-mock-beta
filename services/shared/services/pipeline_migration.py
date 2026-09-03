@@ -1,6 +1,6 @@
 """``stage_configs`` 三行 → 供应商 + 模型条目 + 任务绑定（一次性导入）。
 
-``_allocate_provider_name`` 与 ``migrate_stages_to_profiles`` 必须同文件：
+``allocate_provider_name`` 与 ``migrate_stages_to_profiles`` 必须同文件：
 ``llm_providers.name`` UNIQUE 后缀逻辑与导入流程绑定，拆开会再引入回归。
 """
 
@@ -20,7 +20,7 @@ TASK_BY_STAGE = {
 }
 STAGE_BY_TASK = {task: stage for stage, task in TASK_BY_STAGE.items()}
 # 默认降级策略（与旧 get_or_create_stage_config 的种子一致）
-_DEFAULT_FALLBACK = {
+DEFAULT_FALLBACK = {
     "chat": {"handler": "", "mode": ""},
     "stt": {"handler": "local", "mode": "transcribe"},
     "tts": {"handler": "edge", "mode": "tts_from_text"},
@@ -31,7 +31,7 @@ def _stage_has_data(row: StageConfig | None) -> bool:
     return bool(row and (row.provider or row.api_base or row.model or row.api_key))
 
 
-def _allocate_provider_name(db: Session, desired: str, taken: set[str]) -> str:
+def allocate_provider_name(db: Session, desired: str, taken: set[str]) -> str:
     """``llm_providers.name`` 唯一：同显示名、不同 api_base 时加序号后缀。"""
     base = (desired or "自定义供应商").strip() or "自定义供应商"
     candidate = base
@@ -67,7 +67,7 @@ def migrate_stages_to_profiles(db: Session) -> bool:
         provider = providers_by_key.get(key)
         if provider is None:
             provider = LlmProvider(
-                name=_allocate_provider_name(db, row.provider or "自定义供应商", taken_names),
+                name=allocate_provider_name(db, row.provider or "自定义供应商", taken_names),
                 api_base=row.api_base or "",
                 protocol=row.protocol or DEFAULT_LLM_PROTOCOL,
                 api_key=row.api_key or "",
@@ -99,8 +99,8 @@ def migrate_stages_to_profiles(db: Session) -> bool:
             TaskBinding(
                 task=task,
                 profile_id=profile_id,
-                fallback_handler=_DEFAULT_FALLBACK[task]["handler"],
-                fallback_mode=_DEFAULT_FALLBACK[task]["mode"],
+                fallback_handler=DEFAULT_FALLBACK[task]["handler"],
+                fallback_mode=DEFAULT_FALLBACK[task]["mode"],
             )
         )
     db.commit()

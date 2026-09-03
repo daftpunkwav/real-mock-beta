@@ -16,13 +16,13 @@ from shared.core.constants import DEFAULT_LLM_PROTOCOL
 from shared.core.secrets import decrypt_secret
 from shared.models import StageConfig
 from shared.services.pipeline_legacy import fetch_llm_settings_row, migrate_legacy_to_stages
-from shared.services.pipeline_migration import TASK_BY_STAGE, _DEFAULT_FALLBACK
-from shared.services.pipeline_secrets import _dec, _parse_json, _public_extras, _runtime_extras
+from shared.services.pipeline_migration import TASK_BY_STAGE, DEFAULT_FALLBACK
+from shared.services.pipeline_secrets import _dec, parse_json, public_extras, runtime_extras
 from shared.services.pipeline_stages import get_all_stage_configs, stage_to_response
 
 
 def _profile_extras(profile: ModelProfile) -> dict[str, Any]:
-    return _runtime_extras(_parse_json(profile.extras))
+    return runtime_extras(parse_json(profile.extras))
 
 
 def profile_to_response(profile: ModelProfile, provider: LlmProvider | None) -> dict[str, Any]:
@@ -43,7 +43,7 @@ def profile_to_response(profile: ModelProfile, provider: LlmProvider | None) -> 
             "audio_output": bool(profile.cap_audio_out),
             "reasoning": bool(profile.cap_reasoning),
         },
-        "extras": _public_extras(_profile_extras(profile)),
+        "extras": public_extras(_profile_extras(profile)),
         "enabled": bool(profile.enabled),
     }
 
@@ -62,7 +62,7 @@ def _runtime_config_from_profile(
 ) -> dict[str, Any]:
     """把供应商+模型条目组装成与旧 stage runtime dict 同构的扁平 dict。"""
     extras = _profile_extras(profile)
-    fb = fallback or _DEFAULT_FALLBACK.get(TASK_BY_STAGE.get(stage, "chat"), {})
+    fb = fallback or DEFAULT_FALLBACK.get(TASK_BY_STAGE.get(stage, "chat"), {})
     api_key = ""
     if provider is not None:
         raw = provider.api_key or ""
@@ -122,7 +122,7 @@ def _legacy_stage_config(db: Session, stage: str) -> dict[str, Any]:
     row = rows.get(stage)
     if not row:
         return stage_to_response(StageConfig(stage=stage))
-    extras = _runtime_extras(_parse_json(row.extras))
+    extras = runtime_extras(parse_json(row.extras))
     return {
         "provider": row.provider or extras.get("provider") or "",
         "api_base": row.api_base or "",

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from shared.core.constants import DEFAULT_LLM_PROTOCOL, PipelineStage
 from shared.models import StageConfig
-from shared.services.pipeline_secrets import _parse_json, _public_extras
+from shared.services.pipeline_secrets import parse_json, public_extras
 
 STAGES = [PipelineStage.RECOGNIZE, PipelineStage.REASON, PipelineStage.SPEAK]
 
@@ -84,7 +84,7 @@ def stage_to_response(row: StageConfig) -> dict[str, Any]:
             "handler": row.fallback_handler or "",
             "mode": row.fallback_mode or "",
         },
-        "extras": _public_extras(_parse_json(row.extras)),
+        "extras": public_extras(parse_json(row.extras)),
         "has_api_key": bool(row.api_key),
         "updated_at": row.updated_at,
     }

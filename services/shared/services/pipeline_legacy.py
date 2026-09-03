@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from shared.core.constants import DEFAULT_LLM_PROTOCOL, PipelineStage
 from shared.models import LLMSettings, StageConfig
-from shared.services.pipeline_secrets import _maybe_encrypt
+from shared.services.pipeline_secrets import maybe_encrypt
 from shared.services.pipeline_stages import get_or_create_stage_config
 
 
@@ -115,7 +115,7 @@ def migrate_legacy_to_stages(db: Session) -> dict[str, StageConfig]:
         data = builder(legacy)
         row.provider = data.get("provider") or ""
         row.api_base = data.get("api_base") or ""
-        row.api_key = _maybe_encrypt(data.get("api_key"), row.api_key or "")
+        row.api_key = maybe_encrypt(data.get("api_key"), row.api_key or "")
         row.protocol = data.get("protocol") or DEFAULT_LLM_PROTOCOL
         row.model = data.get("model") or ""
         row.max_tokens = data.get("max_tokens", 4096)

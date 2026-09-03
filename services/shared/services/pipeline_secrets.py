@@ -1,7 +1,7 @@
 """pipeline 配置的密钥与 extras JSON 辅助（叶子模块）。
 
-- ``enc:`` 前缀加密语义（``_SECRET_KEEP`` 表示保留现值）；
-- extras 的响应侧脱敏（``_public_extras``）与运行时解密（``_runtime_extras``）。
+- ``enc:`` 前缀加密语义（``SECRET_KEEP`` 表示保留现值）；
+- extras 的响应侧脱敏（``public_extras``）与运行时解密（``runtime_extras``）。
 """
 
 from __future__ import annotations
@@ -11,12 +11,12 @@ from typing import Any
 
 from shared.core.secrets import decrypt_secret, encrypt_secret
 
-_SECRET_KEEP = "keep"
-_SECRET_EXTRA_KEYS = frozenset({"asr_api_secret", "asr_access_key", "asr_app_key"})
+SECRET_KEEP = "keep"
+SECRET_EXTRA_KEYS = frozenset({"asr_api_secret", "asr_access_key", "asr_app_key"})
 
 
-def _maybe_encrypt(value: str | None, current: str) -> str:
-    if value is None or value == "" or value == _SECRET_KEEP:
+def maybe_encrypt(value: str | None, current: str) -> str:
+    if value is None or value == "" or value == SECRET_KEEP:
         return current
     if str(value).startswith("enc:"):
         return str(value)
@@ -36,7 +36,7 @@ def _dec(row: Any, name: str) -> str:
         raise ValueError(f"密钥字段 {name} 解密失败，请到设置页重新保存密钥") from e
 
 
-def _parse_json(field: str | None) -> dict[str, Any]:
+def parse_json(field: str | None) -> dict[str, Any]:
     if not field:
         return {}
     try:
@@ -46,15 +46,15 @@ def _parse_json(field: str | None) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _public_extras(extras: dict[str, Any]) -> dict[str, Any]:
+def public_extras(extras: dict[str, Any]) -> dict[str, Any]:
     """不把旧版额外密钥回传到浏览器。"""
-    return {key: value for key, value in extras.items() if key not in _SECRET_EXTRA_KEYS}
+    return {key: value for key, value in extras.items() if key not in SECRET_EXTRA_KEYS}
 
 
-def _runtime_extras(extras: dict[str, Any]) -> dict[str, Any]:
+def runtime_extras(extras: dict[str, Any]) -> dict[str, Any]:
     """读取兼容字段时解密旧版额外凭证。"""
     result = dict(extras)
-    for key in _SECRET_EXTRA_KEYS:
+    for key in SECRET_EXTRA_KEYS:
         value = result.get(key)
         if isinstance(value, str) and value.startswith("enc:"):
             result[key] = decrypt_secret(value) or ""

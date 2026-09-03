@@ -17,11 +17,11 @@ from shared.core.constants import DEFAULT_LLM_PROTOCOL
 from shared.core.errors import ApiBusinessError, get_spec, raise_error
 from shared.core.secrets import encrypt_secret
 from shared.services.pipeline_config import (
-    _DEFAULT_FALLBACK,
-    _SECRET_EXTRA_KEYS,
-    _SECRET_KEEP,
+    DEFAULT_FALLBACK,
+    SECRET_EXTRA_KEYS,
+    SECRET_KEEP,
     STAGE_BY_TASK,
-    _parse_json,
+    parse_json,
     get_provider_model_rows,
     migrate_stages_to_profiles,
     profile_to_response,
@@ -93,21 +93,21 @@ def get_profile(db: Session, model_id: int) -> ModelProfile:
 
 
 def apply_provider_key(row: LlmProvider, raw_key: str | None) -> None:
-    if raw_key is None or raw_key == _SECRET_KEEP:
+    if raw_key is None or raw_key == SECRET_KEEP:
         return
     row.api_key = encrypt_secret(raw_key) if raw_key else ""
 
 
 def merge_profile_extras(row: ModelProfile, extras: dict[str, Any] | None) -> str:
-    current = _parse_json(row.extras)
+    current = parse_json(row.extras)
     if extras is None:
         return row.extras or "{}"
     merged = dict(current)
     for key, value in extras.items():
-        if key in _SECRET_EXTRA_KEYS and value in (None, "", _SECRET_KEEP):
+        if key in SECRET_EXTRA_KEYS and value in (None, "", SECRET_KEEP):
             continue
         merged[key] = value
-    for key in _SECRET_EXTRA_KEYS:
+    for key in SECRET_EXTRA_KEYS:
         value = merged.get(key)
         if value and not str(value).startswith("enc:"):
             merged[key] = encrypt_secret(str(value)) or ""
@@ -157,8 +157,8 @@ def list_bindings_payload(db: Session) -> dict[str, Any]:
             "task": task,
             "profile": profile_to_response(profile, provider) if profile else None,
             "fallback": {
-                "handler": (binding.fallback_handler if binding else "") or _DEFAULT_FALLBACK[task]["handler"],
-                "mode": (binding.fallback_mode if binding else "") or _DEFAULT_FALLBACK[task]["mode"],
+                "handler": (binding.fallback_handler if binding else "") or DEFAULT_FALLBACK[task]["handler"],
+                "mode": (binding.fallback_mode if binding else "") or DEFAULT_FALLBACK[task]["mode"],
             },
         }
     return out

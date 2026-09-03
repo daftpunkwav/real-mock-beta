@@ -6,7 +6,7 @@
 - ``pipeline_secrets``：密钥与 extras JSON 辅助
 - ``pipeline_stages``：``stage_configs`` 表持久化与视图
 - ``pipeline_legacy``：旧 LLMSettings → stage 转换
-- ``pipeline_migration``：stage → 供应商 + 模型条目 + 任务绑定（含 ``_allocate_provider_name``）
+- ``pipeline_migration``：stage → 供应商 + 模型条目 + 任务绑定（含 ``allocate_provider_name``）
 - ``pipeline_resolve``：模型条目体系的运行时组装与绑定
 
 运行时配置优先级：``model_profiles`` 体系（task_bindings → 供应商+模型条目）
@@ -30,8 +30,8 @@ from shared.services.pipeline_legacy import fetch_llm_settings_row, migrate_lega
 from shared.services.pipeline_migration import (
     STAGE_BY_TASK,
     TASK_BY_STAGE,
-    _DEFAULT_FALLBACK,
-    _allocate_provider_name,
+    DEFAULT_FALLBACK,
+    allocate_provider_name,
     migrate_stages_to_profiles,
 )
 from shared.services.pipeline_resolve import (
@@ -42,12 +42,12 @@ from shared.services.pipeline_resolve import (
     profile_to_response,
 )
 from shared.services.pipeline_secrets import (
-    _SECRET_EXTRA_KEYS,
-    _SECRET_KEEP,
-    _maybe_encrypt,
-    _parse_json,
-    _public_extras,
-    _runtime_extras,
+    SECRET_EXTRA_KEYS,
+    SECRET_KEEP,
+    maybe_encrypt,
+    parse_json,
+    public_extras,
+    runtime_extras,
 )
 from shared.services.pipeline_stages import (
     STAGES,
@@ -60,13 +60,13 @@ __all__ = [
     "STAGES",
     "TASK_BY_STAGE",
     "STAGE_BY_TASK",
-    "_DEFAULT_FALLBACK",
-    "_SECRET_KEEP",
-    "_SECRET_EXTRA_KEYS",
-    "_maybe_encrypt",
-    "_parse_json",
-    "_public_extras",
-    "_runtime_extras",
+    "DEFAULT_FALLBACK",
+    "SECRET_KEEP",
+    "SECRET_EXTRA_KEYS",
+    "maybe_encrypt",
+    "parse_json",
+    "public_extras",
+    "runtime_extras",
     "get_or_create_stage_config",
     "get_all_stage_configs",
     "stage_to_response",
@@ -74,7 +74,7 @@ __all__ = [
     "get_stage_config_map",
     "fetch_llm_settings_row",
     "migrate_legacy_to_stages",
-    "_allocate_provider_name",
+    "allocate_provider_name",
     "migrate_stages_to_profiles",
     "get_provider_model_rows",
     "profile_to_response",
@@ -91,7 +91,7 @@ def update_stage_config(db: Session, stage: str, data: Any) -> StageConfig:
 
     row.provider = data.provider or ""
     row.api_base = data.api_base or ""
-    row.api_key = _maybe_encrypt(data.api_key, row.api_key or "")
+    row.api_key = maybe_encrypt(data.api_key, row.api_key or "")
     row.protocol = data.protocol or DEFAULT_LLM_PROTOCOL
     row.model = data.model or ""
     row.max_tokens = data.max_tokens
@@ -104,13 +104,13 @@ def update_stage_config(db: Session, stage: str, data: Any) -> StageConfig:
     if fallback:
         row.fallback_handler = fallback.handler or ""
         row.fallback_mode = fallback.mode or ""
-    old_extras = _parse_json(row.extras)
+    old_extras = parse_json(row.extras)
     new_extras = dict(old_extras)
     for key, value in (data.extras or {}).items():
-        if key in _SECRET_EXTRA_KEYS and value in (None, "", _SECRET_KEEP):
+        if key in SECRET_EXTRA_KEYS and value in (None, "", SECRET_KEEP):
             continue
         new_extras[key] = value
-    for key in _SECRET_EXTRA_KEYS:
+    for key in SECRET_EXTRA_KEYS:
         value = new_extras.get(key)
         if value and not str(value).startswith("enc:"):
             new_extras[key] = encrypt_secret(str(value)) or ""
