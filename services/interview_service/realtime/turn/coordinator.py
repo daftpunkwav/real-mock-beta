@@ -13,10 +13,6 @@
 
 from __future__ import annotations
 
-# 兼容再导出：保持旧 import 路径可用。生产调用点在 :mod:`stt_finish`
-# （顶层绑定），测试 patch 目标为 ``stt_finish.transcribe_utterance_result``。
-from shared.capabilities.voice.stt import transcribe_utterance_result  # noqa: F401 — 兼容再导出
-
 from interview_service.realtime.turn.control import TurnControlMixin
 from interview_service.realtime.turn.lock import TurnLockMixin
 from interview_service.realtime.turn.playback import TurnPlaybackMixin
@@ -45,7 +41,6 @@ __all__ = [
     "TurnTextEntryMixin",
     "TurnSttFinishMixin",
     "TurnPlaybackMixin",
-    "transcribe_utterance_result",
     "_AUDIO_BUFFER_MAX_BYTES",
     "_IMAGE_BASE64_MAX_LEN",
 ]

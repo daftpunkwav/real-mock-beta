@@ -142,5 +142,6 @@ def get_workflow(workflow_id: str) -> Workflow:
     return WORKFLOWS.get(workflow_id, TECHNICAL_WORKFLOW)
 
 
-# 向后兼容别名（旧名 InterviewPhase 指 dataclass）
+# 别名：interview 域内 ``InterviewPhase`` 唯一指向本阶段定义 dataclass
+# （constants 的同名词枚举别名已删除，两概念不再同名）
 InterviewPhase = PhaseDef

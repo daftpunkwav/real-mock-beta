@@ -22,10 +22,10 @@ def require_local_peer(request: Request) -> None:
     ``TEST_MODE=1`` 仅在非生产环境放行真实 HTTP；
     ``env=prod`` 时忽略该开关，防止误部署绕过。
     """
-    peer = request.client.host if request.client else None
+    # 无 client（如特定 ASGI 场景）与空 host 同样拒绝，peer 恒为 str
+    peer = (request.client.host if request.client else "") or ""
     if not peer:
         raise_error("A0405")
-    assert peer is not None  # 上方 raise_error 不返回 NoReturn，mypy 需要窄化
     if peer == "testclient":
         return
     if (

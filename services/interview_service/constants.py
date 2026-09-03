@@ -45,10 +45,6 @@ class InterviewPhaseId(StrEnum):
     BUSINESS = "business"
 
 
-# 兼容旧名：历史代码 / 文档中的 InterviewPhase 指阶段 id 枚举
-InterviewPhase = InterviewPhaseId
-
-
 # ── 面试官人格 / 风格 ────────────────────────────────────────
 
 
