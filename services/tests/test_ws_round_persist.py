@@ -116,4 +116,4 @@ def test_interrupt_stats_survive_round_save_state(ws_db) -> None:
     state = json.loads(row.agent_state or "{}")
     assert state["candidate_interrupts"] == 2
     assert state["ai_interrupts"] == 1
-    assert state.get("asked_questions"), "回合消息应一并落库"
+    assert "phase_idx" in state, "回合状态应一并落库"
