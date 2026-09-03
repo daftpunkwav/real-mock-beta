@@ -18,7 +18,7 @@ from shared.models import StageConfig
 from shared.services.pipeline_legacy import fetch_llm_settings_row, migrate_legacy_to_stages
 from shared.services.pipeline_migration import TASK_BY_STAGE, DEFAULT_FALLBACK
 from shared.services.pipeline_secrets import _dec, parse_json, public_extras, runtime_extras
-from shared.services.pipeline_stages import get_all_stage_configs, stage_to_response
+from shared.services.pipeline_stages import load_stage_configs, stage_to_response
 
 
 def _profile_extras(profile: ModelProfile) -> dict[str, Any]:
@@ -113,7 +113,8 @@ def _binding_config(db: Session, task: str, stage: str) -> dict[str, Any] | None
 
 
 def _legacy_stage_config(db: Session, stage: str) -> dict[str, Any]:
-    rows = get_all_stage_configs(db)
+    # 读路径：只读加载，缺失行用内存默认补齐，不隐式落库
+    rows = load_stage_configs(db)
     if fetch_llm_settings_row(db) and any(
         not row.provider and not row.api_base and not row.model and not row.api_key
         for row in rows.values()

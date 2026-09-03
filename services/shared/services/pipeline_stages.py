@@ -57,7 +57,22 @@ def get_or_create_stage_config(db: Session, stage: str) -> StageConfig:
     return row
 
 
+def load_stage_configs(db: Session) -> dict[str, StageConfig]:
+    """只读加载三阶段配置；缺失阶段以内存默认实例补齐，**不写库**。
+
+    供运行时回落解析（`_legacy_stage_config`）等读路径使用，避免隐式
+    ``get_or_create`` + commit 的写副作用；需要落库种子语义时仍用
+    :func:`get_all_stage_configs`。
+    """
+    rows = {row.stage: row for row in db.query(StageConfig).all()}
+    for stage in STAGES:
+        if stage not in rows:
+            rows[stage] = _empty_stage(stage)
+    return rows
+
+
 def get_all_stage_configs(db: Session) -> dict[str, StageConfig]:
+    """加载并确保三阶段行存在（缺失时落库创建）——写语义，供配置页/迁移。"""
     rows = {row.stage: row for row in db.query(StageConfig).all()}
     for stage in STAGES:
         if stage not in rows:
