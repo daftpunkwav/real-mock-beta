@@ -22,35 +22,22 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import re
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi import FastAPI
 
 from api_service.router import service_router as api_router
 from agent_service.router import service_router as agent_router
 from interview_service.router import service_router as interview_router
 from interview_service.startup import ensure_rag_index
+from shared.app_factory import (
+    add_default_cors,
+    install_trace_middleware,
+    register_core_error_handlers,
+)
 from shared.config import Settings, get_settings
-from shared.core.logging import (
-    configure_logging,
-    get_trace_id,
-    reset_trace_id,
-    set_trace_id,
-)
-from shared.core.error_handlers import (
-    on_http_exception,
-    on_request_validation,
-    on_starlette_http_exception,
-    on_unsafe_url,
-    on_unhandled_exception,
-)
-from shared.core.constants import TRACE_ID_HEADER
-from shared.core.security import UnsafeURLError
+from shared.core.logging import configure_logging
 from shared.database import dispose_all_engines
 from shared.router_mount import include_with_legacy_api_alias
 from bootstrap.db_bootstrap import bootstrap_databases_and_seed
@@ -60,19 +47,6 @@ logger = logging.getLogger(__name__)
 
 # 三服务纯路由（无前缀）；聚合入口统一挂载 /api/v1 与 /api 兼容别名
 SERVICE_ROUTERS = (api_router, agent_router, interview_router)
-
-
-# ── X-Request-Id 校验 ────────────────────────────────────────
-# 仅允许 [A-Za-z0-9_-]{8,64}。其他字符 / 过短 / 过长一律重新生成，
-# 防止日志注入（CRLF / 控制字符）。
-_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_\-]{8,64}$")
-
-
-def _sanitize_request_id(raw: str | None) -> str | None:
-    """校验通过返回原值，否则返回 None（由 set_trace_id 重新生成）。"""
-    if raw and _REQUEST_ID_RE.match(raw):
-        return raw
-    return None
 
 
 @asynccontextmanager
@@ -116,7 +90,11 @@ def _shutdown_engine() -> None:
 
 
 def create_app() -> FastAPI:
-    """构造聚合 FastAPI app：三服务路由 + 统一中间件/异常处理。"""
+    """构造聚合 FastAPI app：三服务路由 + 统一中间件/异常处理。
+
+    trace / CORS / 错误 envelope 装配复用 :mod:`shared.app_factory` 的共享
+    函数（单一真相）；本入口额外叠加生产门禁与 ``/api`` 兼容别名。
+    """
     cfg = get_settings()
     app = FastAPI(
         title="RealMock API",
@@ -125,39 +103,11 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    @app.middleware("http")
-    async def trace_middleware(request: Request, call_next):
-        """为每个 HTTP 请求注入 trace_id，便于日志串联。"""
-        raw = request.headers.get("x-request-id") or request.headers.get("X-Request-Id")
-        token = set_trace_id(_sanitize_request_id(raw))
-        response_trace_id = get_trace_id()
-        try:
-            response = await call_next(request)
-        except Exception:
-            logger.exception("HTTP 中间件异常 path=%s", request.url.path)
-            raise
-        finally:
-            reset_trace_id(token)
-        response.headers[TRACE_ID_HEADER] = response_trace_id or ""
-        return response
+    install_trace_middleware(app)
 
     # ── CORS 严格策略 ────────────────────────────────────────
     _check_cors_policy(cfg)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cfg.cors_origin_list,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
-        allow_headers=[
-            "Authorization",
-            "Content-Type",
-            "X-Request-Id",
-            TRACE_ID_HEADER,
-            "X-Interview-Token",
-        ],
-        expose_headers=[TRACE_ID_HEADER],
-        max_age=600,
-    )
+    add_default_cors(app, cors_origin_list=cfg.cors_origin_list)
 
     # ── master key 生产门禁 ────────────────────────────────────────
     _check_secret_key_policy(cfg)
@@ -165,11 +115,7 @@ def create_app() -> FastAPI:
     include_with_legacy_api_alias(app, SERVICE_ROUTERS)
 
     # ── 统一错误响应形状 ────────────────────────────────────────
-    app.add_exception_handler(RequestValidationError, on_request_validation)  # type: ignore[arg-type]
-    app.add_exception_handler(HTTPException, on_http_exception)  # type: ignore[arg-type]
-    app.add_exception_handler(StarletteHTTPException, on_starlette_http_exception)  # type: ignore[arg-type]
-    app.add_exception_handler(UnsafeURLError, on_unsafe_url)  # type: ignore[arg-type]
-    app.add_exception_handler(Exception, on_unhandled_exception)
+    register_core_error_handlers(app)
 
     @app.get("/health")
     def health():

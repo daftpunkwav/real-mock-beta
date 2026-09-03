@@ -121,13 +121,13 @@ class TestErrorEnvelope:
 
 class TestSanitizeRequestId:
     def test_accepts_valid(self) -> None:
-        from services.main import _sanitize_request_id
+        from shared.app_factory import _sanitize_request_id
 
         assert _sanitize_request_id("abcdef123456") == "abcdef123456"
         assert _sanitize_request_id("a-b_c-12345678") == "a-b_c-12345678"
 
     def test_rejects_invalid(self) -> None:
-        from services.main import _sanitize_request_id
+        from shared.app_factory import _sanitize_request_id
 
         for bad in ["", "short", "has space", "has/slash", "a" * 200, None]:
             assert _sanitize_request_id(bad) is None, f"应当拒绝: {bad!r}"

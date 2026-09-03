@@ -108,26 +108,48 @@ def create_service_app(
     )
 
     if enable_trace:
+        install_trace_middleware(app)
 
-        @app.middleware("http")
-        async def trace_middleware(request: Request, call_next):
-            """为每个 HTTP 请求注入 trace_id，便于日志串联。"""
-            raw = request.headers.get("x-request-id") or request.headers.get("X-Request-Id")
-            token = set_trace_id(_sanitize_request_id(raw))
-            response_trace_id = get_trace_id()
-            try:
-                response = await call_next(request)
-            except Exception:
-                logger.exception("HTTP 中间件异常 path=%s", request.url.path)
-                raise
-            finally:
-                reset_trace_id(token)
-            response.headers[TRACE_ID_HEADER] = response_trace_id or ""
-            return response
+    add_default_cors(app, cors_origin_list=settings.cors_origin_list)
 
+    for r in routers:
+        app.include_router(r, prefix="/api/v1")
+
+    if register_error_handlers:
+        register_core_error_handlers(app)
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok", "service": service_name, "version": "1.0.0"}
+
+    return app
+
+
+def install_trace_middleware(app: FastAPI) -> None:
+    """安装 trace_id 注入中间件（X-Request-Id 校验规则单一真相，聚合入口共用）。"""
+
+    @app.middleware("http")
+    async def trace_middleware(request: Request, call_next):
+        """为每个 HTTP 请求注入 trace_id，便于日志串联。"""
+        raw = request.headers.get("x-request-id") or request.headers.get("X-Request-Id")
+        token = set_trace_id(_sanitize_request_id(raw))
+        response_trace_id = get_trace_id()
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception("HTTP 中间件异常 path=%s", request.url.path)
+            raise
+        finally:
+            reset_trace_id(token)
+        response.headers[TRACE_ID_HEADER] = response_trace_id or ""
+        return response
+
+
+def add_default_cors(app: FastAPI, *, cors_origin_list: list[str]) -> None:
+    """安装统一的 CORS 策略（方法/头清单与聚合入口共用同一份）。"""
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origin_list,
+        allow_origins=cors_origin_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Request-Id", TRACE_ID_HEADER, "X-Interview-Token"],
@@ -135,18 +157,11 @@ def create_service_app(
         max_age=600,
     )
 
-    for r in routers:
-        app.include_router(r, prefix="/api/v1")
 
-    if register_error_handlers:
-        app.add_exception_handler(RequestValidationError, on_request_validation)  # type: ignore[arg-type]
-        app.add_exception_handler(HTTPException, on_http_exception)  # type: ignore[arg-type]
-        app.add_exception_handler(StarletteHTTPException, on_starlette_http_exception)  # type: ignore[arg-type]
-        app.add_exception_handler(UnsafeURLError, on_unsafe_url)  # type: ignore[arg-type]
-        app.add_exception_handler(Exception, on_unhandled_exception)
-
-    @app.get("/health")
-    def health():
-        return {"status": "ok", "service": service_name, "version": "1.0.0"}
-
-    return app
+def register_core_error_handlers(app: FastAPI) -> None:
+    """注册统一错误响应 envelope 的 5 个 handler（单一真相）。"""
+    app.add_exception_handler(RequestValidationError, on_request_validation)  # type: ignore[arg-type]
+    app.add_exception_handler(HTTPException, on_http_exception)  # type: ignore[arg-type]
+    app.add_exception_handler(StarletteHTTPException, on_starlette_http_exception)  # type: ignore[arg-type]
+    app.add_exception_handler(UnsafeURLError, on_unsafe_url)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, on_unhandled_exception)
