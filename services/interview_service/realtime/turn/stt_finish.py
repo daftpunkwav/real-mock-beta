@@ -153,29 +153,7 @@ class TurnSttFinishMixin:
 
         text = _pick_stt_text(browser_text, asr_text)
         if text:
-            last_assistant = ""
-            if self.ctx.agent and self.ctx.agent.messages:
-                for m in reversed(self.ctx.agent.messages):
-                    role = getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else None)
-                    content = getattr(m, "content", None) or (
-                        m.get("content") if isinstance(m, dict) else None
-                    )
-                    if role == "assistant" and content:
-                        last_assistant = str(content)
-                        break
-            if last_assistant and _is_echo_of_assistant(text, last_assistant):
-                logger.warning(
-                    "丢弃疑似回采 sid=%s text=%s",
-                    self.ctx.session_id,
-                    text[:80],
-                )
-                await self.send(
-                    "error",
-                    message="检测到可能误采了面试官声音，请再说一遍或打字作答",
-                    code="C2001",
-                    retryable=True,
-                )
-                await self.set_turn(TurnState.USER_SPEAKING)
+            if await self._reject_probable_echo(text):
                 return
             await self.send("stt_final", text=text)
         else:
@@ -191,6 +169,38 @@ class TurnSttFinishMixin:
 
         self.ctx.stt_fail_streak = 0
         await self._process_user_text(text, data, db, session)
+
+    def _last_assistant_content(self) -> str:
+        """消息历史中最近一条面试官发言（回采判定锚点；兼容 dict/ORM 形态）。"""
+        if not (self.ctx.agent and self.ctx.agent.messages):
+            return ""
+        for m in reversed(self.ctx.agent.messages):
+            role = getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else None)
+            content = getattr(m, "content", None) or (
+                m.get("content") if isinstance(m, dict) else None
+            )
+            if role == "assistant" and content:
+                return str(content)
+        return ""
+
+    async def _reject_probable_echo(self, text: str) -> bool:
+        """扬声器回采判定：命中则提示重答并恢复开麦，返回 True（调用方终止入轮）。"""
+        last_assistant = self._last_assistant_content()
+        if not last_assistant or not _is_echo_of_assistant(text, last_assistant):
+            return False
+        logger.warning(
+            "丢弃疑似回采 sid=%s text=%s",
+            self.ctx.session_id,
+            text[:80],
+        )
+        await self.send(
+            "error",
+            message="检测到可能误采了面试官声音，请再说一遍或打字作答",
+            code="C2001",
+            retryable=True,
+        )
+        await self.set_turn(TurnState.USER_SPEAKING)
+        return True
 
 
 __all__ = ["TurnSttFinishMixin", "_AUDIO_BUFFER_MAX_BYTES"]
