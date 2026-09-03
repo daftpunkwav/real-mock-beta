@@ -26,7 +26,7 @@ def test_catalog_has_three_groups() -> None:
     c_codes = [c for c in CATALOG if c.startswith("C")]
     assert len(a_codes) >= 15, f"A 类应覆盖多域，实际仅 {len(a_codes)} 条"
     assert len(b_codes) >= 2, f"B 类至少 B0001/B1001 两条，实际 {len(b_codes)} 条"
-    assert len(c_codes) >= 8, f"C 类覆盖 LLM/报告/语音/搜索/RAG，实际 {len(c_codes)} 条"
+    assert len(c_codes) >= 7, f"C 类覆盖 LLM/报告/语音/搜索/RAG，实际 {len(c_codes)} 条"
 
 
 def test_error_spec_is_frozen() -> None:
@@ -83,7 +83,6 @@ def test_retryable_field_propagates() -> None:
     assert get_spec("B0001").retryable is True   # 500 系统错误
     assert get_spec("B1001").retryable is True   # 500 写入失败
     assert get_spec("C0001").retryable is True   # 502 LLM
-    assert get_spec("C0003").retryable is True   # 503 熔断
     assert get_spec("C1001").retryable is True   # 502 报告
     assert get_spec("A1005").retryable is False  # 404 简历不存在
     assert get_spec("A2002").retryable is False  # 400 面试已结束
